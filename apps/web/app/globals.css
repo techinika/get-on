@@ -1,45 +1,434 @@
 @import "tailwindcss";
 
+/* -------------------------------------------------------------------------
+   Get-On design tokens — single source of truth (UI Spec v1, §1)
+   ---------------------------------------------------------------------- */
+
 :root {
-  --color-background: #fffaf6;
-  --color-foreground: #1f2937;
-  --color-surface: #ffffff;
-  --color-muted: #f3e8e1;
-  --color-muted-foreground: #6b7280;
-  --color-primary: #c2410c;
-  --color-primary-strong: #9a3412;
-  --color-primary-foreground: #fffaf6;
-  --color-border: #e7d3c4;
+  --bg: #fffbf5;
+  --surface: #ffffff;
+  --surface-muted: #f6f0e6;
+  --border: #e8dfd0;
+  --border-strong: #d9cdb8;
+  --text: #1f1a17;
+  --text-muted: #6b6158;
+
+  --primary: #0b6b4f;
+  --primary-hover: #095a42;
+  --primary-soft: #e8f5ef;
+  --on-primary: #ffffff;
+
+  --accent: #f5a524;
+  --accent-soft: #fdefc9;
+  --accent-text: #7a4a00;
+
+  --success: #1e8e3e;
+  --success-soft: #ddf5e6;
+  --success-text: #146c37;
+
+  --warning-soft: #fff4d6;
+  --warning-border: #f3d98a;
+  --warning-text: #7a4a00;
+
+  --danger: #c62828;
+  --danger-hover: #b42323;
+  --danger-soft: #fdecec;
+  --danger-border: #f3b8b8;
+  --danger-text: #8e1b1b;
+
+  --info-soft: #eaf1fb;
+  --info-text: #1b4b8f;
+
+  --scrim: rgba(31, 26, 23, 0.45);
+
+  --shadow-card: 0 1px 2px rgba(31, 26, 23, 0.06), 0 4px 16px rgba(31, 26, 23, 0.06);
+  --shadow-raised: 0 8px 30px rgba(31, 26, 23, 0.12);
+
+  color-scheme: light;
 }
 
+/* Dark tokens: class-based (toggle) … */
+.dark {
+  --bg: #14110f;
+  --surface: #1e1a17;
+  --surface-muted: #28231f;
+  --border: #3a332d;
+  --border-strong: #4a4138;
+  --text: #f5efe6;
+  --text-muted: #b5a99b;
+
+  --primary: #3dbe8b;
+  --primary-hover: #5bd0a2;
+  --primary-soft: #12302a;
+  --on-primary: #06251a;
+
+  --accent: #f5a524;
+  --accent-soft: #3a2c0e;
+  --accent-text: #f7cb7a;
+
+  --success: #3dbe8b;
+  --success-soft: #12301d;
+  --success-text: #7bd99b;
+
+  --warning-soft: #3a2c0e;
+  --warning-border: #6b521a;
+  --warning-text: #f7cb7a;
+
+  --danger: #d13b3b;
+  --danger-hover: #b93232;
+  --danger-soft: #3a1818;
+  --danger-border: #6b2a2a;
+  --danger-text: #f5a3a3;
+
+  --info-soft: #14233a;
+  --info-text: #9cc0f5;
+
+  --scrim: rgba(0, 0, 0, 0.55);
+
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-raised: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+  color-scheme: dark;
+}
+
+/* … and system preference, unless the user forced light via cookie. */
 @media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: #1c1917;
-    --color-foreground: #f5f5f4;
-    --color-surface: #292524;
-    --color-muted: #3f3a38;
-    --color-muted-foreground: #d6d3d1;
-    --color-primary: #fb923c;
-    --color-primary-strong: #f97316;
-    --color-primary-foreground: #1c1917;
-    --color-border: #44403c;
+  :root:not([data-theme="light"]) {
+    --bg: #14110f;
+    --surface: #1e1a17;
+    --surface-muted: #28231f;
+    --border: #3a332d;
+    --border-strong: #4a4138;
+    --text: #f5efe6;
+    --text-muted: #b5a99b;
+
+    --primary: #3dbe8b;
+    --primary-hover: #5bd0a2;
+    --primary-soft: #12302a;
+    --on-primary: #06251a;
+
+    --accent: #f5a524;
+    --accent-soft: #3a2c0e;
+    --accent-text: #f7cb7a;
+
+    --success: #3dbe8b;
+    --success-soft: #12301d;
+    --success-text: #7bd99b;
+
+    --warning-soft: #3a2c0e;
+    --warning-border: #6b521a;
+    --warning-text: #f7cb7a;
+
+    --danger: #d13b3b;
+    --danger-hover: #b93232;
+    --danger-soft: #3a1818;
+    --danger-border: #6b2a2a;
+    --danger-text: #f5a3a3;
+
+    --info-soft: #14233a;
+    --info-text: #9cc0f5;
+
+    --scrim: rgba(0, 0, 0, 0.55);
+
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.4);
+    --shadow-raised: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+    color-scheme: dark;
   }
 }
 
-body {
-  margin: 0;
-  min-height: 100vh;
-  background: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-sans), sans-serif;
+/* -------------------------------------------------------------------------
+   Tailwind v4 theme mapping — semantic utilities, no arbitrary values
+   ---------------------------------------------------------------------- */
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-on-primary: var(--on-primary);
+
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-text: var(--accent-text);
+
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-success-text: var(--success-text);
+
+  --color-warning-soft: var(--warning-soft);
+  --color-warning-border: var(--warning-border);
+  --color-warning-text: var(--warning-text);
+
+  --color-danger: var(--danger);
+  --color-danger-hover: var(--danger-hover);
+  --color-danger-soft: var(--danger-soft);
+  --color-danger-border: var(--danger-border);
+  --color-danger-text: var(--danger-text);
+
+  --color-info-soft: var(--info-soft);
+  --color-info-text: var(--info-text);
+  --color-scrim: var(--scrim);
+
+  --font-body: var(--font-figtree), system-ui, sans-serif;
+  --font-heading: var(--font-bricolage), system-ui, sans-serif;
+
+  --radius-chip: 8px;
+  --radius-input: 12px;
+  --radius-info: 16px;
+  --radius-card: 20px;
+  --radius-dialog: 24px;
+  --radius-panel: 32px;
+  --radius-pill: 999px;
+
+  --shadow-card: var(--shadow-card);
+  --shadow-raised: var(--shadow-raised);
+
+  --breakpoint-xs: 480px;
 }
 
-h1,
-h2,
-h3 {
-  font-family: var(--font-display), serif;
+/* -------------------------------------------------------------------------
+   Base styles
+   ---------------------------------------------------------------------- */
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-figtree), system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    font-weight: 400;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    color: var(--text);
+  }
+
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  /* Global focus ring (spec §1.3) */
+  :focus-visible {
+    outline: 3px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* iOS: inputs must be 16px+ */
+  input,
+  textarea,
+  select {
+    font-size: 16px;
+  }
+
+  ::placeholder {
+    color: var(--text-muted);
+    opacity: 1;
+  }
 }
 
-a {
-  color: inherit;
+/* -------------------------------------------------------------------------
+   Typography scale (spec §1.2)
+   ---------------------------------------------------------------------- */
+
+@layer components {
+  .text-display {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 40px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+
+  .text-h1 {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  .text-h2 {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 28px;
+    line-height: 1.2;
+  }
+
+  .text-h3 {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 20px;
+    line-height: 1.3;
+  }
+
+  .text-eyebrow {
+    font-family: var(--font-figtree), system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.2;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--primary);
+  }
+
+  .text-caption {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .text-prose {
+    max-width: 65ch;
+  }
+
+  @media (min-width: 640px) {
+  }
+
+  @media (min-width: 768px) {
+    .text-h1 {
+      font-size: 32px;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .text-display {
+      font-size: 56px;
+      line-height: 1.05;
+    }
+
+    .text-h2 {
+      font-size: 36px;
+      line-height: 1.15;
+    }
+
+    .text-h3 {
+      font-size: 22px;
+    }
+  }
+}
+
+/* -------------------------------------------------------------------------
+   Motion (spec §1.3) — respect prefers-reduced-motion
+   ---------------------------------------------------------------------- */
+
+@layer utilities {
+  .animate-float {
+    animation: float 6s ease-in-out infinite;
+  }
+
+  .animate-float-delayed {
+    animation: float 6s ease-in-out 1s infinite;
+  }
+
+  .animate-skeleton {
+    animation: skeleton-shimmer 1.2s linear infinite;
+  }
+
+  .animate-panel-in {
+    animation: panel-in 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .animate-toast-in {
+    animation: toast-in 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .animate-step-in {
+    animation: step-in 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(6px);
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes step-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Spec §0: disable transforms/animations except opacity fades under 150ms */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 150ms !important;
+    transition-property: opacity !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-float,
+  .animate-float-delayed,
+  .animate-skeleton,
+  .animate-panel-in,
+  .animate-toast-in,
+  .animate-step-in {
+    animation: none !important;
+  }
 }

@@ -13,5 +13,6 @@ Get-On (get-on.tech) helps non-technical small business owners create a website 
 - TypeScript strict mode
 - Next.js App Router + Tailwind CSS + shadcn/ui-style components
 - Supabase Postgres/Auth/RLS via `@supabase/ssr`
-- pnpm, ESLint, Prettier, Vitest, Playwright
+- pnpm, ESLint, Prettier, Vitest, Playwright (smoke + axe a11y specs)
 - GitHub Actions CI
+- `pnpm screenshots` captures UI-spec screens into `docs/screenshots/` (`E2E_SCREENSHOTS=1` includes signed-in screens)
