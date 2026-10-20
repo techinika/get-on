@@ -13,7 +13,7 @@ test("signup page reaches dashboard after submit", async ({ page }) => {
   await page.getByLabel("Full name").fill("Taylor Baker");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password").fill("testpass123");
-  await page.getByRole("button", { name: "Start free" }).click();
+  await page.getByRole("button", { name: "Create my account" }).click();
 
   await expect(page).toHaveURL(/\/dashboard/);
 });

@@ -1,38 +1,47 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import localFont from "next/font/local";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
+import { themeInitScript } from "@/lib/theme";
 
-const sans = localFont({
-  src: "../public/fonts/GetOnSans.ttf",
-  variable: "--font-sans",
+const bricolage = Bricolage_Grotesque({
+  subsets: ["latin"],
+  weight: ["600", "700"],
+  display: "swap",
+  variable: "--font-bricolage",
 });
 
-const display = localFont({
-  src: "../public/fonts/GetOnDisplay.ttf",
-  variable: "--font-display",
+const figtree = Figtree({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
+  variable: "--font-figtree",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
   title: {
-    default: "Get-On | Website builder for small businesses",
+    default: "Get-On: Get your business online in minutes",
     template: "%s | Get-On",
   },
   description:
-    "Get your business online in minutes. Build your website with simple tools and a free get-on.tech address.",
+    "Build a simple website for your business with AI or by hand. Free web address, no technical skills needed.",
   openGraph: {
     title: "Get your business online in minutes.",
     description:
-      "No technical skills needed. Start free and get a simple website for your business.",
+      "Build a simple website for your business with AI or by hand. Free web address, no technical skills needed.",
     siteName: "Get-On",
     type: "website",
+    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
   },
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${display.variable}`}>
+    <html lang="en" className={`${bricolage.variable} ${figtree.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
+      </head>
       <body>{children}</body>
     </html>
   );

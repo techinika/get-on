@@ -1,4 +1,9 @@
-import { AuthMessage } from "@/components/auth-message";
+import { Suspense } from "react";
+import { MailCheck } from "lucide-react";
+import { AuthHeader } from "@/components/auth/auth-header";
+import { AuthMessage } from "@/components/auth/auth-message";
+import { AuthShell } from "@/components/auth/auth-shell";
+import { ForgotPasswordForm } from "./forgot-password-form";
 
 export const instant = false;
 
@@ -9,20 +14,32 @@ export default async function ForgotPasswordPage({
 }) {
   const params = await searchParams;
 
+  if (params.message) {
+    return (
+      <AuthShell>
+        <div className="flex flex-col items-center text-center">
+          <span
+            aria-hidden
+            className="flex h-14 w-14 items-center justify-center rounded-pill bg-primary-soft text-primary"
+          >
+            <MailCheck size={26} strokeWidth={1.75} />
+          </span>
+          <h1 className="mt-4 text-h3">Check your email</h1>
+          <p className="mt-2 text-base text-text-muted">
+            If that address has an account, a reset link is on its way.
+          </p>
+        </div>
+      </AuthShell>
+    );
+  }
+
   return (
-    <main className="mx-auto w-full max-w-md px-4 py-10">
-      <h1 className="mb-2 text-3xl">Reset your password</h1>
-      <p className="mb-6 text-sm text-[var(--color-muted-foreground)]">We will send you a reset link by email.</p>
-      <AuthMessage error={params.error} message={params.message} />
-      <form action="/auth/forgot-password" method="post" className="mt-4 space-y-4">
-        <label className="block text-sm">
-          Email
-          <input type="email" name="email" className="mt-1 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2" required />
-        </label>
-        <button className="min-h-11 w-full rounded-xl bg-[var(--color-primary)] px-4 py-2 font-semibold text-[var(--color-primary-foreground)]">
-          Send reset link
-        </button>
-      </form>
-    </main>
+    <AuthShell>
+      <AuthHeader title="Reset your password" subtitle="Enter your email and we will send you a link." />
+      <Suspense fallback={null}>
+        <AuthMessage />
+      </Suspense>
+      <ForgotPasswordForm />
+    </AuthShell>
   );
 }

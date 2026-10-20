@@ -1,6 +1,6 @@
 # Get-On bootstrap
 
-Get-On is a website builder for small businesses. This repository currently includes the foundation: app scaffolding, auth, core database schema, landing page, and an empty dashboard.
+Get-On is a website builder for small businesses. This repository includes the full UI spec v1 implementation: app scaffolding, auth, database schema, landing page, auth pages, dashboard, 6-step website wizard, project area, and pages manager (see `docs/ui-spec.md`).
 
 ## Prerequisites
 - Node.js 22+
@@ -54,10 +54,11 @@ Open `http://localhost:3000`.
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm build`
-- `pnpm test:e2e`
+- `pnpm test:e2e` (set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers cannot download)
+- `pnpm screenshots` (captures `docs/screenshots/`; add `E2E_SCREENSHOTS=1` for signed-in screens)
 
 ## Tests
-Unit tests:
+Unit tests (WCAG AA contrast, plan/seed drift):
 ```bash
 pnpm test
 ```
@@ -67,7 +68,12 @@ RLS SQL test:
 supabase db test supabase/tests/rls.sql
 ```
 
-Playwright smoke test (requires app + Supabase running):
+Playwright smoke + a11y suite (axe, 360px overflow, spec copy, hit areas; requires app running):
+```bash
+pnpm test:e2e
+```
+
+Signup flow test (requires app + Supabase running):
 ```bash
 E2E_ENABLE_SIGNUP=1 pnpm test:e2e
 ```
