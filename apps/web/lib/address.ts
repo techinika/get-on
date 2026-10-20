@@ -47,7 +47,10 @@ export function suggestAddresses(base: string, count = 3): string[] {
   for (let i = 2; out.length < count && i < 50; i++) {
     out.push(`${root}-${i}`);
   }
-  if (out.length < count) out.push(`${root}-${Date.now().toString(36).slice(-4)}`);
+  if (out.length < count) {
+    const suffix = crypto.randomUUID().replace(/[^a-z0-9]/g, "").slice(0, 4);
+    out.push(`${root}-${suffix}`);
+  }
   return out;
 }
 
