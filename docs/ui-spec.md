@@ -1,4 +1,5 @@
 # Get-On UI Specification v1
+See also `docs/ui-spec-editor.md` for the Visual page editor, site look, images library, version history and preview.
 
 Single source of truth for all visuals and copy. Follow it exactly. If something is not specified, stay consistent with these tokens and ask nothing; note the choice in your final summary.
 

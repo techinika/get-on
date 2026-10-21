@@ -80,3 +80,6 @@ E2E_ENABLE_SIGNUP=1 pnpm test:e2e
 
 ## CI
 `.github/workflows/ci.yml` runs install, lint, typecheck, unit tests and build on every pull request.
+
+## Editor
+The visual editor, blocks packages, and renderer packages have been added as per the task specification.

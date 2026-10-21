@@ -317,7 +317,7 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
                   </Badge>
 
                   <Link
-                    href={`/dashboard/projects/${project.id}/pages/${page.id}`}
+                    href={`/dashboard/projects/${project.id}/pages/${page.id}/edit`}
                     className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "shrink-0")}
                   >
                     Edit
@@ -337,6 +337,9 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
                     )}
                   >
                     <MenuItem onClick={() => setRenameId(page.id)}>Rename</MenuItem>
+                    <MenuItem asChild>
+                      <Link href={`/dashboard/projects/${project.id}/pages/${page.id}/preview`}>Preview</Link>
+                    </MenuItem>
                     {page.is_homepage ? null : (
                       <MenuItem onClick={() => void setHomepage(page)}>Set as homepage</MenuItem>
                     )}
