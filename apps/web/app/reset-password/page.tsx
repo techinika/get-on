@@ -4,8 +4,6 @@ import { AuthMessage } from "@/components/auth/auth-message";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ResetPasswordForm } from "./reset-password-form";
 
-export const instant = false;
-
 export default function ResetPasswordPage() {
   return (
     <AuthShell>

@@ -2,14 +2,18 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { FileText, GripVertical, House, Lock, MoreVertical, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { AppCard } from "@/components/app/card";
+import { AppEmptyState } from "@/components/app/empty-state";
+import { AppPage } from "@/components/app/app-page";
+import { PageHeader } from "@/components/app/page-header";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { useToast } from "@/components/ui/toast";
 import { friendlyError } from "@/lib/errors";
+import { relativeTime } from "@/lib/relative-time";
 import { cn } from "@/lib/utils";
 import { AddPageDialog } from "@/components/project/add-page-dialog";
 import { DeletePageDialog } from "@/components/project/delete-page-dialog";
@@ -36,14 +40,16 @@ async function send(path: string, init?: RequestInit): Promise<ApiResult> {
 }
 
 export type PagesListProps = {
-  project: { id: string; subdomain: string };
+  project: { id: string; subdomain: string; name: string };
+  teamName: string;
   planName: string;
   pageLimit: number | null;
   pages: PageRow[];
 };
 
-export function PagesList({ project, planName, pageLimit, pages }: PagesListProps) {
+export function PagesList({ project, teamName, planName, pageLimit, pages }: PagesListProps) {
   const { toast } = useToast();
+  const router = useRouter();
   const [items, setItems] = React.useState<PageRow[]>(pages);
 
   const [addOpen, setAddOpen] = React.useState(false);
@@ -166,63 +172,47 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
     }
   }
 
-  const titleRow = (
-    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <h1 className="text-h1">Pages</h1>
-        <p className="mt-2 text-sm text-text-muted">
-          {used} of {pageLimit ?? "unlimited"} pages used
-        </p>
-      </div>
-      {atLimit ? (
-        <div className="flex flex-col gap-3 rounded-info border border-warning-border bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex gap-3">
-            <Lock size={20} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-warning-text" />
-            <p className="text-[15px] text-warning-text">
-              Your {planName} plan includes {pageLimit} page{pageLimit === 1 ? "" : "s"}.
-              Upgrade to add more.
-            </p>
-          </div>
-          <Link
-            href="/#pricing"
-            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "shrink-0 self-start sm:self-auto")}
-          >
+  const header = (
+    <PageHeader
+      breadcrumbs={[
+        { label: teamName, href: "/dashboard" },
+        { label: project.name, href: `/dashboard/projects/${project.id}` },
+        { label: "Pages" },
+      ]}
+      title="Pages"
+      description={`${used} of ${pageLimit ?? "unlimited"} pages used`}
+      actions={
+        atLimit ? (
+          <Link href="/dashboard/plan" className={buttonVariants({ variant: "secondary", size: "md" })}>
             See plans
           </Link>
-        </div>
-      ) : (
-        <Button
-          variant="primary"
-          size="md"
-          onClick={() => setAddOpen(true)}
-          className="w-full shrink-0 sm:w-auto"
-        >
-          Add page
-          <Plus size={18} strokeWidth={1.75} aria-hidden />
-        </Button>
-      )}
-    </div>
+        ) : (
+          <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
+            <Plus size={18} strokeWidth={1.75} aria-hidden />
+            Add page
+          </Button>
+        )
+      }
+    />
   );
 
   if (items.length === 0) {
     return (
-      <div>
-        {titleRow}
-        <div className="mt-6">
-          <EmptyState
-            icon={<FileText size={56} strokeWidth={1.75} aria-hidden className="text-text-muted" />}
-            title="No pages yet"
-            description="Add your first page and it will show up here."
-            action={
-              atLimit ? undefined : (
-                <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
-                  Add page
-                  <Plus size={18} strokeWidth={1.75} aria-hidden />
-                </Button>
-              )
-            }
-          />
-        </div>
+      <AppPage width="default">
+        {header}
+        <AppEmptyState
+          icon={<FileText size={48} strokeWidth={1.75} aria-hidden className="text-text-muted" />}
+          title="No pages yet"
+          description="Add your first page and it will show up here."
+          action={
+            atLimit ? undefined : (
+              <Button variant="primary" size="md" onClick={() => setAddOpen(true)}>
+                <Plus size={18} strokeWidth={1.75} aria-hidden />
+                Add page
+              </Button>
+            )
+          }
+        />
         <AddPageDialog
           open={addOpen}
           onClose={() => setAddOpen(false)}
@@ -230,15 +220,33 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
           subdomain={project.subdomain}
           onCreated={(page) => setItems((prev) => [...prev, page])}
         />
-      </div>
+      </AppPage>
     );
   }
 
   return (
-    <div>
-      {titleRow}
+    <AppPage width="default">
+      {header}
 
-      <Card className="mt-6 overflow-hidden p-0">
+      {atLimit ? (
+        <div className="mb-4 flex flex-col gap-3 rounded-info border border-warning-border bg-warning-soft p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex gap-3">
+            <Lock size={20} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-warning-text" />
+            <p className="text-[15px] text-warning-text">
+              Your {planName} plan includes {pageLimit} page{pageLimit === 1 ? "" : "s"}. Upgrade to add
+              more.
+            </p>
+          </div>
+          <Link
+            href="/dashboard/plan"
+            className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "shrink-0 self-start sm:self-auto")}
+          >
+            See plans
+          </Link>
+        </div>
+      ) : null}
+
+      <AppCard className="overflow-hidden p-0">
         <ul>
           {items.map((page, index) => {
             const isDragging = dragId === page.id;
@@ -301,7 +309,7 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="truncate text-base font-semibold">{page.title}</span>
+                      <span className="truncate text-[15px] font-semibold">{page.title}</span>
                       {page.is_homepage ? (
                         <Badge variant="primary" className="shrink-0 gap-1">
                           <House size={12} strokeWidth={1.75} aria-hidden />
@@ -309,7 +317,12 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
                         </Badge>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 truncate text-sm text-text-muted">{page.path}</p>
+                    <p className="mt-0.5 truncate text-[13px] text-text-muted">{page.path}</p>
+                    {page.updated_at ? (
+                      <p className="mt-0.5 text-xs text-text-muted">
+                        Edited {relativeTime(page.updated_at)}
+                      </p>
+                    ) : null}
                   </div>
 
                   <Badge variant="draft" className="hidden shrink-0 xs:inline-flex">
@@ -337,8 +350,12 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
                     )}
                   >
                     <MenuItem onClick={() => setRenameId(page.id)}>Rename</MenuItem>
-                    <MenuItem asChild>
-                      <Link href={`/dashboard/projects/${project.id}/pages/${page.id}/preview`}>Preview</Link>
+                    <MenuItem
+                      onClick={() =>
+                        router.push(`/dashboard/projects/${project.id}/pages/${page.id}/preview`)
+                      }
+                    >
+                      Preview
                     </MenuItem>
                     {page.is_homepage ? null : (
                       <MenuItem onClick={() => void setHomepage(page)}>Set as homepage</MenuItem>
@@ -372,7 +389,7 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
             );
           })}
         </ul>
-      </Card>
+      </AppCard>
 
       <AddPageDialog
         open={addOpen}
@@ -398,6 +415,6 @@ export function PagesList({ project, planName, pageLimit, pages }: PagesListProp
           if (deletePageRow) void removePage(deletePageRow);
         }}
       />
-    </div>
+    </AppPage>
   );
 }

@@ -5,8 +5,6 @@ import { AuthMessage } from "@/components/auth/auth-message";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { ForgotPasswordForm } from "./forgot-password-form";
 
-export const instant = false;
-
 export default async function ForgotPasswordPage({
   searchParams,
 }: {

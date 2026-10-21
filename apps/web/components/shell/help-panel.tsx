@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { LifeBuoy, Mail, MessageCircle, X } from "lucide-react";
 import env from "@/lib/env";
 import type { PlanId } from "@/lib/plans";
@@ -145,6 +146,18 @@ export function HelpPanel({ open, onClose, planId, teamName, returnFocusRef }: H
           </div>
           <div className="mt-6 rounded-info bg-surface-muted p-4 text-sm text-text">
             Your plan: {PLAN_LABELS[planId]}. Support priority: {PRIORITY_LABELS[planId]}.
+          </div>
+          <div className="mt-6 border-t border-border pt-5">
+            <p className="text-[15px] font-semibold text-text">Want a walkthrough?</p>
+            <p className="mt-1 text-sm text-text-muted">
+              Book a short demo and we will show you how to get your site live.
+            </p>
+            <Link
+              href="/request-demo"
+              className="mt-3 inline-flex h-11 items-center justify-center gap-2 rounded-input border-[1.5px] border-border-strong bg-surface px-5 font-body text-base font-semibold text-text transition-colors hover:bg-surface-muted"
+            >
+              Request a demo
+            </Link>
           </div>
         </div>
       </div>

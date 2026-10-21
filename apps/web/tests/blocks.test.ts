@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { validateContent, migrateContent, themeTokens, PALETTES, generateStarterContent } from '@get-on/blocks';
+import type { Palette } from '@get-on/blocks';
+
+const paletteKeys = Object.keys(PALETTES) as Palette[];
 
 describe('blocks', () => {
   it('migrates old array format', () => {
@@ -19,8 +22,8 @@ describe('blocks', () => {
   });
 
   it('checks theme tokens for all palettes meet contrast', () => {
-    Object.entries(PALETTES).forEach(([key]) => {
-      const tokens = themeTokens({ palette: key as any, fontPair: 'friendly', corners: 'soft' });
+    paletteKeys.forEach((key) => {
+      const tokens = themeTokens({ palette: key, fontPair: 'friendly', corners: 'soft' });
       expect(tokens['--s-primary']).toBeTruthy();
     });
   });
@@ -37,9 +40,9 @@ describe('blocks', () => {
 
 describe('theme contrast', () => {
   it('all palettes have AA contrast for text on bg and on-primary on primary', async () => {
-    const { themeTokens, PALETTES } = await import('@get-on/blocks');
-    for (const key of Object.keys(PALETTES)) {
-      const tokens = themeTokens({ palette: key as any, fontPair: 'friendly', corners: 'soft' });
+    const { themeTokens } = await import('@get-on/blocks');
+    for (const key of paletteKeys) {
+      const tokens = themeTokens({ palette: key, fontPair: 'friendly', corners: 'soft' });
       expect(tokens['--s-primary']).toBeTruthy();
       expect(tokens['--s-bg']).toBeTruthy();
       expect(tokens['--s-text']).toBeTruthy();

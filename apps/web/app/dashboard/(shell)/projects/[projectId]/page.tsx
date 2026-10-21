@@ -1,13 +1,17 @@
-import { notFound } from "next/navigation";
-import { Eye } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentTeam, planLimits } from "@/lib/team";
+import { notFound, redirect } from "next/navigation";
+import { Eye, Pencil } from "lucide-react";
+import Link from "next/link";
+import { AppPage } from "@/components/app/app-page";
+import { PageHeader } from "@/components/app/page-header";
+import { AppCard } from "@/components/app/card";
+import { StatCard } from "@/components/app/stat-card";
+import { AddressCard } from "@/components/app/address-card";
 import { Badge } from "@/components/ui/badge";
-import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { buttonVariants } from "@/components/ui/button";
 import { Checklist } from "@/components/project/checklist";
-
-export const instant = false;
+import { createClient } from "@/lib/supabase/server";
+import { getShellData } from "@/lib/dashboard";
+import { planLimits } from "@/lib/team";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -26,26 +30,32 @@ type ProjectSettings = {
 
 export default async function OverviewPage({ params }: Params) {
   const { projectId } = await params;
-  const supabase = await createClient();
+  const data = await getShellData();
+  if (!data) {
+    redirect("/login");
+  }
 
-  const { data } = await supabase
+  const supabase = await createClient();
+  const { data: row } = await supabase
     .from("projects")
     .select("id, name, subdomain, status, settings")
     .eq("id", projectId)
+    .eq("team_id", data.currentTeam.id)
     .maybeSingle();
 
-  const project = data as ProjectRow | null;
+  const project = row as ProjectRow | null;
   if (!project) {
     notFound();
   }
 
-  const { count: pageCount } = await supabase
+  const { data: pages } = await supabase
     .from("pages")
-    .select("id", { count: "exact", head: true })
+    .select("id, title, is_homepage")
     .eq("project_id", projectId);
 
-  const current = await getCurrentTeam();
-  const plan = planLimits(current?.team.planId ?? "free");
+  const pageRows = pages ?? [];
+  const homepage = pageRows.find((page) => page.is_homepage) ?? pageRows[0] ?? null;
+  const plan = planLimits(data.currentTeam.planId);
 
   const settings = (project.settings ?? {}) as ProjectSettings;
   const contact = settings.contact ?? {};
@@ -56,66 +66,102 @@ export default async function OverviewPage({ params }: Params) {
       settings.logoData,
   );
 
-  const used = pageCount ?? 0;
+  const used = pageRows.length;
   const status = project.status === "published" ? "published" : "draft";
+  const address = `${project.subdomain}.get-on.tech`;
 
   return (
-    <div>
-      <h1 className="text-h1">Overview</h1>
-      <p className="mt-2 text-base text-text-muted">
-        Here is what to do next to get your website ready.
-      </p>
-
-      <Checklist
-        projectId={project.id}
-        subdomain={project.subdomain}
-        detailsDone={detailsDone}
-        customDomainAllowed={plan.customDomainAllowed}
+    <AppPage width="default">
+      <PageHeader
+        breadcrumbs={[
+          { label: data.currentTeam.name, href: "/dashboard" },
+          { label: project.name },
+        ]}
+        title="Overview"
+        description="Here is what to do next to get your website ready."
+        actions={
+          <>
+            <Link
+              href={`/dashboard/projects/${project.id}/pages`}
+              className={buttonVariants({ variant: "secondary", size: "md" })}
+            >
+              <Eye size={20} strokeWidth={1.75} aria-hidden />
+              Preview
+            </Link>
+            {homepage ? (
+              <Link
+                href={`/dashboard/projects/${project.id}/pages/${homepage.id}`}
+                className={buttonVariants({ variant: "primary", size: "md" })}
+              >
+                <Pencil size={20} strokeWidth={1.75} aria-hidden />
+                Edit homepage
+              </Link>
+            ) : null}
+          </>
+        }
       />
 
-      <section aria-label="Website summary" className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-        <Card className="p-5">
-          <p className="text-sm text-text-muted">Pages</p>
-          <p className="mt-1 font-heading text-2xl font-bold">
-            {used} of {plan.maxPagesPerSite ?? "unlimited"}
-          </p>
-          {plan.maxPagesPerSite !== null ? (
-            <Progress
-              value={plan.maxPagesPerSite > 0 ? (used / plan.maxPagesPerSite) * 100 : 0}
-              label="Pages used"
-              className="mt-3"
-            />
-          ) : null}
-        </Card>
+      <div className="flex flex-col gap-6 min-[1024px]:grid min-[1024px]:grid-cols-[minmax(0,1fr)_280px] min-[1024px]:gap-6">
+        <div className="order-1 min-[1024px]:col-start-1 min-[1024px]:row-start-1">
+          <Checklist
+            projectId={project.id}
+            subdomain={project.subdomain}
+            detailsDone={detailsDone}
+            customDomainAllowed={plan.customDomainAllowed}
+          />
+        </div>
 
-        <Card className="p-5">
-          <p className="text-sm text-text-muted">Storage</p>
-          <p className="mt-1 font-heading text-2xl font-bold">0 MB of {plan.storageMb} MB</p>
-        </Card>
+        <div className="order-3 min-[1024px]:col-start-1 min-[1024px]:row-start-2">
+          <AppCard className="flex aspect-[16/10] max-h-[360px] w-full flex-col items-center justify-center bg-surface-muted">
+            <Eye size={32} strokeWidth={1.75} aria-hidden className="text-text-muted" />
+            <p className="mt-3 text-base text-text-muted">Your homepage preview will appear here</p>
+          </AppCard>
+        </div>
 
-        <Card className="p-5">
-          <p className="text-sm text-text-muted">Status</p>
-          <div className="mt-1">
-            {status === "published" ? (
-              <Badge variant="live" dot className="h-9 px-4 text-base">
-                Live
-              </Badge>
-            ) : (
-              <Badge variant="draft" className="h-9 px-4 text-base">
-                Draft
-              </Badge>
-            )}
-          </div>
-          <p className="mt-3 text-sm text-text-muted">
-            {status === "published" ? "Visible to everyone" : "Not live yet"}
-          </p>
-        </Card>
-      </section>
+        <div className="order-2 flex flex-col gap-4 min-[1024px]:col-start-2 min-[1024px]:row-start-1 min-[1024px]:row-span-2">
+          <AddressCard address={address} />
 
-      <div className="mt-4 flex aspect-[16/10] max-h-[360px] w-full flex-col items-center justify-center rounded-card border border-border bg-surface-muted">
-        <Eye size={32} strokeWidth={1.75} aria-hidden className="text-text-muted" />
-        <p className="mt-3 text-base text-text-muted">Preview coming soon</p>
+          <StatCard
+            label="Pages"
+            value={`${used} of ${plan.maxPagesPerSite ?? "unlimited"}`}
+            progress={
+              plan.maxPagesPerSite === null || plan.maxPagesPerSite === 0
+                ? undefined
+                : (used / plan.maxPagesPerSite) * 100
+            }
+            progressLabel="Pages used"
+          />
+
+          <StatCard label="Storage" value={`0 MB of ${plan.storageMb} MB`} />
+
+          <AppCard className="p-4">
+            <p className="text-sm text-text-muted">Status</p>
+            <div className="mt-1.5">
+              {status === "published" ? (
+                <Badge variant="live" dot>
+                  Live
+                </Badge>
+              ) : (
+                <Badge variant="draft">Draft</Badge>
+              )}
+            </div>
+            <p className="mt-2 text-sm text-text-muted">
+              {status === "published" ? "Visible to everyone" : "Not live yet"}
+            </p>
+          </AppCard>
+
+          <AppCard className="bg-info-soft p-4">
+            <p className="text-sm text-info-text">Stuck? We are happy to help.</p>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new Event("get-on:help"))}
+              className="mt-2 inline-flex h-9 items-center rounded-input px-3 text-sm font-semibold text-info-text transition-colors hover:bg-surface"
+            >
+              Open help
+            </button>
+          </AppCard>
+        </div>
       </div>
-    </div>
+    </AppPage>
   );
 }

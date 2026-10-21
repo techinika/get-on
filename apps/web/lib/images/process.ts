@@ -46,8 +46,9 @@ export async function processImageForUpload(file: File): Promise<{ blob: Blob; w
   }
   if (!blob) throw new Error('INVALID_FILE');
   if (blob.size > 5 * 1024 * 1024) {
+    const previousType = blob.type;
     blob = await new Promise<Blob | null>((resolve) =>
-      canvas.toBlob((b) => resolve(b), blob.type === 'image/webp' ? 'image/webp' : 'image/jpeg', 0.7),
+      canvas.toBlob((b) => resolve(b), previousType === 'image/webp' ? 'image/webp' : 'image/jpeg', 0.7),
     );
   }
   if (!blob || blob.size > 5 * 1024 * 1024) {

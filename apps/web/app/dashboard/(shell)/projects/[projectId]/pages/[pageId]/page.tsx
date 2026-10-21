@@ -5,8 +5,6 @@ import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-export const instant = false;
-
 type Params = { params: Promise<{ projectId: string; pageId: string }> };
 
 type Block = {

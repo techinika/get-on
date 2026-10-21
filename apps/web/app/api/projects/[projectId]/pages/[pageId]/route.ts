@@ -94,6 +94,8 @@ export async function PATCH(request: Request, { params }: Params) {
     updates.blocks = body.blocks;
   }
 
+  updates.updated_at = new Date().toISOString();
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 400 });
   }

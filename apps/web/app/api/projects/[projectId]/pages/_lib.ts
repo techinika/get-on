@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam, planLimits, type CurrentTeam } from "@/lib/team";
 
-export const PAGE_COLUMNS = "id, project_id, title, path, position, is_homepage, blocks, created_at";
+export const PAGE_COLUMNS =
+  "id, project_id, title, path, position, is_homepage, blocks, created_at, updated_at";
 
 export type ProjectContext = {
   supabase: Awaited<ReturnType<typeof createClient>>;

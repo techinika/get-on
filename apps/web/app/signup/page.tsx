@@ -6,8 +6,6 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import env from "@/lib/env";
 import { SignupForm } from "./signup-form";
 
-export const instant = false;
-
 export default function SignupPage() {
   return (
     <AuthShell>

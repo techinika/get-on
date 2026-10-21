@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check, ChevronDown, ChevronRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { AppCard } from "@/components/app/card";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
@@ -114,9 +114,9 @@ export function Checklist({
   const open = userChoice ?? !allDone;
 
   return (
-    <Card className="mt-6 p-6">
+    <AppCard className="p-6">
       <div className="flex items-center gap-2">
-        <h3 className="text-h3 min-w-0 flex-1">Get your website ready</h3>
+        <h3 className="text-section-title min-w-0 flex-1">Get your website ready</h3>
         <p className="shrink-0 text-sm text-text-muted">
           {done} of {total} done
         </p>
@@ -154,7 +154,7 @@ export function Checklist({
           </Button>
         </div>
       ) : null}
-    </Card>
+    </AppCard>
   );
 }
 
