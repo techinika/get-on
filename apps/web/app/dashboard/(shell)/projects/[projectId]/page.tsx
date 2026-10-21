@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { AppCard } from "@/components/app/card";
 import { StatCard } from "@/components/app/stat-card";
 import { AddressCard } from "@/components/app/address-card";
+import { OpenHelpButton } from "@/components/app/open-help-button";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Checklist } from "@/components/project/checklist";
@@ -152,13 +153,7 @@ export default async function OverviewPage({ params }: Params) {
 
           <AppCard className="bg-info-soft p-4">
             <p className="text-sm text-info-text">Stuck? We are happy to help.</p>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new Event("get-on:help"))}
-              className="mt-2 inline-flex h-9 items-center rounded-input px-3 text-sm font-semibold text-info-text transition-colors hover:bg-surface"
-            >
-              Open help
-            </button>
+            <OpenHelpButton className="mt-2" />
           </AppCard>
         </div>
       </div>
