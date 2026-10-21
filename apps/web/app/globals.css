@@ -586,3 +586,39 @@
     animation: none !important;
   }
 }
+
+/* Legal pages: print stylesheet (spec §9.2) */
+@media print {
+  .legal-page {
+    color: #000;
+    background: #fff;
+    font-size: 12pt;
+  }
+
+  .legal-page h1,
+  .legal-page h2,
+  .legal-page h3 {
+    color: #000;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .legal-page p,
+  .legal-page li,
+  .legal-page tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .legal-page a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    word-break: break-all;
+  }
+
+  .legal-page mark {
+    background: none;
+    color: #000;
+    text-decoration: underline;
+  }
+}

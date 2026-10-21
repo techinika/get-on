@@ -32,6 +32,27 @@ export function SignupForm({ enableGoogleAuth }: { enableGoogleAuth: boolean }) 
           Create my account
         </SubmitButton>
       </PendingForm>
+      <p className="mt-3 text-center text-[13px] leading-[1.5] text-text-muted">
+        By creating an account you agree to our{" "}
+        <a
+          href="/terms"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-primary underline underline-offset-[3px]"
+        >
+          Terms of Service
+        </a>{" "}
+        and{" "}
+        <a
+          href="/privacy"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-semibold text-primary underline underline-offset-[3px]"
+        >
+          Privacy Policy
+        </a>
+        .
+      </p>
       {enableGoogleAuth ? <GoogleAuth /> : null}
     </>
   );
