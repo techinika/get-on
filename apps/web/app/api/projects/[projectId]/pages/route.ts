@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { hasPageCapacity, PAGE_COLUMNS, requireProject } from "./_lib";
+import { invalidateQuickFind, touchProject } from "@/lib/project-activity";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -78,5 +79,9 @@ export async function POST(request: Request, { params }: Params) {
   if (error || !page) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
+
+  await touchProject(ctx.supabase, projectId);
+  invalidateQuickFind(ctx.current.team.teamId);
+
   return NextResponse.json({ page }, { status: 201 });
 }

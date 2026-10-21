@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProject } from "../pages/_lib";
+import { touchProject } from "@/lib/project-activity";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -74,6 +75,8 @@ export async function POST(request: Request, { params }: Params) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
 
+  await touchProject(ctx.supabase, projectId);
+
   const { data: signed } = await ctx.supabase.storage.from(BUCKET).createSignedUrl(name, 3600);
   return NextResponse.json({ media: { ...media, url: signed?.signedUrl ?? null } });
 }
@@ -121,6 +124,8 @@ export async function DELETE(request: Request, { params }: Params) {
       return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
     }
   }
+
+  await touchProject(ctx.supabase, projectId);
 
   return NextResponse.json({ ok: true });
 }

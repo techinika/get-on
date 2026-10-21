@@ -167,6 +167,17 @@ export function ShellSidebar({
     { key: "settings", label: "Settings", icon: Settings, soon: true },
   ];
 
+  // Prefetch the project routes when the sidebar mounts, so the first click
+  // on Overview, Pages or Pictures is instant (spec §7.2).
+  const projectId = project?.id;
+  React.useEffect(() => {
+    if (!projectId) return;
+    const projectBase = `/dashboard/projects/${projectId}`;
+    router.prefetch(projectBase);
+    router.prefetch(`${projectBase}/pages`);
+    router.prefetch(`${projectBase}/images`);
+  }, [projectId, router]);
+
   function isActive(href: string | undefined) {
     if (!href) return false;
     if (href === "/dashboard") return pathname === "/dashboard";

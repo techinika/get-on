@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam, planLimits } from "@/lib/team";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { friendlyError } from "@/lib/errors";
+import { invalidateQuickFind } from "@/lib/project-activity";
 
 type Block =
   | { id: string; type: "heading"; text: string }
@@ -116,6 +117,8 @@ export async function POST(request: Request) {
     await supabase.from("projects").delete().eq("id", project.id);
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
+
+  invalidateQuickFind(current.team.teamId);
 
   return NextResponse.json({ project }, { status: 201 });
 }

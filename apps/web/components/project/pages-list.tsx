@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { FileText, GripVertical, House, Lock, MoreVertical, Plus } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -49,7 +48,6 @@ export type PagesListProps = {
 
 export function PagesList({ project, teamName, planName, pageLimit, pages }: PagesListProps) {
   const { toast } = useToast();
-  const router = useRouter();
   const [items, setItems] = React.useState<PageRow[]>(pages);
 
   const [addOpen, setAddOpen] = React.useState(false);
@@ -330,7 +328,7 @@ export function PagesList({ project, teamName, planName, pageLimit, pages }: Pag
                   </Badge>
 
                   <Link
-                    href={`/dashboard/projects/${project.id}/pages/${page.id}/edit`}
+                    href={`/dashboard/projects/${project.id}/pages/${page.id}`}
                     className={cn(buttonVariants({ variant: "secondary", size: "sm" }), "shrink-0")}
                   >
                     Edit
@@ -350,13 +348,6 @@ export function PagesList({ project, teamName, planName, pageLimit, pages }: Pag
                     )}
                   >
                     <MenuItem onClick={() => setRenameId(page.id)}>Rename</MenuItem>
-                    <MenuItem
-                      onClick={() =>
-                        router.push(`/dashboard/projects/${project.id}/pages/${page.id}/preview`)
-                      }
-                    >
-                      Preview
-                    </MenuItem>
                     {page.is_homepage ? null : (
                       <MenuItem onClick={() => void setHomepage(page)}>Set as homepage</MenuItem>
                     )}

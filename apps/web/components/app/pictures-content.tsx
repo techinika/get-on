@@ -200,10 +200,18 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
                       </button>
                     )}
                   >
-                    <MenuItem onClick={() => toast("Picture details.", "success")}>
+                    <MenuItem
+                      onClick={() =>
+                        toast("Editing picture details is not ready yet. The editor is coming soon.", "info")
+                      }
+                    >
                       Edit details
                     </MenuItem>
-                    <MenuItem onClick={() => toast("Open a page to add this picture.", "success")}>
+                    <MenuItem
+                      onClick={() =>
+                        toast("Placing a picture on a page is not ready yet. The editor is coming soon.", "info")
+                      }
+                    >
                       Use on page
                     </MenuItem>
                     <MenuSeparator />
