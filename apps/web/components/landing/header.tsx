@@ -63,6 +63,15 @@ export function LandingHeader() {
             Log in
           </Link>
           <Link
+            href="/request-demo"
+            className={cn(
+              buttonVariants({ variant: "secondary", size: "md" }),
+              "hidden min-[1024px]:inline-flex",
+            )}
+          >
+            Request a demo
+          </Link>
+          <Link
             href="/signup"
             className={cn(buttonVariants({ variant: "primary", size: "md" }), "hidden md:inline-flex")}
           >
@@ -107,6 +116,13 @@ export function LandingHeader() {
                 {link.label}
               </a>
             ))}
+            <Link
+              href="/request-demo"
+              onClick={() => setMenuOpen(false)}
+              className="flex h-14 items-center text-xl font-semibold text-text"
+            >
+              Request a demo
+            </Link>
             <Link
               href="/login"
               onClick={() => setMenuOpen(false)}

@@ -12,13 +12,15 @@ const linkColumns: { heading: string; links: { label: string; href: string }[] }
   },
   {
     heading: "Company",
-    links: [{ label: "Contact", href: "/contact" }],
+    links: [{ label: "Request a demo", href: "/request-demo" }],
   },
   {
     heading: "Legal",
     links: [
-      { label: "Terms", href: "/terms" },
-      { label: "Privacy", href: "/privacy" },
+      { label: "Terms of Service", href: "/terms" },
+      { label: "Privacy Policy", href: "/privacy" },
+      { label: "Cookie Policy", href: "/cookies" },
+      { label: "Acceptable Use", href: "/acceptable-use" },
     ],
   },
 ];

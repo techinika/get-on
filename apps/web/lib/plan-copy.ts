@@ -9,6 +9,8 @@ export type PlanCopy = {
   priceLabel: string;
   cta: string;
   ctaVariant: "primary" | "secondary";
+  /** Set when the button leaves the sign-up flow, for example for a demo. */
+  ctaHref?: string;
   features: string[];
 };
 
@@ -62,8 +64,9 @@ export const PLAN_COPY: Record<PlanId, PlanCopy> = {
     descriptor: "For big teams and agencies",
     summary: "For big teams and agencies. Everything is unlimited.",
     priceLabel: "$59.99 per month",
-    cta: "Choose Enterprise",
+    cta: "Talk to us",
     ctaVariant: "secondary",
+    ctaHref: "/request-demo?interest=enterprise",
     features: [
       "Unlimited websites",
       "Unlimited pages",

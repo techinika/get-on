@@ -15,20 +15,24 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { BUSINESS_TYPE_LABELS, type BusinessTypeLabel } from "@/lib/business-types";
 import { useRadioGroup } from "./use-radio-group";
 
-const BUSINESS_TYPES: ReadonlyArray<{ label: string; Icon: LucideIcon }> = [
-  { label: "Restaurant or cafe", Icon: UtensilsCrossed },
-  { label: "Salon or beauty", Icon: Scissors },
-  { label: "Shop", Icon: ShoppingBag },
-  { label: "Photographer or creative", Icon: Camera },
-  { label: "Consultant or freelancer", Icon: Briefcase },
-  { label: "Church or community", Icon: Users },
-  { label: "Repairs and services", Icon: Wrench },
-  { label: "Farm or agriculture", Icon: Sprout },
-  { label: "Teaching or tutoring", Icon: GraduationCap },
-  { label: "Something else", Icon: Sparkles },
-];
+const BUSINESS_TYPE_ICONS: Record<BusinessTypeLabel, LucideIcon> = {
+  "Restaurant or cafe": UtensilsCrossed,
+  "Salon or beauty": Scissors,
+  Shop: ShoppingBag,
+  "Photographer or creative": Camera,
+  "Consultant or freelancer": Briefcase,
+  "Church or community": Users,
+  "Repairs and services": Wrench,
+  "Farm or agriculture": Sprout,
+  "Teaching or tutoring": GraduationCap,
+  "Something else": Sparkles,
+};
+
+const BUSINESS_TYPES: ReadonlyArray<{ label: BusinessTypeLabel; Icon: LucideIcon }> =
+  BUSINESS_TYPE_LABELS.map((label) => ({ label, Icon: BUSINESS_TYPE_ICONS[label] }));
 
 const OPTION_LABELS = BUSINESS_TYPES.map((type) => type.label);
 

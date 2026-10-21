@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 const faqItems = [
@@ -23,6 +24,21 @@ const faqItems = [
   {
     question: "Can I cancel any time?",
     answer: "Yes. You can change or cancel your plan whenever you want.",
+  },
+  {
+    question: "Can I see a demo first?",
+    answer: (
+      <>
+        Yes.{" "}
+        <Link
+          href="/request-demo"
+          className="font-semibold text-primary underline underline-offset-[3px]"
+        >
+          Request a demo
+        </Link>{" "}
+        and we will show you around and answer your questions.
+      </>
+    ),
   },
 ];
 

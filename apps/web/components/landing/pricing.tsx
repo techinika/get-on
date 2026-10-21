@@ -53,7 +53,7 @@ export function LandingPricing() {
                 </p>
 
                 <Link
-                  href="/signup"
+                  href={copy.ctaHref ?? "/signup"}
                   className={cn(buttonVariants({ variant: copy.ctaVariant, size: "md" }), "mt-5 w-full")}
                 >
                   {copy.cta}
