@@ -5,14 +5,15 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { AppCard } from "@/components/app/card";
 import { StatCard } from "@/components/app/stat-card";
-import { AddressCard } from "@/components/app/address-card";
+import { PublishCard } from "@/components/project/publish-card";
 import { OpenHelpButton } from "@/components/app/open-help-button";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Checklist } from "@/components/project/checklist";
 import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
 import { planLimits } from "@/lib/team";
+import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { siteStateOf } from "@/lib/publishing/status";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -22,6 +23,8 @@ type ProjectRow = {
   subdomain: string;
   status: string;
   settings: unknown;
+  review_state: string | null;
+  suspended_at: string | null;
 };
 
 type ProjectSettings = {
@@ -39,7 +42,7 @@ export default async function OverviewPage({ params }: Params) {
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("projects")
-    .select("id, name, subdomain, status, settings")
+    .select("id, name, subdomain, status, settings, review_state, suspended_at")
     .eq("id", projectId)
     .eq("team_id", data.currentTeam.id)
     .maybeSingle();
@@ -51,8 +54,19 @@ export default async function OverviewPage({ params }: Params) {
 
   const { data: pages } = await supabase
     .from("pages")
-    .select("id, title, is_homepage")
+    .select("id, title, is_homepage, blocks")
     .eq("project_id", projectId);
+
+  const { data: livePublish } = await supabase
+    .from("publishes")
+    .select("id, created_at, live_at")
+    .eq("project_id", projectId)
+    .eq("status", "live")
+    .maybeSingle();
+
+  const { data: hasChanges } = await supabase.rpc("project_has_unpublished_changes", {
+    p_project_id: projectId,
+  });
 
   const pageRows = pages ?? [];
   const homepage = pageRows.find((page) => page.is_homepage) ?? pageRows[0] ?? null;
@@ -68,8 +82,25 @@ export default async function OverviewPage({ params }: Params) {
   );
 
   const used = pageRows.length;
-  const status = project.status === "published" ? "published" : "draft";
-  const address = `${project.subdomain}.get-on.tech`;
+  const address = siteAddress(readPublishConfig(), project.subdomain);
+  const hasLiveVersion = Boolean(livePublish);
+  const siteState = siteStateOf({
+    published: project.status === "published",
+    hasLiveVersion,
+    hasChanges: hasChanges === true,
+    reviewState: project.review_state,
+    suspendedAt: project.suspended_at,
+  });
+
+  function blocksOf(value: unknown): unknown[] {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object" && Array.isArray((value as { blocks?: unknown[] }).blocks)) {
+      return (value as { blocks: unknown[] }).blocks;
+    }
+    return [];
+  }
+
+  const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
 
   return (
     <AppPage width="default">
@@ -120,7 +151,17 @@ export default async function OverviewPage({ params }: Params) {
         </div>
 
         <div className="order-2 flex flex-col gap-4 min-[1024px]:col-start-2 min-[1024px]:row-start-1 min-[1024px]:row-span-2">
-          <AddressCard address={address} />
+          <PublishCard
+            projectId={project.id}
+            name={project.name}
+            address={address}
+            state={siteState}
+            hasLiveVersion={hasLiveVersion}
+            pagesCount={used}
+            homepageReady={homepageReady}
+            detailsReady={detailsDone}
+            lastPublishedAt={livePublish?.live_at ?? livePublish?.created_at ?? null}
+          />
 
           <StatCard
             label="Pages"
@@ -134,22 +175,6 @@ export default async function OverviewPage({ params }: Params) {
           />
 
           <StatCard label="Storage" value={`0 MB of ${plan.storageMb} MB`} />
-
-          <AppCard className="p-4">
-            <p className="text-sm text-text-muted">Status</p>
-            <div className="mt-1.5">
-              {status === "published" ? (
-                <Badge variant="live" dot>
-                  Live
-                </Badge>
-              ) : (
-                <Badge variant="draft">Draft</Badge>
-              )}
-            </div>
-            <p className="mt-2 text-sm text-text-muted">
-              {status === "published" ? "Visible to everyone" : "Not live yet"}
-            </p>
-          </AppCard>
 
           <AppCard className="bg-info-soft p-4">
             <p className="text-sm text-info-text">Stuck? We are happy to help.</p>

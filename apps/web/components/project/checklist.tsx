@@ -103,7 +103,7 @@ export function Checklist({
       id: "publish",
       title: "Publish your website",
       description: "Make it live for everyone.",
-      soon: true,
+      href: `/dashboard/projects/${projectId}`,
     },
   ];
 

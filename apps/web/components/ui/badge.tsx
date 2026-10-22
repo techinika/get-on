@@ -12,6 +12,8 @@ const badgeVariants = cva(
         live: "bg-success-soft text-success-text",
         primary: "bg-primary-soft text-primary",
         accent: "bg-accent-soft text-accent-text",
+        info: "bg-info-soft text-info-text",
+        danger: "bg-danger-soft text-danger-text",
       },
     },
     defaultVariants: { variant: "neutral" },

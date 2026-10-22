@@ -12,6 +12,7 @@ import {
   usedImageIds,
 } from "@/lib/publishing/build-input";
 import { createPublishStore } from "@/lib/publishing/store";
+import { displayAddress, siteStateOf } from "@/lib/publishing/status";
 
 const dirs: string[] = [];
 
@@ -205,5 +206,73 @@ describe("local publish store", () => {
     expect(pointer.publishId).toBe("publish-1");
     const sharedFile = await readFile(path.join(dir, "_shared", "fonts", "figtree-400-abc.woff2"));
     expect(Buffer.from(sharedFile).equals(Buffer.from([1, 2]))).toBe(true);
+  });
+});
+
+describe("site status", () => {
+  it("uses one status for every screen", () => {
+    expect(
+      siteStateOf({
+        published: false,
+        hasLiveVersion: false,
+        hasChanges: true,
+        reviewState: "none",
+        suspendedAt: null,
+      }),
+    ).toBe("draft");
+    expect(
+      siteStateOf({
+        published: true,
+        hasLiveVersion: true,
+        hasChanges: false,
+        reviewState: "none",
+        suspendedAt: null,
+      }),
+    ).toBe("live");
+    expect(
+      siteStateOf({
+        published: true,
+        hasLiveVersion: true,
+        hasChanges: true,
+        reviewState: "none",
+        suspendedAt: null,
+      }),
+    ).toBe("changes");
+    expect(
+      siteStateOf({
+        published: false,
+        hasLiveVersion: true,
+        hasChanges: false,
+        reviewState: "none",
+        suspendedAt: null,
+      }),
+    ).toBe("offline");
+    expect(
+      siteStateOf({
+        published: true,
+        hasLiveVersion: true,
+        hasChanges: false,
+        reviewState: "pending",
+        suspendedAt: null,
+      }),
+    ).toBe("review");
+    expect(
+      siteStateOf({
+        published: true,
+        hasLiveVersion: true,
+        hasChanges: false,
+        reviewState: "none",
+        suspendedAt: "2026-10-22T10:00:00.000Z",
+      }),
+    ).toBe("suspended");
+  });
+
+  it("shows an address without the http prefix", () => {
+    expect(displayAddress("https://rosebakery.get-on.tech/")).toBe(
+      "rosebakery.get-on.tech",
+    );
+    expect(displayAddress("http://rosebakery.localhost:8787")).toBe(
+      "rosebakery.localhost:8787",
+    );
   });
 });

@@ -333,17 +333,17 @@ export function ShellSidebar({
               <Eye size={20} strokeWidth={1.75} aria-hidden />
               {collapsed ? null : "Preview"}
             </Link>
-            <span
-              title="Publishing is coming soon"
-              aria-disabled="true"
+            <Link
+              href={`${base}`}
+              title={collapsed ? "Publish" : undefined}
               className={cn(
-                "mt-2 flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary opacity-50",
+                "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary transition-colors hover:bg-primary-hover",
                 collapsed && "mx-auto w-12 px-0",
               )}
             >
               <Rocket size={20} strokeWidth={1.75} aria-hidden />
               {collapsed ? null : "Publish"}
-            </span>
+            </Link>
           </div>
         </>
       ) : (
