@@ -22,6 +22,7 @@ import {
   Puzzle,
   Rocket,
   Settings,
+  Shield,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -131,6 +132,7 @@ export type ShellSidebarProps = {
   project: ShellProject | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  isAdmin?: boolean;
 };
 
 export function ShellSidebar({
@@ -140,6 +142,7 @@ export function ShellSidebar({
   project,
   collapsed,
   onToggleCollapsed,
+  isAdmin = false,
 }: ShellSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -370,6 +373,24 @@ export function ShellSidebar({
           </nav>
 
           <div className="flex-1" />
+
+          {isAdmin ? (
+            <div className="mb-2">
+              <Link
+                href="/admin"
+                title={collapsed ? "Admin" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <Shield size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Admin
+                </span>
+              </Link>
+            </div>
+          ) : null}
 
           {planId === "enterprise" ? (
             collapsed ? (
