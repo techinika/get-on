@@ -266,6 +266,132 @@ create policy "owners admins editors write project settings"
   using (public.user_can_access_project(project_settings.project_id, array['owner', 'admin', 'editor']))
   with check (public.user_can_access_project(project_settings.project_id, array['owner', 'admin', 'editor']));
 
+-- Version history functions -------------------------------------------------
+-- These run as the table owner, so they have to check the caller's role
+-- themselves. The first version did not, which let any signed-in account
+-- read and rewrite the history of any page.
+
+create or replace function public.save_page_version(p_page_id uuid, p_label text)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_project_id uuid;
+  v_team_id uuid;
+  v_role text;
+  v_stored_content jsonb;
+  v_block_count integer;
+  v_new_id uuid;
+begin
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  select pg.project_id into v_project_id
+  from public.pages pg
+  where pg.id = p_page_id;
+
+  if v_project_id is null then
+    raise exception 'page_not_found';
+  end if;
+
+  select p.team_id into v_team_id
+  from public.projects p
+  where p.id = v_project_id;
+
+  select tm.role into v_role
+  from public.team_members tm
+  where tm.team_id = v_team_id and tm.user_id = v_user_id;
+
+  -- A user with no membership has a null role, so compare the text value.
+  if coalesce(v_role, '') not in ('owner', 'admin', 'editor') then
+    raise exception 'not_authorized';
+  end if;
+
+  select blocks into v_stored_content
+  from public.pages
+  where id = p_page_id;
+
+  v_block_count := jsonb_array_length(coalesce(v_stored_content->'blocks', '[]'::jsonb));
+  insert into public.page_versions (page_id, content, reason, label, block_count, created_by)
+  values (p_page_id, v_stored_content, 'manual', p_label, v_block_count, v_user_id)
+  returning id into v_new_id;
+
+  return v_new_id;
+end;
+$$;
+
+create or replace function public.restore_page_version(p_version_id uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_user_id uuid;
+  v_project_id uuid;
+  v_team_id uuid;
+  v_role text;
+  v_page_id uuid;
+  v_version_content jsonb;
+  v_current_content jsonb;
+  v_current_revision integer;
+  v_new_revision integer;
+begin
+  v_user_id := auth.uid();
+  if v_user_id is null then
+    raise exception 'not_authenticated';
+  end if;
+
+  select pv.page_id, pv.content into v_page_id, v_version_content
+  from public.page_versions pv
+  where pv.id = p_version_id;
+
+  if v_page_id is null then
+    raise exception 'version_not_found';
+  end if;
+
+  select pg.project_id into v_project_id
+  from public.pages pg
+  where pg.id = v_page_id;
+
+  select p.team_id into v_team_id
+  from public.projects p
+  where p.id = v_project_id;
+
+  select tm.role into v_role
+  from public.team_members tm
+  where tm.team_id = v_team_id and tm.user_id = v_user_id;
+
+  -- A user with no membership has a null role, so compare the text value.
+  if coalesce(v_role, '') not in ('owner', 'admin', 'editor') then
+    raise exception 'not_authorized';
+  end if;
+
+  select pg.blocks, pg.revision into v_current_content, v_current_revision
+  from public.pages pg
+  where pg.id = v_page_id
+  for update;
+
+  -- snapshot current as before_restore
+  insert into public.page_versions (page_id, content, reason, block_count, created_by)
+  values (v_page_id, v_current_content, 'before_restore', jsonb_array_length(coalesce(v_current_content->'blocks', '[]'::jsonb)), v_user_id);
+
+  v_new_revision := v_current_revision + 1;
+  update public.pages
+  set blocks = v_version_content,
+      revision = v_new_revision,
+      updated_at = now()
+  where id = v_page_id;
+
+  return v_new_revision;
+end;
+$$;
+
 -- Storage ------------------------------------------------------------------
 
 drop policy if exists "team can upload project media" on storage.objects;

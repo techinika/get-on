@@ -330,7 +330,8 @@ begin
   from public.team_members tm
   where tm.team_id = v_team_id and tm.user_id = v_user_id;
 
-  if v_role not in ('owner', 'admin', 'editor') then
+  -- A user with no membership has a null role, so compare the text value.
+  if coalesce(v_role, '') not in ('owner', 'admin', 'editor') then
     raise exception 'not_authorized';
   end if;
 
@@ -402,6 +403,9 @@ set search_path = public
 as $$
 declare
   v_user_id uuid;
+  v_project_id uuid;
+  v_team_id uuid;
+  v_role text;
   v_stored_content jsonb;
   v_block_count integer;
   v_new_id uuid;
@@ -409,6 +413,27 @@ begin
   v_user_id := auth.uid();
   if v_user_id is null then
     raise exception 'not_authenticated';
+  end if;
+
+  select pg.project_id into v_project_id
+  from public.pages pg
+  where pg.id = p_page_id;
+
+  if v_project_id is null then
+    raise exception 'page_not_found';
+  end if;
+
+  select p.team_id into v_team_id
+  from public.projects p
+  where p.id = v_project_id;
+
+  select tm.role into v_role
+  from public.team_members tm
+  where tm.team_id = v_team_id and tm.user_id = v_user_id;
+
+  -- A user with no membership has a null role, so compare the text value.
+  if coalesce(v_role, '') not in ('owner', 'admin', 'editor') then
+    raise exception 'not_authorized';
   end if;
 
   select blocks into v_stored_content
@@ -432,6 +457,9 @@ set search_path = public
 as $$
 declare
   v_user_id uuid;
+  v_project_id uuid;
+  v_team_id uuid;
+  v_role text;
   v_page_id uuid;
   v_version_content jsonb;
   v_current_content jsonb;
@@ -446,6 +474,27 @@ begin
   select pv.page_id, pv.content into v_page_id, v_version_content
   from public.page_versions pv
   where pv.id = p_version_id;
+
+  if v_page_id is null then
+    raise exception 'version_not_found';
+  end if;
+
+  select pg.project_id into v_project_id
+  from public.pages pg
+  where pg.id = v_page_id;
+
+  select p.team_id into v_team_id
+  from public.projects p
+  where p.id = v_project_id;
+
+  select tm.role into v_role
+  from public.team_members tm
+  where tm.team_id = v_team_id and tm.user_id = v_user_id;
+
+  -- A user with no membership has a null role, so compare the text value.
+  if coalesce(v_role, '') not in ('owner', 'admin', 'editor') then
+    raise exception 'not_authorized';
+  end if;
 
   select pg.blocks, pg.revision into v_current_content, v_current_revision
   from public.pages pg
