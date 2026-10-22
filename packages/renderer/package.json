@@ -7,11 +7,17 @@
   "types": "./index.tsx",
   "exports": {
     ".": "./index.tsx",
-    "./styles.css": "./styles/renderer.css"
+    "./styles.css": "./styles/renderer.css",
+    "./package.json": "./package.json"
   },
   "dependencies": {
+    "@get-on/blocks": "workspace:*",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.553.0",
-    "@get-on/blocks": "workspace:*"
+    "lucide-react": "^0.553.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.3.0",
+    "react": "^19.3.0",
+    "typescript": "^5.9.3"
   }
 }

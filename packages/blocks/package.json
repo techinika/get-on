@@ -11,5 +11,8 @@
   "dependencies": {
     "nanoid": "^5.0.9",
     "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "sharp": "^0.35.5"
   }
 }
