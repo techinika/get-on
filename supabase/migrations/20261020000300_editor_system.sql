@@ -5,10 +5,60 @@ alter table public.pages
   add column if not exists show_in_menu boolean not null default true,
   add column if not exists updated_at timestamptz not null default now();
 
+create table if not exists public.project_settings (
+  project_id uuid primary key references public.projects(id) on delete cascade,
+  theme jsonb not null default '{"palette":"fresh-green","fontPair":"friendly","corners":"soft","colorMode":"light"}'::jsonb,
+  logo_dark_url text,
+  show_watermark boolean not null default true,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 alter table public.project_settings
   add column if not exists theme jsonb not null default '{"palette":"fresh-green","fontPair":"friendly","corners":"soft","colorMode":"light"}'::jsonb,
   add column if not exists logo_dark_url text,
   add column if not exists show_watermark boolean not null default true;
+
+alter table public.project_settings enable row level security;
+
+drop policy if exists "members can read project settings" on public.project_settings;
+create policy "members can read project settings"
+  on public.project_settings
+  for select
+  using (
+    exists (
+      select 1
+      from public.projects p
+      join public.team_members tm on tm.team_id = p.team_id
+      where p.id = project_settings.project_id
+        and tm.user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "owners admins editors write project settings" on public.project_settings;
+create policy "owners admins editors write project settings"
+  on public.project_settings
+  for all
+  using (
+    exists (
+      select 1
+      from public.projects p
+      join public.team_members tm on tm.team_id = p.team_id
+      where p.id = project_settings.project_id
+        and tm.user_id = auth.uid()
+        and tm.role in ('owner', 'admin', 'editor')
+    )
+  )
+  with check (
+    exists (
+      select 1
+      from public.projects p
+      join public.team_members tm on tm.team_id = p.team_id
+      where p.id = project_settings.project_id
+        and tm.user_id = auth.uid()
+        and tm.role in ('owner', 'admin', 'editor')
+    )
+  );
 
 create table if not exists public.page_versions (
   id uuid primary key default gen_random_uuid(),
