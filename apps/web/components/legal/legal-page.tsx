@@ -48,36 +48,43 @@ function renderBlock(block: LegalBlock, key: string): React.ReactNode {
       );
     case "table":
       return (
-        <div key={key} className="mb-4 overflow-x-auto rounded-input border border-border">
-          <table className="w-full border-collapse text-left">
-            <thead>
-              <tr className="bg-surface-muted">
-                {block.head.map((cell, index) => (
-                  <th
-                    key={`${key}-head-${index}`}
-                    scope="col"
-                    className="px-4 py-3 text-[13px] font-bold uppercase tracking-[0.04em] text-text"
-                  >
-                    {cell}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.map((row, rowIndex) => (
-                <tr key={`${key}-row-${rowIndex}`} className="border-t border-border">
-                  {row.map((cell, cellIndex) => (
-                    <td
-                      key={`${key}-row-${rowIndex}-cell-${cellIndex}`}
-                      className="px-4 py-3 align-top text-[15px] text-text"
+        <div key={key} className="relative mb-4">
+          <div className="overflow-x-auto rounded-input border border-border">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-surface-muted">
+                  {block.head.map((cell, index) => (
+                    <th
+                      key={`${key}-head-${index}`}
+                      scope="col"
+                      className="px-4 py-3 text-[13px] font-bold uppercase tracking-[0.04em] text-text"
                     >
-                      <LegalText text={cell} />
-                    </td>
+                      {cell}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {block.rows.map((row, rowIndex) => (
+                  <tr key={`${key}-row-${rowIndex}`} className="border-t border-border">
+                    {row.map((cell, cellIndex) => (
+                      <td
+                        key={`${key}-row-${rowIndex}-cell-${cellIndex}`}
+                        className="px-4 py-3 align-top text-[15px] text-text"
+                      >
+                        <LegalText text={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Right edge fade, so a wide table shows there is more to scroll. */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-8 rounded-r-input bg-gradient-to-l from-surface to-transparent"
+          />
         </div>
       );
     default:

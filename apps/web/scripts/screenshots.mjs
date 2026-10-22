@@ -16,7 +16,7 @@ import { fileURLToPath } from "node:url";
 
 const WEB_DIR = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const OUT_DIR = resolve(WEB_DIR, "../../docs/screenshots");
-const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:3000";
+const BASE = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";
 const WIDTHS = [360, 768, 1024, 1280, 1440];
 const SCHEMES = ["light", "dark"];
 const AUTH = process.env.E2E_SCREENSHOTS === "1";
@@ -44,6 +44,20 @@ async function shot(page, name, { fullPage = true } = {}) {
   await page.waitForTimeout(400); // let fonts/animations settle
   await page.screenshot({ path: join(OUT_DIR, `${name}.png`), fullPage });
   console.log(`captured ${name}`);
+}
+
+/** Wait until a button with this name is enabled. */
+async function waitForEnabled(page, name, timeout = 20_000) {
+  await page.waitForFunction(
+    (label) => {
+      const button = Array.from(document.querySelectorAll("button")).find(
+        (el) => el.textContent?.trim() === label,
+      );
+      return Boolean(button && !button.disabled);
+    },
+    name,
+    { timeout },
+  );
 }
 
 async function capturePublic(contextFactory) {
@@ -127,8 +141,10 @@ async function captureAuthenticated(contextFactory) {
   }
 
   // Wizard steps 1–6
-  await page.getByLabel("Business name").fill("Rose Bakery");
-  await page.waitForTimeout(1200); // address check
+  const stamp = String(Date.now()).slice(-6);
+  const businessName = `Rose Bakery ${stamp}`;
+  await page.getByLabel("Business name").fill(businessName);
+  await waitForEnabled(page, "Continue");
   await shot(page, "wizard-step1-360-light");
   await page.getByRole("button", { name: "Continue" }).click();
 
@@ -191,8 +207,8 @@ async function captureAuthenticated(contextFactory) {
       await p2.goto(`${BASE}/dashboard/account`, { waitUntil: "networkidle" });
       await shot(p2, `account-${width}-${scheme}`);
 
-      // Project pages via first card.
-      const open = p2.getByRole("link", { name: "Open" }).first();
+      // Project pages via the website card.
+      const open = p2.getByRole("link", { name: businessName }).first();
       if (await open.count()) {
         await open.click();
         await p2.waitForURL(/\/dashboard\/projects\//, { timeout: 15_000 });
