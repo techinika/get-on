@@ -164,3 +164,17 @@ When a publish is stopped for review the dialog shows the "Under review" InfoBox
 - Errors: invalid address "We could not find a website with that address." (check against projects; never reveal state); rate limit (3 per hour per `ip_hash`) "You have sent a few reports already. Please try again a little later."
 - On success: insert `abuse_reports`; email `ABUSE_EMAIL` through `lib/email.ts` (subject "New report: {name} ({reason})", body with all fields). If 3 or more reports for the same site come from different `ip_hash` values within 24 hours, automatically add a `site_flags` row of kind `report` and mark the project `review_state = 'pending'` for admin attention (does not take the site offline automatically).
 - Metadata: title "Report a website | Get-On", `noindex`.
+
+### 9.3 Admin console (`/admin`, internal)
+- Only people whose email is in `ADMIN_EMAILS` may open it. Everyone else gets the standard 404 page, so the console cannot be found by guessing the address.
+- It uses the dashboard shell (same sidebar and top bar as the rest of the app) with an extra "Admin" item at the bottom of the sidebar, marked with a small shield icon.
+- **Overview** (`/admin`): three cards in a row (stack on mobile): "Live websites" (count of published sites), "Waiting for review" (count of `review_state = 'pending'` sites, link to the list) and "Reports today" (count of `abuse_reports` in the last 24 hours). Below them, a table of the sites that need attention: each row shows the website address, the owner email, the reason (reason text or "Reported"), the time and a button to open the site.
+- **Site list** (`/admin/sites`): a search field ("Search by address or owner email") above a table with columns: website address, owner, status (Live, Not published, Under review, Suspended), last published, reports. Rows are sortable by last published and by reports. The search filters as you type. An empty result shows "No websites match that search."
+- **Site details** (`/admin/sites/[siteId]`): the address, the owner, the current status, the publishing history (date, result, reference) and the flags for that site. Actions:
+  - "Take offline" (danger outline): asks for a reason in a dialog (440 wide, H3 "Take {address} offline?", reason Textarea required, "Cancel" and "Take offline" danger md). The site is served the suspended page straight away and the owner sees the reason in the Publish dialog (8.3).
+  - "Bring back online" (primary md): only when the site is suspended; it flips the pointer back to the previous live version and clears the flag.
+  - "Ask for a review" (secondary md): sets `review_state = 'pending'` so the owner sees the "Under review" state.
+  - "Approve and publish" (primary md): clears the review flag and publishes the current version.
+  - "Remove a report" (ghost md) on each report row: marks the report as handled.
+- Every action writes a row in `admin_audit_log` with the admin email, the action, the project id, the reason and the time. The audit log is visible on the site details page and in a dedicated "History" tab, newest first. Nothing in the console can change a website without a log entry.
+- The console never shows the rules a site broke to the owner, and never shows the admin notes to anyone but the admins.
