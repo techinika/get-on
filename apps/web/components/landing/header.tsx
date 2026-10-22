@@ -6,6 +6,7 @@ import { Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import type { Viewer } from "@/lib/viewer";
 
 const navLinks = [
   { href: "#how", label: "How it works" },
@@ -13,7 +14,12 @@ const navLinks = [
   { href: "#faq", label: "FAQ" },
 ];
 
-export function LandingHeader() {
+export type LandingHeaderProps = {
+  /** The signed-in person, so the header can point at the dashboard. */
+  viewer?: Viewer | null;
+};
+
+export function LandingHeader({ viewer = null }: LandingHeaderProps) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -56,12 +62,41 @@ export function LandingHeader() {
         </nav>
 
         <div className="flex items-center gap-2 md:justify-self-end">
-          <Link
-            href="/login"
-            className={cn(buttonVariants({ variant: "ghost", size: "md" }), "hidden md:inline-flex")}
-          >
-            Log in
-          </Link>
+          {viewer ? (
+            <>
+              <Link
+                href="/dashboard"
+                className={cn(
+                  buttonVariants({ variant: "primary", size: "md" }),
+                  "hidden md:inline-flex",
+                )}
+              >
+                Dashboard
+              </Link>
+              <Link
+                href="/dashboard/account"
+                aria-label={`Account for ${viewer.name}`}
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-bold text-accent-text min-[640px]:h-10 min-[640px]:w-10"
+              >
+                {viewer.initials}
+              </Link>
+            </>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className={cn(buttonVariants({ variant: "ghost", size: "md" }), "hidden md:inline-flex")}
+              >
+                Log in
+              </Link>
+              <Link
+                href="/signup"
+                className={cn(buttonVariants({ variant: "primary", size: "md" }), "hidden md:inline-flex")}
+              >
+                Start free
+              </Link>
+            </>
+          )}
           <Link
             href="/request-demo"
             className={cn(
@@ -71,18 +106,14 @@ export function LandingHeader() {
           >
             Request a demo
           </Link>
-          <Link
-            href="/signup"
-            className={cn(buttonVariants({ variant: "primary", size: "md" }), "hidden md:inline-flex")}
-          >
-            Start free
-          </Link>
-          <Link
-            href="/signup"
-            className={cn(buttonVariants({ variant: "primary", size: "md" }), "h-10 px-4 md:hidden")}
-          >
-            Start free
-          </Link>
+          {!viewer ? (
+            <Link
+              href="/signup"
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "h-10 px-4 md:hidden")}
+            >
+              Start free
+            </Link>
+          ) : null}
           <button
             type="button"
             aria-label={menuOpen ? "Close menu" : "Open menu"}
@@ -123,13 +154,32 @@ export function LandingHeader() {
             >
               Request a demo
             </Link>
-            <Link
-              href="/login"
-              onClick={() => setMenuOpen(false)}
-              className={cn(buttonVariants({ variant: "secondary", size: "md" }), "mt-3 w-full")}
-            >
-              Log in
-            </Link>
+            {viewer ? (
+              <>
+                <Link
+                  href="/dashboard"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex h-14 items-center text-xl font-semibold text-text"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  href="/dashboard/account"
+                  onClick={() => setMenuOpen(false)}
+                  className="flex h-14 items-center text-xl font-semibold text-text"
+                >
+                  Account
+                </Link>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                onClick={() => setMenuOpen(false)}
+                className={cn(buttonVariants({ variant: "secondary", size: "md" }), "mt-3 w-full")}
+              >
+                Log in
+              </Link>
+            )}
           </nav>
         </div>
       ) : null}

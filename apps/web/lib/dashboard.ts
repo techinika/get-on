@@ -2,6 +2,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
+import { initialsFrom } from "@/lib/viewer";
 import type {
   ShellProject,
   ShellRole,
@@ -28,15 +29,6 @@ export type ShellData = {
   projects: ShellProject[];
   usage: ShellUsage;
 };
-
-function initialsFrom(name: string | null | undefined, email: string | undefined): string {
-  const source = (name ?? "").trim() || (email ?? "").trim();
-  if (!source) return "U";
-  const parts = source.split(/[\s@._-]+/).filter(Boolean);
-  const first = parts[0]?.[0] ?? "U";
-  const second = parts[1]?.[0] ?? "";
-  return (first + second).toUpperCase();
-}
 
 /**
  * Everything the app shell needs, fetched once per request (spec §7.5).
