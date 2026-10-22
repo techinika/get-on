@@ -69,6 +69,18 @@ supabase db reset
 - `supabase db reset` applies migrations and `supabase/seed.sql`.
 - Local Studio runs at `http://127.0.0.1:54323` by default.
 
+## Apply the database to a hosted project
+The app needs every migration in `supabase/migrations/`, in file-name order. Pick one:
+```bash
+supabase link --project-ref <project-ref>
+supabase db push
+```
+or paste the migration files into the Supabase SQL editor, one file at a time, in order.
+
+- The plans and the reserved web addresses are inserted by a migration, so the list is complete after the push.
+- The row level security policies call `security definer` helpers. A policy must never read the table it is defined on, that makes Postgres raise `42P17 infinite recursion detected in policy`.
+- Turn off "Confirm email" in the Supabase dashboard for local work, otherwise a new account has no session and the dashboard cannot be reached.
+
 ## Run the app
 ```bash
 pnpm dev
@@ -109,3 +121,5 @@ E2E_ENABLE_SIGNUP=1 pnpm test:e2e
 
 ## Status
 The visual editor is the remaining piece of work. The blocks and renderer packages exist, and the editor route shows what is on a page, but the canvas, inspector, version history and the public site route are not built yet. See `docs/ui-spec-editor.md`.
+
+The dashboard, the wizard, the request-a-demo form and the legal pages are built. The legal copy still carries `[[DECISION: ...]]` markers and placeholders, and `docs/legal.md` lists what has to be decided before launch.

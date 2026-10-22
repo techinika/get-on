@@ -16,6 +16,7 @@ Get-On (get-on.tech) helps non-technical small business owners create a website 
 - pnpm, ESLint, Prettier, Vitest, Playwright (smoke + axe a11y specs)
 - GitHub Actions CI
 - `pnpm screenshots` captures UI-spec screens into `docs/screenshots/` at 360, 768, 1024, 1280 and 1440 px in light and dark (`E2E_SCREENSHOTS=1` includes signed-in screens)
+- Tailwind runs through the Turbopack loader (`@tailwindcss/turbopack` in `apps/web/next.config.ts`). There is no PostCSS config, so without that rule no utility classes are generated.
 
 ## Specs
 - `docs/ui-spec.md` - the original specification.
@@ -50,6 +51,12 @@ The site design system is prepared for a future "dark-mode" plugin:
 - project_settings has logo_dark_url as nullable (unused now).
 - Plugin "dark-mode" is registered as status 'planned' conceptually; not shown in UI.
 
+## Database
+- Migrations live in `supabase/migrations/` and run in file-name order.
+- The membership checks use `security definer` helpers (`user_is_team_member`, `user_has_team_role`, `user_can_access_project`, `user_can_access_page`, `user_shares_team_with`). Policies must never read the table they are defined on, that made Postgres raise 42P17.
+- Plans and reserved web addresses are inserted by a migration, not only by `supabase/seed.sql`.
+- A database needs every migration applied before the app works. `supabase db push` does it, or paste the files into the Supabase SQL editor in order.
+
 ## Known gaps
 - The visual editor is a placeholder: the blocks and renderer packages exist, but there is no canvas, inspector, version history UI or public site route yet.
-- `next start` fails on this machine with `ENOENT .next/server/preview-props.json`; `next dev` works.
+- Signed-in screenshots and the dashboard need a database with every migration applied and email confirmation switched off (or confirmed accounts).
