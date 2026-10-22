@@ -7,7 +7,7 @@
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test",
+    "test": "pnpm --filter web test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test && pnpm --filter @get-on/sites-worker test",
     "test:e2e": "pnpm --filter web test:e2e",
     "screenshots": "pnpm --filter web screenshots"
   },
