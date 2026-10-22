@@ -60,6 +60,32 @@ async function waitForEnabled(page, name, timeout = 20_000) {
   );
 }
 
+/**
+ * Walk the website wizard and capture the three steps the spec shows. The
+ * draft is cleared first so every run starts at step 1.
+ */
+async function captureWizardSteps(page, width, scheme) {
+  await page.goto(`${BASE}/dashboard/new`, { waitUntil: "networkidle" });
+  await page.evaluate(() => window.sessionStorage.clear());
+  await page.reload({ waitUntil: "networkidle" });
+
+  const name = `Rose Bakery ${String(Date.now()).slice(-6)}`;
+  await page.getByLabel("Business name").fill(name);
+  await waitForEnabled(page, "Continue");
+  await shot(page, `wizard-step1-${width}-${scheme}`);
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByRole("radio", { name: /Restaurant or cafe/ }).click();
+  await shot(page, `wizard-step2-${width}-${scheme}`);
+  await page.getByRole("button", { name: "Continue" }).click();
+
+  await page.getByRole("button", { name: "Continue" }).click(); // step 3 skippable
+  await page.getByRole("radio", { name: /Start blank/ }).click();
+  await page.getByRole("button", { name: "Continue" }).click(); // step 4
+  await page.getByRole("button", { name: "Skip this step" }).click(); // step 5
+  await shot(page, `wizard-step6-${width}-${scheme}`);
+}
+
 async function capturePublic(contextFactory) {
   const routes = [
     ["landing", "/"],
@@ -221,6 +247,7 @@ async function captureAuthenticated(contextFactory) {
         await p2.goto(`${BASE}${url}/images`, { waitUntil: "networkidle" });
         await shot(p2, `pictures-${width}-${scheme}`);
       }
+      await captureWizardSteps(p2, width, scheme);
       await ctx2.close();
     }
   }
