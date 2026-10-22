@@ -1,7 +1,6 @@
 import React from 'react';
 import type { Theme } from '@get-on/blocks';
 import { themeTokens } from '@get-on/blocks';
-import { RenderPage } from './render-page';
 
 export { RenderPage } from './render-page';
 export { themeTokens } from '@get-on/blocks';

@@ -2,6 +2,8 @@
 
 For all `/dashboard` screens except the editor, the wizard and the preview, this document overrides `docs/ui-spec.md`.
 
+Publishing, the published site, the publish UI and the safety and moderation screens are specified in `docs/ui-spec-publish.md`.
+
 ## 3. Information architecture and routes
 | Route | Level | Page | Container |
 |---|---|---|---|

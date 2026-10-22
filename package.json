@@ -7,8 +7,12 @@
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test",
+    "test": "pnpm --filter web test && pnpm --filter @get-on/site-server test",
     "test:e2e": "pnpm --filter web test:e2e",
     "screenshots": "pnpm --filter web screenshots"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "typescript-eslint": "^8.71.2"
   }
 }
