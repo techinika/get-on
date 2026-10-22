@@ -208,6 +208,7 @@ async function captureAuthenticated(contextFactory) {
       await shot(p2, `account-${width}-${scheme}`);
 
       // Project pages via the website card.
+      await p2.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
       const open = p2.getByRole("link", { name: businessName }).first();
       if (await open.count()) {
         await open.click();
