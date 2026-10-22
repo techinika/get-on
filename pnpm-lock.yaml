@@ -206,9 +206,15 @@ importers:
       '@get-on/blocks':
         specifier: workspace:*
         version: link:../../packages/blocks
+      '@get-on/publisher':
+        specifier: workspace:*
+        version: link:../../packages/publisher
       '@get-on/renderer':
         specifier: workspace:*
         version: link:../../packages/renderer
+      '@get-on/site-server':
+        specifier: workspace:*
+        version: link:../../packages/site-server
       '@supabase/ssr':
         specifier: ^0.7.0
         version: 0.7.0(@supabase/supabase-js@2.118.0)

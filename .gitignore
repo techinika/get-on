@@ -1,4 +1,5 @@
 node_modules
+.local-sites
 .pnp
 .pnp.js
 coverage
