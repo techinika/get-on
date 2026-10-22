@@ -90,6 +90,7 @@ async function capturePublic(contextFactory) {
   const routes = [
     ["landing", "/"],
     ["request-demo", "/request-demo"],
+    ["report", "/report"],
     ["terms", "/terms"],
     ["privacy", "/privacy"],
     ["cookies", "/cookies"],
@@ -190,6 +191,17 @@ async function captureAuthenticated(contextFactory) {
   await shot(page, "project-overview-360-light");
 
   const projectPath = new URL(page.url()).pathname;
+  const publishButton = page.getByRole("button", { name: /^Publish (website|changes)$/ }).first();
+  if (await publishButton.count()) {
+    await publishButton.click();
+    await page.getByRole("dialog").waitFor({ state: "visible", timeout: 15_000 });
+    await shot(page, "publish-dialog-360-light", { fullPage: false });
+    await page.getByRole("button", { name: "Not now" }).click().catch(() => undefined);
+  }
+  await page.goto(`${BASE}${projectPath}/publish`, { waitUntil: "networkidle" });
+  await shot(page, "publish-history-360-light");
+
+  // The larger variants are captured in the loop below, so skip the baseline.
   await page.goto(`${BASE}${projectPath}/pages`, { waitUntil: "networkidle" });
   await shot(page, "pages-list-360-light");
 
@@ -242,6 +254,17 @@ async function captureAuthenticated(contextFactory) {
         await p2.waitForLoadState("networkidle");
         await shot(p2, `project-overview-${width}-${scheme}`);
         const url = new URL(p2.url()).pathname;
+
+        const publish = p2.getByRole("button", { name: /^Publish (website|changes)$/ }).first();
+        if (await publish.count()) {
+          await publish.click();
+          await p2.getByRole("dialog").waitFor({ state: "visible", timeout: 15_000 });
+          await shot(p2, `publish-dialog-${width}-${scheme}`, { fullPage: false });
+          await p2.getByRole("button", { name: "Not now" }).click().catch(() => undefined);
+        }
+        await p2.goto(`${BASE}${url}/publish`, { waitUntil: "networkidle" });
+        await shot(p2, `publish-history-${width}-${scheme}`);
+
         await p2.goto(`${BASE}${url}/pages`, { waitUntil: "networkidle" });
         await shot(p2, `pages-list-${width}-${scheme}`);
         await p2.goto(`${BASE}${url}/images`, { waitUntil: "networkidle" });
@@ -253,6 +276,57 @@ async function captureAuthenticated(contextFactory) {
   }
 
   await context.close();
+  await browser.close();
+}
+
+/**
+ * Admin screens need an account whose email is in ADMIN_EMAILS. Supply that
+ * account with E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD; otherwise this is
+ * skipped so `pnpm screenshots` still works for everyone else.
+ */
+async function captureAdmin(contextFactory) {
+  const email = process.env.E2E_ADMIN_EMAIL;
+  const password = process.env.E2E_ADMIN_PASSWORD;
+  if (!email || !password) {
+    console.log("Skipping admin screens (set E2E_ADMIN_EMAIL and E2E_ADMIN_PASSWORD).");
+    return;
+  }
+
+  const browser = await chromium.launch(LAUNCH_OPTIONS);
+
+  for (const scheme of SCHEMES) {
+    for (const width of WIDTHS) {
+      const context = await contextFactory(browser, scheme, width);
+      const page = await context.newPage();
+      await page.goto(`${BASE}/login`, { waitUntil: "networkidle" });
+      await page.getByLabel("Email").fill(email);
+      await page.getByRole("textbox", { name: "Password" }).fill(password);
+      await page.getByRole("button", { name: "Log in" }).click();
+      await page.waitForURL(/\/dashboard/, { timeout: 30_000 }).catch(() => undefined);
+
+      await page.goto(`${BASE}/admin`, { waitUntil: "networkidle" });
+      if (!page.url().includes("/admin")) {
+        console.warn(`SKIP admin screens: ${email} is not in ADMIN_EMAILS.`);
+        await context.close();
+        await browser.close();
+        return;
+      }
+
+      await shot(page, `admin-${width}-${scheme}`);
+      await page.goto(`${BASE}/admin/sites`, { waitUntil: "networkidle" });
+      await shot(page, `admin-sites-${width}-${scheme}`);
+
+      const firstSite = page.locator('a[href^="/admin/sites/"]').first();
+      if (await firstSite.count()) {
+        await firstSite.click();
+        await page.waitForLoadState("networkidle");
+        await shot(page, `admin-site-${width}-${scheme}`);
+      }
+
+      await context.close();
+    }
+  }
+
   await browser.close();
 }
 
@@ -294,6 +368,7 @@ async function main() {
     await capturePublic(contextFactory);
     if (AUTH) {
       await captureAuthenticated(contextFactory);
+      await captureAdmin(contextFactory);
     } else {
       console.log("Skipping authenticated screens (set E2E_SCREENSHOTS=1 to include).");
     }

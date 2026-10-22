@@ -51,3 +51,10 @@ test("signup page reaches dashboard after submit", async ({ page }) => {
   }
   await expect(page).toHaveURL(/\/dashboard/);
 });
+
+test("report page explains what happens and asks for the website", async ({ page }) => {
+  await page.goto("/report");
+  await expect(page.getByRole("heading", { name: "Report a website" })).toBeVisible();
+  await expect(page.getByLabel(/website address/i)).toBeVisible();
+  await expect(page.getByText(/we look at every report/i)).toBeVisible();
+});

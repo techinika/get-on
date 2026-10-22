@@ -4,6 +4,9 @@
   "packageManager": "pnpm@12.14.0",
   "scripts": {
     "dev": "pnpm --filter web dev",
+    "dev:sites": "pnpm --filter web dev:sites",
+    "dev:all": "pnpm --filter web dev:all",
+    "seed:site": "pnpm --filter web seed:site",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",

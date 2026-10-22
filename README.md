@@ -2,12 +2,13 @@
 
 Get-On helps non-technical small business owners create a website quickly. Users sign up, get a personal team, and build websites inside teams.
 
-This repository contains the app: Next.js web app, Supabase schema and migrations, landing and auth pages, the dashboard, the 6-step website wizard, the project area, the request-a-demo flow, and the legal pages.
+This repository contains the app: Next.js web app, Supabase schema and migrations, landing and auth pages, the dashboard, the 6-step website wizard, the project area, publishing to `{name}.get-on.tech`, the report and admin moderation flows, and the legal pages.
 
 ## Documentation
 - `docs/ui-spec.md` - the original UI specification (scaffolding, auth, landing, dashboard, wizard, project area).
 - `docs/ui-spec-app.md` - the dashboard app refresh. It overrides `docs/ui-spec.md` for every `/dashboard` screen except the editor, the wizard and the preview.
 - `docs/ui-spec-editor.md` - the visual editor, site look, images library, version history and preview, plus what is still to be built.
+- `docs/ui-spec-publish.md` - publishing, public site pages, safety/moderation, the report page and the admin console.
 - `docs/legal.md` - legal pages setup, company details, review markers and the pre-launch checklist.
 - `docs/screenshots/` - the UI at 360, 768, 1024, 1280 and 1440 px wide, in light and dark.
 
@@ -21,6 +22,9 @@ This repository contains the app: Next.js web app, Supabase schema and migration
 - `apps/web` - Next.js web app
 - `packages/blocks` - block schemas, types and starter content
 - `packages/renderer` - the page renderer used by the site output
+- `packages/publisher` - turns a project into the static files for a published site
+- `packages/site-server` - shared request handling for published sites (Worker and local Node)
+- `apps/sites-worker` - the Cloudflare Worker for `*.get-on.tech`
 - `supabase` - local Supabase config, migrations, seed, SQL tests
 - `docs` - specifications and screenshots
 
@@ -33,7 +37,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `NEXT_PUBLIC_SITE_URL`: app URL (local default: `http://localhost:3000`)
    - `NEXT_PUBLIC_SUPABASE_URL`: local or hosted Supabase URL
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key for that Supabase project
-   - `SUPABASE_SERVICE_ROLE_KEY`: service role key, only used server side to store demo requests
+   - `SUPABASE_SERVICE_ROLE_KEY`: service role key, only used on the server for demo requests, publishing and the admin console
    - `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH`: `true` to show Google auth button
    - `SUPPORT_EMAIL`: support mailbox for help panel
    - `SUPPORT_WHATSAPP_NUMBER`: WhatsApp number in international format, no `+`
@@ -47,6 +51,13 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `EMAIL_FROM`: the from address for those emails
    - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys. When the secret is set, the form must pass Turnstile
    - `NEXT_PUBLIC_COOKIE_CONSENT`: set to `true` to show the cookie notice
+
+   Publishing (see `apps/web/.env.example` for the full list):
+   - `PUBLISH_STORE`: `local` (default) builds into `.local-sites`; `cloudflare` uploads to R2 and KV
+   - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_KV_NAMESPACE_ID`, `CLOUDFLARE_R2_BUCKET`: needed for `cloudflare`
+   - `ROOT_DOMAIN`: the live root domain, default `get-on.tech`
+   - `ADMIN_EMAILS`: comma-separated emails allowed into `/admin`; empty disables it
+   - `ABUSE_EMAIL`: where report notifications and abuse contacts go
 
    Legal pages:
    - `COMPANY_NAME`, `LEGAL_ENTITY`, `COMPANY_COUNTRY`, `COMPANY_ADDRESS`: the company details shown in the legal pages
@@ -87,16 +98,35 @@ pnpm dev
 ```
 Open `http://localhost:3000`.
 
+To work on published sites locally:
+```bash
+pnpm dev:all
+```
+This starts the app and the local site server at `http://localhost:8787`, serving `{name}.localhost`. `pnpm seed:site` creates a sample published site at `rosebakery.localhost:8787`. Without Cloudflare credentials, publishing writes to `.local-sites/`.
+
+## Publishing setup (manual, before launch)
+1. Apply every migration, including `20261022000300_publishing.sql`.
+2. Create the R2 bucket and KV namespace, then put their names/ids and a scoped API token in the environment.
+3. Add the wildcard DNS record and route for `*.get-on.tech`, then deploy the Worker:
+   ```bash
+   pnpm --filter @get-on/sites-worker deploy
+   ```
+4. Register `get-on.tech` with the Public Suffix List so each website gets browser isolation.
+5. Set `ADMIN_EMAILS` and `ABUSE_EMAIL`.
+6. Check that the R2 REST upload keeps the `Content-Type` header the adapter sends. The adapter also verifies `index.html` by reading it back.
+
 ## Scripts
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:e2e` (set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers cannot download)
-- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens)
+- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens, plus `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` for the admin screens)
+- `pnpm dev:all` (app plus the local published-site server)
+- `pnpm seed:site` (create the local `rosebakery` sample site)
 
 ## Tests
-Unit tests (WCAG AA contrast, plan/seed drift, block schemas, demo request validation, spam checks, legal content):
+Unit tests (WCAG AA contrast, plan/seed drift, block schemas, demo request validation, spam checks, publishing, moderation, admin access and legal content):
 ```bash
 pnpm test
 ```
@@ -120,6 +150,6 @@ E2E_ENABLE_SIGNUP=1 pnpm test:e2e
 `.github/workflows/ci.yml` runs install, lint, typecheck, unit tests and build on every pull request.
 
 ## Status
-The visual editor is the remaining piece of work. The blocks and renderer packages exist, and the editor route shows what is on a page, but the canvas, inspector, version history and the public site route are not built yet. See `docs/ui-spec-editor.md`.
+The visual editor is the remaining piece of work. The blocks and renderer packages exist, and the editor route shows what is on a page, but the canvas, inspector, version history and the public site preview are not built yet. See `docs/ui-spec-editor.md`.
 
-The dashboard, the wizard, the request-a-demo form and the legal pages are built. The legal copy still carries `[[DECISION: ...]]` markers and placeholders, and `docs/legal.md` lists what has to be decided before launch.
+The dashboard, the wizard, publishing, the local site server, the Cloudflare Worker, the report flow, the admin console, the request-a-demo form and the legal pages are built. The legal copy still carries `[[DECISION: ...]]` markers and placeholders, and `docs/legal.md` lists what has to be decided before launch.
