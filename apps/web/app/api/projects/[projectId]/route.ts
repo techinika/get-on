@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { invalidateQuickFind } from "@/lib/project-activity";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -31,5 +32,8 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (error) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
+
+  invalidateQuickFind(current.team.teamId);
+
   return NextResponse.json({ ok: true });
 }

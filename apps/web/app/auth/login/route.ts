@@ -1,13 +1,16 @@
 import { NextResponse } from "next/server";
 import { toFriendlyAuthError } from "@/lib/auth-errors";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  const supabase = await createClient();
+  const redirectTo = new URL("/dashboard", request.url);
+  const response = NextResponse.redirect(redirectTo);
+
+  const supabase = await createRouteClient(response);
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
@@ -16,5 +19,5 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.redirect(new URL("/dashboard", request.url));
+  return response;
 }

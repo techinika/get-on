@@ -1,70 +1,9 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
-import { PLAN_DEFINITIONS, type PlanId } from "@/lib/plans";
+import { PLAN_DEFINITIONS } from "@/lib/plans";
+import { PLAN_COPY } from "@/lib/plan-copy";
 import { cn } from "@/lib/utils";
-
-type PlanCopy = {
-  descriptor: string;
-  cta: string;
-  ctaVariant: "primary" | "secondary";
-  features: string[];
-};
-
-const PLAN_COPY: Record<PlanId, PlanCopy> = {
-  free: {
-    descriptor: "To try it out",
-    cta: "Start free",
-    ctaVariant: "secondary",
-    features: [
-      "1 website",
-      "1 page",
-      "Contact form",
-      "Free address: yourname.get-on.tech",
-      "Small Get-On badge on your site",
-      "Standard support",
-    ],
-  },
-  basic: {
-    descriptor: "For a small business site",
-    cta: "Choose Basic",
-    ctaVariant: "primary",
-    features: [
-      "2 websites",
-      "Up to 5 pages each",
-      "Use your own domain",
-      "2 extra features (plugins)",
-      "No Get-On badge",
-      "Standard support",
-    ],
-  },
-  pro: {
-    descriptor: "For growing businesses",
-    cta: "Choose Pro",
-    ctaVariant: "secondary",
-    features: [
-      "5 websites",
-      "Unlimited pages",
-      "Use your own domain",
-      "5 extra features (plugins)",
-      "Up to 5 team members",
-      "Priority support",
-    ],
-  },
-  enterprise: {
-    descriptor: "For big teams and agencies",
-    cta: "Choose Enterprise",
-    ctaVariant: "secondary",
-    features: [
-      "Unlimited websites",
-      "Unlimited pages",
-      "Unlimited team members",
-      "Unlimited extra features",
-      "Use your own domain",
-      "Highest-priority support",
-    ],
-  },
-};
 
 export function LandingPricing() {
   return (
@@ -114,7 +53,7 @@ export function LandingPricing() {
                 </p>
 
                 <Link
-                  href="/signup"
+                  href={copy.ctaHref ?? "/signup"}
                   className={cn(buttonVariants({ variant: copy.ctaVariant, size: "md" }), "mt-5 w-full")}
                 >
                   {copy.cta}

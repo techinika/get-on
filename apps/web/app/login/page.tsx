@@ -6,8 +6,6 @@ import { AuthShell } from "@/components/auth/auth-shell";
 import env from "@/lib/env";
 import { LoginForm } from "./login-form";
 
-export const instant = false;
-
 export default function LoginPage() {
   return (
     <AuthShell>

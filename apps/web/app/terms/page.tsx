@@ -1,3 +1,20 @@
+import type { Metadata } from "next";
+import { LegalPage } from "@/components/legal/legal-page";
+import { legalDocument } from "@/lib/legal-content";
+
+const document = legalDocument("terms");
+
+export const metadata: Metadata = {
+  title: "Terms of Service",
+  description: "The simple rules for using Get-On: your account, your website, plans, and how to contact us.",
+  alternates: { canonical: "/terms" },
+  openGraph: {
+    title: "Terms of Service | Get-On",
+    description: "The simple rules for using Get-On: your account, your website, plans, and how to contact us.",
+    url: "/terms",
+  },
+};
+
 export default function TermsPage() {
-  return <main className="mx-auto max-w-3xl px-4 py-10">Terms page coming soon.</main>;
+  return <LegalPage document={document} />;
 }

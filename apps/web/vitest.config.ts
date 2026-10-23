@@ -1,14 +1,16 @@
-import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config';
+import path from 'path';
 
 export default defineConfig({
-  test: {
-    environment: "node",
-    include: ["tests/**/*.test.ts"],
-  },
   resolve: {
     alias: {
-      "@": fileURLToPath(new URL("./", import.meta.url)),
+      '@': path.resolve(__dirname, './'),
     },
+  },
+  test: {
+    environment: 'jsdom',
+    // Playwright specs live next to the unit tests. Only *.test.ts files run
+    // under Vitest, the *.spec.ts files are run by Playwright.
+    include: ['tests/**/*.test.ts'],
   },
 });

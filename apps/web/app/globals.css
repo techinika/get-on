@@ -44,6 +44,15 @@
   --shadow-card: 0 1px 2px rgba(31, 26, 23, 0.06), 0 4px 16px rgba(31, 26, 23, 0.06);
   --shadow-raised: 0 8px 30px rgba(31, 26, 23, 0.12);
 
+  /* Dashboard app tokens (docs/ui-spec-app.md §4) */
+  --app-bg: #f8f4ec;
+  --sidebar-bg: var(--surface);
+  --row-hover: #f6f0e6;
+  --kbd-bg: #f1ebdf;
+  --scrim-strong: rgba(31, 26, 23, 0.55);
+  --shadow-interactive: 0 2px 8px rgba(31, 26, 23, 0.08);
+  --radius-app-card: 16px;
+
   color-scheme: light;
 }
 
@@ -87,6 +96,14 @@
 
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.4);
   --shadow-raised: 0 8px 30px rgba(0, 0, 0, 0.4);
+
+  /* Dashboard app tokens (docs/ui-spec-app.md §4) */
+  --app-bg: #12100e;
+  --sidebar-bg: var(--surface);
+  --row-hover: #28231f;
+  --kbd-bg: #332d27;
+  --scrim-strong: rgba(0, 0, 0, 0.6);
+  --shadow-interactive: 0 2px 8px rgba(0, 0, 0, 0.35);
 
   color-scheme: dark;
 }
@@ -133,6 +150,14 @@
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.4);
     --shadow-raised: 0 8px 30px rgba(0, 0, 0, 0.4);
 
+    /* Dashboard app tokens (docs/ui-spec-app.md §4) */
+    --app-bg: #12100e;
+    --sidebar-bg: var(--surface);
+    --row-hover: #28231f;
+    --kbd-bg: #332d27;
+    --scrim-strong: rgba(0, 0, 0, 0.6);
+    --shadow-interactive: 0 2px 8px rgba(0, 0, 0, 0.35);
+
     color-scheme: dark;
   }
 }
@@ -177,6 +202,12 @@
   --color-info-text: var(--info-text);
   --color-scrim: var(--scrim);
 
+  --color-app-bg: var(--app-bg);
+  --color-sidebar-bg: var(--sidebar-bg);
+  --color-row-hover: var(--row-hover);
+  --color-kbd-bg: var(--kbd-bg);
+  --color-scrim-strong: var(--scrim-strong);
+
   --font-body: var(--font-figtree), system-ui, sans-serif;
   --font-heading: var(--font-bricolage), system-ui, sans-serif;
 
@@ -184,12 +215,14 @@
   --radius-input: 12px;
   --radius-info: 16px;
   --radius-card: 20px;
+  --radius-app-card: 16px;
   --radius-dialog: 24px;
   --radius-panel: 32px;
   --radius-pill: 999px;
 
   --shadow-card: var(--shadow-card);
   --shadow-raised: var(--shadow-raised);
+  --shadow-interactive: var(--shadow-interactive);
 
   --breakpoint-xs: 480px;
 }
@@ -255,6 +288,86 @@
    ---------------------------------------------------------------------- */
 
 @layer components {
+  /* Dashboard app shell primitives (docs/ui-spec-app.md §5.11) */
+  .app-page {
+    width: 100%;
+    margin-inline: auto;
+    padding-inline: 20px;
+    padding-top: 32px;
+    padding-bottom: 64px;
+  }
+
+  .app-page--wide {
+    max-width: 1120px;
+  }
+
+  .app-page--default {
+    max-width: 960px;
+  }
+
+  .app-page--narrow {
+    max-width: 720px;
+  }
+
+  .app-page--form {
+    max-width: 560px;
+  }
+
+  .app-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-app-card);
+  }
+
+  .app-card-interactive {
+    transition:
+      border-color 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+
+  .app-card-interactive:hover {
+    border-color: var(--border-strong);
+    box-shadow: var(--shadow-interactive);
+  }
+
+  .text-page-title {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 26px;
+    line-height: 32px;
+    letter-spacing: -0.01em;
+  }
+
+  .text-section-title {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 18px;
+    line-height: 24px;
+  }
+
+  .text-card-title {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 16px;
+    line-height: 24px;
+  }
+
+  .text-label-caps {
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+  }
+
+  .text-stat-number {
+    font-family: var(--font-bricolage), system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 24px;
+    line-height: 28px;
+  }
+
   .text-display {
     font-family: var(--font-bricolage), system-ui, sans-serif;
     font-weight: 700;
@@ -306,13 +419,41 @@
   @media (min-width: 640px) {
   }
 
+  @media (max-width: 639px) {
+    .app-page {
+      padding-top: 24px;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .text-page-title {
+      font-size: 28px;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1023px) {
+    .app-page {
+      padding-inline: 24px;
+    }
+  }
+
   @media (min-width: 768px) {
     .text-h1 {
       font-size: 32px;
     }
   }
 
+  @media (max-width: 1023px) {
+    .app-page {
+      padding-bottom: 96px;
+    }
+  }
+
   @media (min-width: 1024px) {
+    .app-page {
+      padding-inline: 40px;
+    }
+
     .text-display {
       font-size: 56px;
       line-height: 1.05;
@@ -356,6 +497,10 @@
 
   .animate-step-in {
     animation: step-in 250ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  }
+
+  .animate-page-in {
+    animation: page-in 120ms ease-out;
   }
 }
 
@@ -411,6 +556,15 @@
   }
 }
 
+@keyframes page-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 /* Spec §0: disable transforms/animations except opacity fades under 150ms */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -430,5 +584,41 @@
   .animate-toast-in,
   .animate-step-in {
     animation: none !important;
+  }
+}
+
+/* Legal pages: print stylesheet (spec §9.2) */
+@media print {
+  .legal-page {
+    color: #000;
+    background: #fff;
+    font-size: 12pt;
+  }
+
+  .legal-page h1,
+  .legal-page h2,
+  .legal-page h3 {
+    color: #000;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .legal-page p,
+  .legal-page li,
+  .legal-page tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .legal-page a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 10pt;
+    word-break: break-all;
+  }
+
+  .legal-page mark {
+    background: none;
+    color: #000;
+    text-decoration: underline;
   }
 }

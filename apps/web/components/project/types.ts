@@ -7,6 +7,7 @@ export type PageRow = {
   is_homepage: boolean;
   blocks: unknown[] | null;
   created_at?: string;
+  updated_at?: string;
 };
 
 export type ProjectSummary = {

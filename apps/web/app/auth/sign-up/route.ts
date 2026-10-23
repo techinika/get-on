@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { toFriendlyAuthError } from "@/lib/auth-errors";
-import { createClient } from "@/lib/supabase/server";
+import { createRouteClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -8,8 +8,10 @@ export async function POST(request: Request) {
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.signUp({
+  const response = NextResponse.redirect(new URL("/dashboard/new", request.url));
+
+  const supabase = await createRouteClient(response);
+  const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
@@ -24,5 +26,16 @@ export async function POST(request: Request) {
     );
   }
 
-  return NextResponse.redirect(new URL("/dashboard/new", request.url));
+  // When email confirmation is enabled, Supabase returns a user but no session.
+  // Sending them to the dashboard would bounce straight back to /login.
+  if (!data.session) {
+    return NextResponse.redirect(
+      new URL(
+        `/login?message=${encodeURIComponent("Check your email to confirm your account, then log in.")}`,
+        request.url,
+      ),
+    );
+  }
+
+  return response;
 }

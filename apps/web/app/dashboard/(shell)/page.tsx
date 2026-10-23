@@ -1,44 +1,31 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentTeam, planLimits } from "@/lib/team";
-import { DashboardContent } from "@/components/project/dashboard-content";
-
-export const instant = false;
+import { getShellData } from "@/lib/dashboard";
+import { planLimits } from "@/lib/team";
+import { WebsitesContent } from "@/components/app/websites-content";
 
 export default async function DashboardPage() {
-  const current = await getCurrentTeam();
-  if (!current) {
+  const data = await getShellData();
+  if (!data) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
-  const plan = planLimits(current.team.planId);
-
-  const [{ data: projects, count: websiteCount }, { count: memberCount }] = await Promise.all([
-    supabase
-      .from("projects")
-      .select("id, name, subdomain, status, created_at")
-      .eq("team_id", current.team.teamId)
-      .order("created_at", { ascending: false }),
-    supabase
-      .from("team_members")
-      .select("user_id", { count: "exact", head: true })
-      .eq("team_id", current.team.teamId),
-  ]);
+  const plan = planLimits(data.currentTeam.planId);
 
   return (
-    <DashboardContent
+    <WebsitesContent
+      teamName={data.currentTeam.name}
       planName={plan.name}
-      websiteCount={websiteCount ?? 0}
+      websiteCount={data.usage.websites}
       maxWebsites={plan.maxWebsites}
-      memberCount={memberCount ?? 0}
+      memberCount={data.usage.members}
       maxMembers={plan.maxMembers}
       aiCredits={plan.aiCreditsMonthly}
-      projects={(projects ?? []).map((p) => ({
-        id: p.id,
-        name: p.name,
-        subdomain: p.subdomain,
-        status: p.status as "draft" | "published",
+      websites={data.projects.map((project) => ({
+        id: project.id,
+        name: project.name,
+        subdomain: project.subdomain,
+        status: project.status,
+        updatedAt: project.updatedAt ?? null,
       }))}
     />
   );

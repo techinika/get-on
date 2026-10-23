@@ -33,6 +33,12 @@ export function LandingFinalCta() {
             Start free
             <ArrowRight size={20} strokeWidth={1.75} aria-hidden />
           </Link>
+          <Link
+            href="/request-demo"
+            className="mt-4 inline-block text-[15px] font-semibold text-white underline underline-offset-[3px]"
+          >
+            or request a demo
+          </Link>
         </div>
       </div>
     </section>

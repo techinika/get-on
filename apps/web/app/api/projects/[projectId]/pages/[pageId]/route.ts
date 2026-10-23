@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PAGE_COLUMNS, requireProject } from "../_lib";
+import { invalidateQuickFind, touchProject } from "@/lib/project-activity";
 
 type Params = { params: Promise<{ projectId: string; pageId: string }> };
 
@@ -94,6 +95,8 @@ export async function PATCH(request: Request, { params }: Params) {
     updates.blocks = body.blocks;
   }
 
+  updates.updated_at = new Date().toISOString();
+
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 400 });
   }
@@ -108,6 +111,10 @@ export async function PATCH(request: Request, { params }: Params) {
   if (error || !updated) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
+
+  await touchProject(ctx.supabase, projectId);
+  invalidateQuickFind(ctx.current.team.teamId);
+
   return NextResponse.json({ page: updated });
 }
 
@@ -139,5 +146,9 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (error) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
+
+  await touchProject(ctx.supabase, projectId);
+  invalidateQuickFind(ctx.current.team.teamId);
+
   return NextResponse.json({ ok: true });
 }

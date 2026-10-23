@@ -1,0 +1,140 @@
+.gs-root {
+  background: var(--s-bg);
+  color: var(--s-text);
+  font-family: var(--s-font-body), system-ui, -apple-system, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  container-type: inline-size;
+  container-name: site;
+  overflow-x: clip;
+  min-height: 100%;
+}
+
+.gs-section {
+  padding: 48px 20px;
+}
+
+.gs-inner {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+@container site (min-width: 640px) {
+  .gs-section {
+    padding: 64px 32px;
+  }
+}
+
+@container site (min-width: 900px) {
+  .gs-section {
+    padding: 80px 32px;
+  }
+}
+
+.gs-header {
+  height: 64px;
+  background: var(--s-bg);
+  border-bottom: 1px solid var(--s-border);
+  padding: 0 20px;
+}
+
+@container site (min-width: 640px) {
+  .gs-header {
+    padding: 0 32px;
+  }
+}
+
+.gs-header-inner {
+  max-width: 960px;
+  margin: 0 auto;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.gs-footer {
+  background: var(--s-soft);
+  border-top: 1px solid var(--s-border);
+  padding: 32px 20px;
+}
+
+@container site (min-width: 640px) {
+  .gs-footer {
+    padding: 40px 32px;
+  }
+}
+
+.gs-section-bg-soft {
+  background: var(--s-soft);
+}
+
+.gs-section-bg-brand {
+  background: var(--s-primary);
+  color: var(--s-on-primary);
+}
+
+.gs-h2 {
+  font-family: var(--s-font-heading), system-ui, sans-serif;
+  font-weight: 700;
+  font-size: 28px;
+  line-height: 1.15;
+  letter-spacing: -0.01em;
+}
+
+@container site (min-width: 640px) {
+  .gs-h2 {
+    font-size: 32px;
+  }
+}
+
+@container site (min-width: 900px) {
+  .gs-h2 {
+    font-size: 36px;
+  }
+}
+
+.gs-p {
+  max-width: 720px;
+}
+
+.gs-btn-wrap {
+  padding: 8px 0;
+  display: flex;
+}
+
+.gs-btn {
+  height: 48px;
+  padding: 0 24px;
+  font-family: var(--s-font-body);
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: var(--s-radius-btn);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+
+@container site (min-width: 900px) {
+  .gs-btn {
+    height: 52px;
+  }
+}
+
+.gs-btn-solid {
+  background: var(--s-primary);
+  color: var(--s-on-primary);
+}
+
+.gs-divider {
+  height: 1px;
+  background: var(--s-border);
+  max-width: 960px;
+  margin: 8px auto;
+}
+
+.gs-spacer {
+  display: block;
+}

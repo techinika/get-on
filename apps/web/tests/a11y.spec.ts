@@ -12,6 +12,20 @@ const ROUTES: [name: string, path: string][] = [
   ["login", "/login"],
   ["forgot-password", "/forgot-password"],
   ["not-found", "/does-not-exist"],
+  ["request-demo", "/request-demo"],
+  ["terms", "/terms"],
+  ["privacy", "/privacy"],
+  ["cookies", "/cookies"],
+  ["acceptable-use", "/acceptable-use"],
+];
+
+const PUBLIC_ROUTES: [name: string, path: string][] = [
+  ["landing", "/"],
+  ["signup", "/signup"],
+  ["login", "/login"],
+  ["request-demo", "/request-demo"],
+  ["terms", "/terms"],
+  ["privacy", "/privacy"],
 ];
 
 async function scan(page: Page, label: string) {
@@ -42,6 +56,21 @@ test("landing: no horizontal scroll at 360 px", async ({ page }) => {
     clientWidth: document.documentElement.clientWidth,
   }));
   expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+});
+
+test("public screens: no horizontal scroll at 360 px", async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  for (const [name, path] of PUBLIC_ROUTES) {
+    await page.goto(path, { waitUntil: "networkidle" });
+    const overflow = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+    }));
+    expect(
+      overflow.scrollWidth,
+      `${name} scrolls sideways at 360 px`,
+    ).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  }
 });
 
 test("landing: key spec copy and landmarks present", async ({ page }) => {
