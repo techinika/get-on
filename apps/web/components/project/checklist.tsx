@@ -15,6 +15,9 @@ type ChecklistProps = {
   /** True when any of phone, email, address or logo exists in project settings. */
   detailsDone: boolean;
   customDomainAllowed: boolean;
+  homepageId: string | null;
+  contactEnabled: boolean;
+  hasContactForm: boolean;
 };
 
 type Item = {
@@ -47,6 +50,9 @@ export function Checklist({
   subdomain,
   detailsDone,
   customDomainAllowed,
+  homepageId,
+  contactEnabled,
+  hasContactForm,
 }: ChecklistProps) {
   const viewedKey = `get-on-viewed-pages:${projectId}`;
   const [userChoice, setUserChoice] = React.useState<boolean | null>(null);
@@ -77,8 +83,22 @@ export function Checklist({
       id: "contact-form",
       title: "Turn on your contact form",
       description: "Let customers send you messages.",
-      soon: true,
+      href: `/dashboard/projects/${projectId}/plugins?enable=contact`,
+      completable: true,
+      done: contactEnabled,
     },
+    ...(contactEnabled && homepageId
+      ? [
+          {
+            id: "add-contact-form",
+            title: "Add a contact form to a page",
+            description: "Choose a ready-made one from Add a section.",
+            href: `/dashboard/projects/${projectId}/pages/${homepageId}?panel=add&tab=ready`,
+            completable: true,
+            done: hasContactForm,
+          } satisfies Item,
+        ]
+      : []),
     {
       id: "search",
       title: "Add a title and description for Google",

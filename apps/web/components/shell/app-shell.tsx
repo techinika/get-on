@@ -139,14 +139,14 @@ export function AppShell({
       <main
         id="main-content"
         className={cn(
-          "min-h-[calc(100dvh-56px)] min-[640px]:min-h-[calc(100dvh-64px)]",
+          "min-h-[calc(100dvh-56px)] min-[640px]:min-h-[calc(100dvh-64px)] pt-14 min-[640px]:pt-16",
           "min-[1024px]:ml-[var(--sidebar-w)]",
         )}
       >
         {children}
       </main>
 
-      <ShellBottomTabs project={project} />
+      <ShellBottomTabs project={project} onOpenHelp={() => setHelpOpen(true)} />
 
       <NavigationProgress />
 

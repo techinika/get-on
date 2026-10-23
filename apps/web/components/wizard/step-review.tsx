@@ -56,6 +56,7 @@ export function StepReview({
   name,
   address,
   businessType,
+  includeContactForm,
   submitError,
   limitReached,
   onEditStep,
@@ -63,6 +64,7 @@ export function StepReview({
   name: string;
   address: string;
   businessType: string;
+  includeContactForm: boolean;
   submitError: string | null;
   limitReached: boolean;
   onEditStep: (step: number) => void;
@@ -132,6 +134,13 @@ export function StepReview({
             editLabel="business type"
           >
             {businessType || "—"}
+          </SummaryRow>
+          <SummaryRow
+            label="Contact form"
+            onEdit={() => onEditStep(5)}
+            editLabel="contact form"
+          >
+            {includeContactForm ? "On" : "Off"}
           </SummaryRow>
         </div>
       </Card>

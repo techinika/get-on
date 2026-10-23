@@ -13,7 +13,8 @@
   "dependencies": {
     "@get-on/blocks": "workspace:*",
     "clsx": "^2.1.1",
-    "lucide-react": "^0.553.0"
+    "lucide-react": "^0.553.0",
+    "@get-on/plugins": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19.3.0",

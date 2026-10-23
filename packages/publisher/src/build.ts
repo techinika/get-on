@@ -5,7 +5,7 @@ import { gzipSync } from "node:zlib";
 import sharp from "sharp";
 import { buildCss } from "./css";
 import { prepareFonts } from "./fonts";
-import { renderHtml, renderNotFoundHtml, type NavItem } from "./html";
+import { renderHtml, renderNotFoundHtml, renderFormStatusHtml, type NavItem } from "./html";
 import { prepareImages, type PreparedImage } from "./images";
 import { hashBytes, slugify } from "./hash";
 import type { BuildSiteInput, BuildSiteResult, BuiltFile } from "./types";
@@ -111,7 +111,23 @@ export async function buildSite(
   const files: Record<string, BuiltFile> = {};
   Object.assign(files, images.files);
 
+  const formsEnabled = input.forms?.enabled === true;
   const visiblePages = input.pages.filter((page) => !page.hidden);
+  if (
+    !formsEnabled &&
+    visiblePages.some((page) =>
+      page.blocks.some(
+        (block) =>
+          typeof block === "object" &&
+          block !== null &&
+          (block as { type?: string }).type === "contact-form",
+      ),
+    )
+  ) {
+    warnings.push(
+      "Your contact form is turned off, so visitors cannot send you messages.",
+    );
+  }
   const nav: NavItem[] = visiblePages
     .filter((page) => page.showInMenu !== false && page.slug !== "")
     .map((page) => ({
@@ -136,7 +152,15 @@ export async function buildSite(
 
   let largestPageBytes = 0;
 
-  for (const page of visiblePages) {
+  const forms = collectForms(input);
+  // Defuse any brace pairs a visitor typed, so their text can never become a
+  // placeholder. Form block ids are read before this, so forms still work.
+  const safePages = visiblePages.map((page) => ({
+    ...page,
+    blocks: defuseBraces(page.blocks) as unknown[],
+  }));
+
+  for (const page of safePages) {
     const canonical = pageUrl(baseUrl, page.slug);
     const html = renderHtml({
       settings: input.settings,
@@ -147,6 +171,8 @@ export async function buildSite(
       images: preparedImages,
       logoUrl: logo.url,
       ogImageUrl: ogImage.url,
+      contactEnabled: formsEnabled,
+      pagePath: page.slug === "" ? "/" : `/${slugify(page.slug)}`,
     });
     const file = textFile(html);
     files[pagePath(page.slug)] = file;
@@ -162,7 +188,7 @@ export async function buildSite(
 
   // The home page always exists, even when it has no blocks yet.
   if (!files["index.html"]) {
-    const home = input.pages.find((page) => page.slug === "");
+    const home = safePages.find((page) => page.slug === "");
     const html = renderHtml({
       settings: input.settings,
       page: home ?? {
@@ -177,6 +203,8 @@ export async function buildSite(
       images: preparedImages,
       logoUrl: logo.url,
       ogImageUrl: ogImage.url,
+      contactEnabled: formsEnabled,
+      pagePath: "/",
     });
     files["index.html"] = textFile(html);
   }
@@ -184,6 +212,29 @@ export async function buildSite(
   files["404.html"] = textFile(
     renderNotFoundHtml({ settings: input.settings, css, logoUrl: logo.url }),
   );
+
+  if (formsEnabled) {
+    files["_forms/sent/index.html"] = textFile(
+      renderFormStatusHtml({
+        settings: input.settings,
+        css,
+        logoUrl: logo.url,
+        heading: "Message sent",
+        text: "Thank you. We will get back to you as soon as we can.",
+        problem: false,
+      }),
+    );
+    files["_forms/problem/index.html"] = textFile(
+      renderFormStatusHtml({
+        settings: input.settings,
+        css,
+        logoUrl: logo.url,
+        heading: "Message not sent",
+        text: "{{GS_PROBLEM_TEXT}}",
+        problem: true,
+      }),
+    );
+  }
 
   files["sitemap.xml"] = xmlFile(buildSitemap(baseUrl, visiblePages));
   files["robots.txt"] = textPlain(
@@ -195,7 +246,52 @@ export async function buildSite(
     Object.values(files).reduce((sum, file) => sum + file.size, 0) +
     Object.values(shared).reduce((sum, file) => sum + file.size, 0);
 
-  return { files, shared, warnings, totalBytes, largestPageBytes };
+  return { files, shared, warnings, totalBytes, largestPageBytes, forms };
+}
+
+/**
+ * Walks a content value and breaks up any `{{` or `}}` in strings with a
+ * zero-width space, so text a visitor typed can never match a placeholder.
+ */
+function defuseBraces(value: unknown): unknown {
+  if (typeof value === "string") {
+    return value.replace(/\{\{/g, "{\u200B{").replace(/\}\}/g, "}\u200B}");
+  }
+  if (Array.isArray(value)) return value.map(defuseBraces);
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value)) out[key] = defuseBraces(child);
+    return out;
+  }
+  return value;
+}
+
+const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
+
+/** Finds the contact form in the pages, so the app can store its address. */
+function collectForms(input: BuildSiteInput): BuildSiteResult["forms"] {
+  if (input.forms?.enabled !== true) return [];
+  const found: BuildSiteResult["forms"] = [];
+  for (const page of input.pages) {
+    if (page.hidden) continue;
+    const pagePath = page.slug === "" ? "/" : `/${slugify(page.slug)}`;
+    for (const block of page.blocks) {
+      if (!block || typeof block !== "object") continue;
+      if ((block as { type?: string }).type !== "contact-form") continue;
+      const id = (block as { id?: string }).id;
+      if (!id || !FORM_ID_RE.test(id)) continue;
+      const props = ((block as { props?: Record<string, unknown> }).props ?? {}) as Record<string, unknown>;
+      found.push({
+        id,
+        pagePath,
+        showName:
+          props.variation === 'mini' ? props.showName === true : props.showName !== false,
+        showPhone: Boolean(props.showPhone),
+        phoneRequired: Boolean(props.phoneRequired) && Boolean(props.showPhone),
+      });
+    }
+  }
+  return found;
 }
 
 function buildSitemap(baseUrl: string, pages: BuildSiteInput["pages"]): string {
@@ -213,6 +309,7 @@ function buildRobots(baseUrl: string, allowIndexing: boolean): string {
   const lines = ["User-agent: *"];
   if (allowIndexing) {
     lines.push("Allow: /");
+    lines.push("Disallow: /_forms/");
   } else {
     lines.push("Disallow: /");
   }

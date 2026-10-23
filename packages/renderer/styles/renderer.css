@@ -499,3 +499,394 @@
 .gs-404 .gs-btn-wrap {
   justify-content: center;
 }
+
+/* Contact forms (plugin) */
+.gs-form-section {
+  --f-bg: var(--s-field-bg);
+  --f-text: var(--s-field-text);
+  --f-border: var(--s-field-border);
+  --f-label: var(--s-text);
+  --f-ring: var(--s-focus-ring);
+}
+
+.gs-section-bg-brand.gs-form-section {
+  --f-bg: var(--s-bg);
+  --f-text: var(--s-text);
+  --f-border: transparent;
+  --f-label: var(--s-on-primary);
+  --f-ring: var(--s-on-primary);
+}
+
+.gs-form {
+  margin-top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.gs-form-heading {
+  margin: 0;
+}
+
+.gs-form-intro {
+  margin: 12px 0 0;
+  font-size: 17px;
+  color: color-mix(in srgb, var(--s-text) 70%, var(--s-bg));
+}
+
+.gs-field-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.gs-field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--f-label);
+  margin-bottom: 6px;
+}
+
+@container site (min-width: 900px) {
+  .gs-field-label {
+    font-size: 15px;
+  }
+}
+
+.gs-field-optional {
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.gs-field {
+  box-sizing: border-box;
+  width: 100%;
+  height: 52px;
+  padding: 0 16px;
+  font-family: var(--s-font-body);
+  font-size: 16px;
+  line-height: 1.4;
+  border-radius: var(--s-radius);
+  background: var(--f-bg);
+  border: 1px solid var(--f-border);
+  color: var(--f-text);
+}
+
+textarea.gs-field {
+  height: auto;
+  padding: 14px 16px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.gs-field::placeholder {
+  color: var(--s-placeholder);
+}
+
+.gs-field:focus {
+  outline: 3px solid var(--f-ring);
+  outline-offset: 0;
+  border-color: var(--s-primary);
+}
+
+.gs-field:user-invalid {
+  border-color: var(--s-error);
+}
+
+.gs-form-submit {
+  width: 100%;
+  margin-top: 8px;
+}
+
+@container site (min-width: 640px) {
+  .gs-form-classic .gs-form-submit,
+  .gs-form-boxed .gs-form-submit,
+  .gs-form-split .gs-form-submit {
+    width: auto;
+    min-width: 180px;
+  }
+}
+
+.gs-section-bg-brand .gs-form-submit {
+  background: var(--s-on-primary);
+  color: var(--s-primary);
+}
+
+.gs-form-submit:hover {
+  filter: brightness(0.94);
+}
+
+.gs-form-submit:active {
+  transform: translateY(1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-form-submit:active {
+    transform: none;
+  }
+}
+
+.gs-consent {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--f-label) 70%, transparent);
+}
+
+.gs-hp {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.gs-form-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  color: color-mix(in srgb, var(--s-text) 60%, var(--s-bg));
+}
+
+.gs-form-row {
+  display: grid;
+  gap: 16px;
+}
+
+@container site (min-width: 640px) {
+  .gs-form-classic .gs-form-row,
+  .gs-form-boxed .gs-form-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.gs-form-classic-inner {
+  max-width: 640px;
+}
+
+.gs-form-boxed-inner {
+  max-width: 640px;
+}
+
+.gs-form-compact-inner {
+  max-width: 480px;
+}
+
+.gs-form-mini-inner {
+  max-width: 400px;
+}
+
+.gs-form-compact-inner .gs-form,
+.gs-form-mini-inner .gs-form {
+  margin-top: 20px;
+}
+
+.gs-form-compact-inner .gs-form-submit,
+.gs-form-mini-inner .gs-form-submit {
+  width: 100%;
+}
+
+.gs-form-card {
+  background: var(--s-card);
+  border: 1px solid var(--s-card-border);
+  border-radius: var(--s-radius-lg);
+  padding: 24px;
+}
+
+@container site (min-width: 900px) {
+  .gs-form-card {
+    padding: 32px;
+  }
+}
+
+.gs-form-split {
+  display: grid;
+  gap: 32px;
+}
+
+@container site (min-width: 640px) {
+  .gs-form-split {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 48px;
+    align-items: start;
+  }
+}
+
+.gs-form-split-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.gs-form-details {
+  margin-top: 28px;
+  gap: 16px;
+}
+
+.gs-form-details .gs-contact-item {
+  display: grid;
+  grid-template-columns: 40px 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 12px;
+  align-items: center;
+}
+
+.gs-icon-tile {
+  grid-row: 1 / span 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--s-icon-tile);
+  color: var(--s-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.gs-contact-label {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: color-mix(in srgb, var(--s-text) 60%, var(--s-bg));
+}
+
+.gs-form-details .gs-contact-item > :last-child {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+/* Contact call to action */
+.gs-cta-strip {
+  border-top: 1px solid var(--s-border);
+  border-bottom: 1px solid var(--s-border);
+  padding: 32px 20px;
+}
+
+.gs-cta-strip-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.gs-cta-strip-text {
+  max-width: 560px;
+}
+
+.gs-cta-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gs-cta-buttons .gs-btn {
+  width: 100%;
+}
+
+.gs-cta-card-section .gs-cta-card {
+  max-width: 720px;
+  margin: 0 auto;
+  background: var(--s-card);
+  border: 1px solid var(--s-card-border);
+  border-radius: var(--s-radius-lg);
+  padding: 32px;
+}
+
+.gs-cta-card .gs-cta-buttons {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.gs-cta-card .gs-cta-buttons .gs-btn {
+  width: auto;
+}
+
+.gs-cta-banner {
+  padding: 56px 20px;
+}
+
+.gs-cta-banner-title {
+  color: var(--s-on-primary);
+}
+
+.gs-cta-banner-text {
+  color: color-mix(in srgb, var(--s-on-primary) 85%, transparent);
+  max-width: 520px;
+  margin: 12px auto 0;
+}
+
+.gs-cta-banner .gs-cta-buttons {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.gs-cta-banner .gs-cta-buttons .gs-btn {
+  width: auto;
+}
+
+.gs-cta-banner .gs-btn-solid {
+  background: var(--s-on-primary);
+  color: var(--s-primary);
+}
+
+.gs-cta-banner .gs-btn-outline {
+  color: var(--s-on-primary);
+  border-color: var(--s-on-primary);
+}
+
+@container site (min-width: 640px) {
+  .gs-cta-strip {
+    padding: 40px 32px;
+  }
+
+  .gs-cta-strip-inner {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .gs-cta-strip-inner .gs-cta-buttons {
+    flex-shrink: 0;
+  }
+
+  .gs-cta-strip .gs-cta-buttons .gs-btn {
+    width: auto;
+  }
+
+  .gs-cta-card-section .gs-cta-card {
+    padding: 48px;
+  }
+}
+
+@container site (min-width: 900px) {
+  .gs-cta-banner {
+    padding: 80px 32px;
+  }
+}
+
+/* Quick contact */
+.gs-quick-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.gs-quick-btn {
+  gap: 8px;
+  padding: 0 20px;
+}
+
+.gs-quick-row .gs-quick-btn {
+  width: 100%;
+}
+
+@container site (min-width: 640px) {
+  .gs-quick-row .gs-quick-btn {
+    width: auto;
+  }
+
+  .gs-quick-inner.gs-align-center {
+    justify-content: center;
+  }
+}

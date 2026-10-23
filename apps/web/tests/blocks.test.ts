@@ -7,7 +7,7 @@ const paletteKeys = Object.keys(PALETTES) as Palette[];
 describe('blocks', () => {
   it('migrates old array format', () => {
     const migrated = migrateContent([{ type: 'heading', text: 'Hi' }]);
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(4);
     expect(Array.isArray(migrated.blocks)).toBe(true);
   });
 
@@ -33,7 +33,7 @@ describe('blocks', () => {
       businessName: 'Tasty',
       businessType: 'restaurant',
     });
-    expect(content.schemaVersion).toBe(2);
+    expect(content.schemaVersion).toBe(3);
     expect(content.blocks.length).toBeGreaterThan(0);
   });
 });

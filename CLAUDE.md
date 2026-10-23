@@ -34,7 +34,7 @@ Get-On (get-on.tech) helps non-technical small business owners create a website 
 - `apps/web/app/request-demo/actions.ts` is the server action. It uses a honeypot field, a signed timing token, optional Turnstile, shared Zod validation and rate limits (3 per hour per IP, 5 per day per email).
 - The IP is stored only as a salted hash, using `IP_HASH_SALT`.
 - `SUPABASE_SERVICE_ROLE_KEY` is only used server side, to write to `demo_requests` (RLS is on and no policies are exposed to the browser).
-- Emails go out through Resend when `RESEND_API_KEY` is set, otherwise they are logged to the console. `sendEmail` never throws, so a mail outage cannot break the form.
+- All platform emails go through Amazon SES from team@get-on.tech, otherwise they are logged to the console. `sendEmail` never throws, so a mail outage cannot break the form.
 - Turnstile is required as soon as `TURNSTILE_SECRET_KEY` is set.
 
 ## Legal pages

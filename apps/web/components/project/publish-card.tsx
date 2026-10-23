@@ -31,6 +31,7 @@ export type PublishCardProps = {
   pagesCount: number;
   homepageReady: boolean;
   detailsReady: boolean;
+  contactFormPluginOff: boolean;
   lastPublishedAt: string | null;
   className?: string;
 };
@@ -44,6 +45,7 @@ export function PublishCard({
   pagesCount,
   homepageReady,
   detailsReady,
+  contactFormPluginOff,
   lastPublishedAt,
   className,
 }: PublishCardProps) {
@@ -207,6 +209,7 @@ export function PublishCard({
           pagesCount={pagesCount}
           homepageReady={homepageReady}
           detailsReady={detailsReady}
+          contactFormPluginOff={contactFormPluginOff}
           blockedReason={state === "review" ? "review" : state === "suspended" ? "suspended" : null}
           onPublished={() => router.refresh()}
         />

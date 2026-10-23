@@ -97,12 +97,31 @@ async function serve(
     }
   }
 
+  const clientIp =
+    request.headers.get("cf-connecting-ip") ??
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    "";
+
   const response = await handleSiteRequest(request, store, {
     rootDomain,
     rawPath: rawPathOf(request.url),
+    formTokenSecret: env.FORM_TOKEN_SECRET,
+    formTokenSecretPrevious: env.FORM_TOKEN_SECRET_PREVIOUS,
+    workerSharedSecret: env.WORKER_SHARED_SECRET,
+    appOrigin: env.APP_ORIGIN,
+    clientIp,
   });
 
-  if (cache && key && request.method === "GET" && response.status === 200) {
+  const cacheControl = response.headers.get("cache-control") ?? "";
+  const cacheable =
+    cache &&
+    key &&
+    request.method === "GET" &&
+    response.status === 200 &&
+    !cacheControl.includes("no-store") &&
+    !/^\/_forms\//.test(rawPathOf(request.url) ?? "");
+
+  if (cacheable && key) {
     const copy = response.clone();
     ctx?.waitUntil(cache.put(key, copy).catch(() => undefined));
   }

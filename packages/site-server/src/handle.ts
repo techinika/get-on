@@ -5,6 +5,14 @@ import {
   notPublishedPage,
   suspendedPage,
 } from "./platform-pages";
+import {
+  PROBLEM_TEXTS,
+  sanitizeBackPath,
+  sanitizeProblemCode,
+  sha256Hex,
+  signFormToken,
+  signWorkerRequest,
+} from "./forms";
 import type { SiteFile, SiteStore } from "./types";
 
 export type HandleOptions = {
@@ -16,7 +24,22 @@ export type HandleOptions = {
    * traversal attempts can be refused with a 400.
    */
   rawPath?: string;
+  /** Shared secret used to sign/verify form tokens. */
+  formTokenSecret?: string;
+  /** Previous form token secret, for rotation. */
+  formTokenSecretPrevious?: string;
+  /** Shared secret for signing requests to the app. */
+  workerSharedSecret?: string;
+  /** The app origin that receives forwarded form submissions. */
+  appOrigin?: string;
+  /** The client IP as seen by the adapter. */
+  clientIp?: string;
+  /** Fetch implementation, injectable for tests. */
+  fetchImpl?: typeof fetch;
 };
+
+const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
+const MAX_FORM_BODY = 16 * 1024;
 
 const SECURITY_HEADERS: Record<string, string> = {
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
@@ -25,8 +48,46 @@ const SECURITY_HEADERS: Record<string, string> = {
   "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
   "X-Frame-Options": "DENY",
   "Content-Security-Policy":
-    "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'",
 };
+
+/**
+ * Replaces every GS placeholder in an HTML buffer. It runs after the cache
+ * lookup, so the cached base is never personalised.
+ */
+export async function resolveFormPlaceholders(
+  html: string,
+  request: Request,
+  siteId: string,
+  secrets: string[],
+): Promise<string> {
+  if (!html.includes("{{GS_")) return html;
+  const url = new URL(request.url);
+  let out = html;
+
+  const tokenRe = /\{\{GS_FORM_TOKEN:([^}]+)\}\}/g;
+  for (const match of html.matchAll(tokenRe)) {
+    const formId = match[1]!;
+    if (!FORM_ID_RE.test(formId)) continue;
+    const token = await signFormToken(secrets[0] ?? "", {
+      s: siteId,
+      f: formId,
+      t: Date.now(),
+    });
+    out = out.split(match[0]).join(token);
+  }
+
+  out = out.replace(/\{\{GS_PAGE_PATH\}\}/g, sanitizeBackPath(url.pathname));
+  out = out.replace(
+    /\{\{GS_BACK\}\}/g,
+    sanitizeBackPath(url.searchParams.get("b") ?? "/"),
+  );
+  out = out.replace(
+    /\{\{GS_PROBLEM_TEXT\}\}/g,
+    PROBLEM_TEXTS[sanitizeProblemCode(url.searchParams.get("c"))] ?? PROBLEM_TEXTS.unavailable,
+  );
+  return out;
+}
 
 function cacheControlFor(
   path: string,
@@ -188,8 +249,12 @@ export async function handleSiteRequest(
   options: HandleOptions = {},
 ): Promise<Response> {
   const rootDomain = options.rootDomain ?? DEFAULT_ROOT_DOMAIN;
+  const url = new URL(request.url);
 
-  if (request.method !== "GET" && request.method !== "HEAD") {
+  const isFormPost =
+    request.method === "POST" && /^\/_forms\/[A-Za-z0-9_-]{6,32}$/.test(url.pathname);
+
+  if (request.method !== "GET" && request.method !== "HEAD" && !isFormPost) {
     return new Response("Method not allowed", {
       status: 405,
       headers: {
@@ -200,7 +265,6 @@ export async function handleSiteRequest(
     });
   }
 
-  const url = new URL(request.url);
   const host = parseHost(request.headers.get("host"), rootDomain);
   if (!host.ok) {
     return platformResponse(
@@ -208,6 +272,10 @@ export async function handleSiteRequest(
       404,
       cacheControlFor("", "platform"),
     );
+  }
+
+  if (isFormPost) {
+    return handleFormPost(request, url, host.hostname, store, options);
   }
 
   if (options.rawPath && isUnsafePath(options.rawPath)) {
@@ -221,8 +289,8 @@ export async function handleSiteRequest(
 
   const path = decoded.path;
 
-  // Lower case only.
-  if (path !== path.toLowerCase()) {
+  // Lower case only. Form paths are exempt because block ids are mixed case.
+  if (path !== path.toLowerCase() && !path.startsWith("/_forms")) {
     return redirect(`${url.pathname.toLowerCase()}${url.search}`);
   }
 
@@ -262,6 +330,7 @@ export async function handleSiteRequest(
 
   const filePath = filePathFor(path);
   const isShared = filePath.startsWith("fonts/");
+  const isPlatformFormPage = path === "/_forms/sent" || path === "/_forms/problem";
   const file = isShared
     ? ((await store.getSharedFile?.(filePath)) ??
       (await store.getFile(pointer.siteId, pointer.publishId, filePath)))
@@ -291,7 +360,138 @@ export async function handleSiteRequest(
         ? "listing"
         : "html";
 
+  if (isPlatformFormPage && (request.method === "GET" || request.method === "HEAD")) {
+    const html = new TextDecoder().decode(file.body);
+    const replaced = await resolveFormPlaceholders(html, request, pointer.siteId, tokenSecrets(options));
+    const headers = new Headers({
+      "Content-Type": "text/html; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex",
+      ...SECURITY_HEADERS,
+    });
+    if (request.method === "HEAD") return new Response(null, { status: 200, headers });
+    return new Response(replaced, { status: 200, headers });
+  }
+
+  // Replace personalised placeholders on HTML responses, after the cache.
+  if (kind === "html" && (request.method === "GET" || request.method === "HEAD")) {
+    const needsReplace = file.contentType.includes("html");
+    if (needsReplace) {
+      const response = await fileResponse(file, request, filePath, kind);
+      if (response.status === 200 || response.status === 404) {
+        const html = new TextDecoder().decode(file.body);
+        if (html.includes("{{GS_")) {
+          const replaced = await resolveFormPlaceholders(html, request, pointer.siteId, tokenSecrets(options));
+          const headers = new Headers(response.headers);
+          headers.delete("Content-Length");
+          headers.delete("ETag");
+          // The page carries a signed token, so it must never be cached.
+          headers.set("Cache-Control", "no-store");
+          if (request.method === "HEAD") return new Response(null, { status: response.status, headers });
+          return new Response(replaced, { status: response.status, headers });
+        }
+      }
+      return response;
+    }
+  }
+
   return fileResponse(file, request, filePath, kind);
+}
+
+function tokenSecrets(options: HandleOptions): string[] {
+  const secrets = [options.formTokenSecret ?? ""];
+  if (options.formTokenSecretPrevious) secrets.push(options.formTokenSecretPrevious);
+  return secrets;
+}
+
+function formRedirect(location: string): Response {
+  return new Response(null, {
+    status: 303,
+    headers: {
+      Location: location,
+      "Cache-Control": "no-store",
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
+async function handleFormPost(
+  request: Request,
+  url: URL,
+  hostname: string,
+  store: SiteStore,
+  options: HandleOptions,
+): Promise<Response> {
+  const formId = url.pathname.slice("/_forms/".length);
+  const back = sanitizeBackPath(url.searchParams.get("b"));
+  const problem = (code: string) =>
+    formRedirect(`/_forms/problem?c=${code}&b=${encodeURIComponent(back)}`);
+  const sent = () => formRedirect(`/_forms/sent?b=${encodeURIComponent(back)}`);
+
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+    return new Response("Unsupported media type", {
+      status: 415,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...SECURITY_HEADERS },
+    });
+  }
+
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > MAX_FORM_BODY) {
+    return new Response("Payload too large", {
+      status: 413,
+      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store", ...SECURITY_HEADERS },
+    });
+  }
+
+  const pointer = await store.getPointer(hostname);
+  if (!pointer || pointer.state !== "live") {
+    return problem("closed");
+  }
+
+  const appOrigin = options.appOrigin;
+  if (!appOrigin) {
+    return problem("unavailable");
+  }
+
+  const ip = options.clientIp ?? request.headers.get("cf-connecting-ip") ?? "";
+  const ua = (request.headers.get("user-agent") ?? "").slice(0, 200);
+  const ts = String(Math.floor(Date.now() / 1000));
+  const bodyHash = await sha256Hex(body);
+  const sig = await signWorkerRequest(options.workerSharedSecret ?? "", {
+    ts,
+    host: hostname,
+    ip,
+    bodyHash,
+  });
+
+  const doFetch = options.fetchImpl ?? fetch;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const forwardUrl = `${appOrigin.replace(/\/$/, "")}/api/public/forms/${formId}`;
+    const response = await doFetch(forwardUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-gs-host": hostname,
+        "x-gs-ip": ip,
+        "x-gs-ua": ua,
+        "x-gs-ts": ts,
+        "x-gs-sig": sig,
+      },
+      body,
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    if (response.ok) return sent();
+    if (response.status === 400 || response.status === 413) return problem("invalid");
+    if (response.status === 429) return problem("rate");
+    if (response.status === 403 || response.status === 404) return problem("closed");
+    return problem("unavailable");
+  } catch {
+    return problem("unavailable");
+  }
 }
 
 export { contentTypeFor };

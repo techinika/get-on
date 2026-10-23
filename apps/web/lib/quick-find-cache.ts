@@ -13,6 +13,7 @@ export const QUICK_FIND_TTL_MS = 60_000;
 export type QuickFindPayload = {
   websites: QuickFindItem[];
   pages: QuickFindItem[];
+  project?: QuickFindItem[];
 };
 
 type CacheEntry = {

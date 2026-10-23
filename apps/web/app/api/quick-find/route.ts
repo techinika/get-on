@@ -53,7 +53,36 @@ export async function GET(request: Request) {
     }));
 
     let pages: QuickFindItem[] = [];
+    let projectItems: QuickFindItem[] = [];
     if (projectId) {
+      const [{ data: install }] = await Promise.all([
+        supabase
+          .from("plugin_installs")
+          .select("state")
+          .eq("project_id", projectId)
+          .eq("plugin_id", "contact")
+          .maybeSingle(),
+      ]);
+
+      projectItems = [
+        {
+          id: "project-plugins",
+          title: "Plugins",
+          detail: "Add extra features",
+          href: `/dashboard/projects/${projectId}/plugins`,
+          icon: "link",
+        },
+      ];
+      if (install?.state === "active") {
+        projectItems.push({
+          id: "project-messages",
+          title: "Messages",
+          detail: "Read what visitors sent",
+          href: `/dashboard/projects/${projectId}/messages`,
+          icon: "link",
+        });
+      }
+
       const { data } = await supabase
         .from("pages")
         .select("id, title, path, project_id")
@@ -69,13 +98,14 @@ export async function GET(request: Request) {
       }));
     }
 
-    cached = { websites, pages };
+    cached = { websites, pages, project: projectItems };
     setCachedQuickFind(cacheKey, cached);
   }
 
   return NextResponse.json({
     websites: rankItems(query, cached.websites),
     pages: rankItems(query, cached.pages),
+    project: rankItems(query, cached.project ?? []),
     goTo: rankItems(query, GO_TO),
   });
 }

@@ -56,6 +56,8 @@ type LoadedSite = {
   settings: SourceSettings | null;
   pages: SourcePage[];
   media: SourceMedia[];
+  /** The plugins that are switched on for the website. */
+  activePlugins: string[];
 };
 
 function asProject(row: Record<string, unknown>): LoadedSite["project"] {
@@ -85,7 +87,7 @@ async function loadSite(
   if (error || !row) return null;
   const project = asProject(row as Record<string, unknown>);
 
-  const [{ data: settings }, { data: pages }, { data: media }] =
+  const [{ data: settings }, { data: pages }, { data: media }, { data: installs }] =
     await Promise.all([
       supabase
         .from("project_settings")
@@ -106,13 +108,23 @@ async function loadSite(
         .select("id, path, alt, width, height, mime")
         .eq("project_id", projectId)
         .is("deleted_at", null),
+      supabase
+        .from("plugin_installs")
+        .select("plugin_id, state")
+        .eq("project_id", projectId)
+        .eq("state", "active"),
     ]);
+
+  const activePlugins = (installs ?? []).map((row) =>
+    String((row as { plugin_id: unknown }).plugin_id),
+  );
 
   return {
     project,
     settings: (settings as SourceSettings | null) ?? null,
     pages: (pages ?? []) as SourcePage[],
     media: (media ?? []) as SourceMedia[],
+    activePlugins,
   };
 }
 
@@ -150,7 +162,7 @@ export async function publishProject(
   const loaded = await loadSite(ctx.supabase, ctx.project.id);
   if (!loaded) throw new PublishError("PROJECT_NOT_FOUND");
 
-  const { project, settings, pages, media } = loaded;
+  const { project, settings, pages, media, activePlugins } = loaded;
   if (project.suspended_reason) {
     throw new PublishError("SUSPENDED");
   }
@@ -219,6 +231,7 @@ export async function publishProject(
       publishId,
       rootDomain:
         config.kind === "local" ? config.localRootDomain : config.rootDomain,
+      activePlugins,
       builtAt,
     });
 
@@ -234,6 +247,8 @@ export async function publishProject(
         status: "ready",
         pages_count: pagesCount,
         size_bytes: result.totalBytes,
+        forms: result.forms,
+        plugins: activePlugins,
       })
       .eq("id", publishId);
     if (readyError) throw new PublishError("PUBLISH_FAILED", publishId);

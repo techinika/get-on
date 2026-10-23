@@ -62,6 +62,24 @@ export type SiteSettings = {
   plan?: string;
 };
 
+/**
+ * The contact form details a published website needs. Present only when the
+ * contact plugin is switched on for the website.
+ */
+export type PublishForm = {
+  /** The form id, used in the posting address and the signed token. */
+  id: string;
+  /** The page the form lives on, for the "back" link. */
+  pagePath: string;
+  /** Where the thank-you page sends people, when different from the form page. */
+  thankYouPagePath?: string | null;
+};
+
+export type PublishForms = {
+  enabled: boolean;
+  form?: PublishForm | null;
+};
+
 export type BuildSiteInput = {
   siteId: string;
   publishId: string;
@@ -71,9 +89,20 @@ export type BuildSiteInput = {
   pages: PublishPage[];
   images?: PublishImage[];
   fonts?: PublishFont[];
+  /** The contact form details, when the contact plugin is on. */
+  forms?: PublishForms;
   /** The stylesheet of the renderer. Read from the package when it is missing. */
   css?: string;
   builtAt?: Date;
+};
+
+/** What the build reports back so the app can record it. */
+export type BuiltForm = {
+  id: string;
+  pagePath: string;
+  showName: boolean;
+  showPhone: boolean;
+  phoneRequired: boolean;
 };
 
 export type BuiltFile = {
@@ -92,4 +121,6 @@ export type BuildSiteResult = {
   totalBytes: number;
   /** The size of the largest page, gzipped. */
   largestPageBytes: number;
+  /** The forms found while building, so the app can store them. */
+  forms: BuiltForm[];
 };

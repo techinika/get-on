@@ -25,6 +25,14 @@ export type WorkerEnv = {
   SITES_BUCKET: R2BucketLike;
   SITES_KV: KVLike;
   ROOT_DOMAIN?: string;
+  /** Secret used to sign and verify form tokens. */
+  FORM_TOKEN_SECRET?: string;
+  /** Previous form token secret, kept during rotation. */
+  FORM_TOKEN_SECRET_PREVIOUS?: string;
+  /** Shared secret used to sign forwarded form requests. */
+  WORKER_SHARED_SECRET?: string;
+  /** The app origin that receives forwarded form submissions. */
+  APP_ORIGIN?: string;
 };
 
 export type CacheLike = {

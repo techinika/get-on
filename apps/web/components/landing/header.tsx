@@ -97,15 +97,17 @@ export function LandingHeader({ viewer = null }: LandingHeaderProps) {
               </Link>
             </>
           )}
-          <Link
-            href="/request-demo"
-            className={cn(
-              buttonVariants({ variant: "secondary", size: "md" }),
-              "hidden min-[1024px]:inline-flex",
-            )}
-          >
-            Request a demo
-          </Link>
+          {!viewer ? (
+            <Link
+              href="/request-demo"
+              className={cn(
+                buttonVariants({ variant: "secondary", size: "md" }),
+                "hidden min-[1024px]:inline-flex",
+              )}
+            >
+              Request a demo
+            </Link>
+          ) : null}
           {!viewer ? (
             <Link
               href="/signup"
@@ -147,13 +149,15 @@ export function LandingHeader({ viewer = null }: LandingHeaderProps) {
                 {link.label}
               </a>
             ))}
-            <Link
-              href="/request-demo"
-              onClick={() => setMenuOpen(false)}
-              className="flex h-14 items-center text-xl font-semibold text-text"
-            >
-              Request a demo
-            </Link>
+            {!viewer ? (
+              <Link
+                href="/request-demo"
+                onClick={() => setMenuOpen(false)}
+                className="flex h-14 items-center text-xl font-semibold text-text"
+              >
+                Request a demo
+              </Link>
+            ) : null}
             {viewer ? (
               <>
                 <Link

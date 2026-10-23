@@ -26,6 +26,7 @@ export default async function DashboardPage() {
         subdomain: project.subdomain,
         status: project.status,
         updatedAt: project.updatedAt ?? null,
+        unreadMessages: project.unreadMessages ?? 0,
       }))}
     />
   );

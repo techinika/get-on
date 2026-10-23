@@ -396,7 +396,7 @@ const privacy: LegalDocument = {
           items: [
             "Database and login provider: [Supabase](https://supabase.com).",
             "Hosting and network provider: [Provider name].",
-            "Email delivery provider: [Resend](https://resend.com).",
+            "Email delivery provider: Amazon Web Services (Amazon SES).",
             "AI generation provider: [Provider name].",
             "Payment provider: [Provider name], once payments are live.",
             "Error monitoring provider: [Provider name].",

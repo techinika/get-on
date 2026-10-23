@@ -42,10 +42,15 @@ export default async function AdminOverviewPage() {
         title="Admin"
         description="A quick look at websites that need attention."
         actions={
-          <Link href="/admin/sites" className={buttonVariants({ variant: "secondary", size: "md" })}>
-            All websites
-            <ArrowRight size={20} strokeWidth={1.75} aria-hidden />
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/admin/email" className={buttonVariants({ variant: "ghost", size: "md" })}>
+              Email
+            </Link>
+            <Link href="/admin/sites" className={buttonVariants({ variant: "secondary", size: "md" })}>
+              All websites
+              <ArrowRight size={20} strokeWidth={1.75} aria-hidden />
+            </Link>
+          </div>
         }
       />
 

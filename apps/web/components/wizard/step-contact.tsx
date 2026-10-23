@@ -4,6 +4,7 @@ import * as React from "react";
 import { Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FieldError, Input, Label } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 const MAX_LOGO_BYTES = 2 * 1024 * 1024;
@@ -16,6 +17,8 @@ export function StepContact({
   logoError,
   onLogoChange,
   onLogoError,
+  includeContactForm,
+  onIncludeContactFormChange,
 }: {
   contact: { phone: string; email: string; address: string };
   onContactChange: (contact: { phone: string; email: string; address: string }) => void;
@@ -23,6 +26,8 @@ export function StepContact({
   logoError: string | null;
   onLogoChange: (data: string | null) => void;
   onLogoError: (error: string | null) => void;
+  includeContactForm: boolean;
+  onIncludeContactFormChange: (value: boolean) => void;
 }) {
   const changeInputRef = React.useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = React.useState(false);
@@ -167,6 +172,15 @@ export function StepContact({
             <FieldError>{logoError}</FieldError>
           </div>
         ) : null}
+      </div>
+
+      <div className="mt-6 rounded-info border border-border p-4">
+        <Switch
+          checked={includeContactForm}
+          onCheckedChange={onIncludeContactFormChange}
+          label="Add a contact form to my homepage"
+          description="Visitors can send you messages. You will get an email each time."
+        />
       </div>
     </div>
   );

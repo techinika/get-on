@@ -7,6 +7,7 @@ type StarterInput = {
   phone?: string;
   email?: string;
   address?: string;
+  includeContactForm?: boolean;
 };
 
 const businessMap: Record<string, any> = {
@@ -156,5 +157,23 @@ export function generateStarterContent(input: StarterInput) {
     );
   }
 
-  return { schemaVersion: 2 as const, blocks };
+  if (input.includeContactForm) {
+    blocks.push(
+      createBlock('contact-form', {
+        props: {
+          heading: 'Send us a message',
+          intro: 'Fill in the form and we will get back to you.',
+          variation: 'classic',
+          showName: true,
+          showPhone: false,
+          phoneRequired: false,
+          submitLabel: 'Send message',
+          consentText: 'We will only use your details to reply to your message.',
+          background: 'plain',
+        },
+      }),
+    );
+  }
+
+  return { schemaVersion: 3 as const, blocks };
 }

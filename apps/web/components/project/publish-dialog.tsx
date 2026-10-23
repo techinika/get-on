@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Check, CircleAlert, Copy, ExternalLink, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
@@ -37,6 +38,7 @@ export type PublishDialogProps = {
   pagesCount: number;
   homepageReady: boolean;
   detailsReady: boolean;
+  contactFormPluginOff: boolean;
   blockedReason: "review" | "suspended" | null;
   onPublished: () => void;
 };
@@ -53,6 +55,7 @@ export function PublishDialog({
   pagesCount,
   homepageReady,
   detailsReady,
+  contactFormPluginOff,
   blockedReason,
   onPublished,
 }: PublishDialogProps) {
@@ -184,11 +187,23 @@ export function PublishDialog({
             until the new one is ready.
           </p>
 
-          {blockers.length > 0 ? (
+          {blockers.length > 0 || contactFormPluginOff ? (
             <div className="rounded-info bg-warning-soft p-4 text-sm leading-5 text-warning-text">
               {blockers.map((line) => (
                 <p key={line}>{line}</p>
               ))}
+              {contactFormPluginOff ? (
+                <p>
+                  Your contact form is turned off, so visitors cannot send you messages.{" "}
+                  <Link
+                    href={`/dashboard/projects/${projectId}/plugins?enable=contact`}
+                    onClick={onClose}
+                    className="font-semibold underline"
+                  >
+                    Turn it on
+                  </Link>
+                </p>
+              ) : null}
             </div>
           ) : null}
 
@@ -208,6 +223,14 @@ export function PublishDialog({
               hint={detailsReady ? undefined : "You can still publish without these."}
               warning
             />
+            {contactFormPluginOff ? (
+              <CheckRow
+                ok={false}
+                label="Your contact form is on"
+                hint="You can turn it on in Plugins, then publish again."
+                warning
+              />
+            ) : null}
           </ul>
 
           <p className="text-sm leading-5 text-text-muted">

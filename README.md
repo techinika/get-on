@@ -47,7 +47,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    Request-a-demo (see `apps/web/.env.example` for the full list):
    - `IP_HASH_SALT`: salt used to hash the visitor IP for rate limiting
    - `FORM_TOKEN_SECRET`: secret used to sign the form timing token
-   - `RESEND_API_KEY`: Resend API key for the notification emails. Without it the emails are logged to the console instead
+   - `TEAM_EMAIL`, `EMAIL_TRANSPORT`, AWS SES keys: Amazon SES for all platform emails (see docs/ses-setup.md). Without credentials emails are logged to the console instead.
    - `EMAIL_FROM`: the from address for those emails
    - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys. When the secret is set, the form must pass Turnstile
    - `NEXT_PUBLIC_COOKIE_CONSENT`: set to `true` to show the cookie notice

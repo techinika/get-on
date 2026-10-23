@@ -78,6 +78,8 @@ export type BuildInputArgs = {
   planId: string;
   publishId: string;
   rootDomain?: string;
+  /** The plugin ids that are switched on for the website. */
+  activePlugins?: string[];
   builtAt?: Date;
 };
 
@@ -231,6 +233,8 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     plan: args.planId,
   };
 
+  const contactEnabled = (args.activePlugins ?? []).includes("contact");
+
   return {
     siteId: args.project.id,
     publishId: args.publishId,
@@ -238,6 +242,7 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     rootDomain: args.rootDomain,
     settings: siteSettings,
     pages: args.pages.map((page) => toPublishPage(page, allowIndexing)),
+    forms: { enabled: contactEnabled },
     images,
     builtAt: args.builtAt ?? new Date(),
   };

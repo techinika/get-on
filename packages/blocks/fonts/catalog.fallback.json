@@ -1,0 +1,982 @@
+[
+  {
+    "id": "inter",
+    "family": "Inter",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 100,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "figtree",
+    "family": "Figtree",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 95,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "nunito-sans",
+    "family": "Nunito Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 90,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "source-sans-3",
+    "family": "Source Sans 3",
+    "category": "sans",
+    "weights": [
+      400,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 88,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "open-sans",
+    "family": "Open Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 87,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "lato",
+    "family": "Lato",
+    "category": "sans",
+    "weights": [
+      400,
+      700,
+      900
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 86,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "poppins",
+    "family": "Poppins",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 85,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "montserrat",
+    "family": "Montserrat",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 84,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "dm-sans",
+    "family": "DM Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 83,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "work-sans",
+    "family": "Work Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 82,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "manrope",
+    "family": "Manrope",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 81,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "plus-jakarta-sans",
+    "family": "Plus Jakarta Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 80,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "outfit",
+    "family": "Outfit",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 79,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "rubik",
+    "family": "Rubik",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 78,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "mulish",
+    "family": "Mulish",
+    "category": "sans",
+    "weights": [
+      400,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 77,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "karla",
+    "family": "Karla",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 76,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "raleway",
+    "family": "Raleway",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 75,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "barlow",
+    "family": "Barlow",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 74,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "space-grotesk",
+    "family": "Space Grotesk",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 73,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "bricolage-grotesque",
+    "family": "Bricolage Grotesque",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 72,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "lexend",
+    "family": "Lexend",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 71,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "red-hat-display",
+    "family": "Red Hat Display",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 70,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "urbanist",
+    "family": "Urbanist",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 69,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "albert-sans",
+    "family": "Albert Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 68,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "public-sans",
+    "family": "Public Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 67,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "roboto",
+    "family": "Roboto",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 66,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "noto-sans",
+    "family": "Noto Sans",
+    "category": "sans",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 65,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "playfair-display",
+    "family": "Playfair Display",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700,
+      800
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 64,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "fraunces",
+    "family": "Fraunces",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 63,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "lora",
+    "family": "Lora",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 62,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "merriweather",
+    "family": "Merriweather",
+    "category": "serif",
+    "weights": [
+      400,
+      700,
+      900
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 61,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "cormorant-garamond",
+    "family": "Cormorant Garamond",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 60,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "dm-serif-display",
+    "family": "DM Serif Display",
+    "category": "serif",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 59,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "libre-baskerville",
+    "family": "Libre Baskerville",
+    "category": "serif",
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 58,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "source-serif-4",
+    "family": "Source Serif 4",
+    "category": "serif",
+    "weights": [
+      400,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 57,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "crimson-pro",
+    "family": "Crimson Pro",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 56,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "eb-garamond",
+    "family": "EB Garamond",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 55,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "bitter",
+    "family": "Bitter",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 54,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "young-serif",
+    "family": "Young Serif",
+    "category": "serif",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 53,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "noto-serif",
+    "family": "Noto Serif",
+    "category": "serif",
+    "weights": [
+      400,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 52,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "roboto-slab",
+    "family": "Roboto Slab",
+    "category": "serif",
+    "weights": [
+      400,
+      500,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 51,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "bebas-neue",
+    "family": "Bebas Neue",
+    "category": "display",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 50,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "oswald",
+    "family": "Oswald",
+    "category": "display",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 49,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "anton",
+    "family": "Anton",
+    "category": "display",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 48,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "archivo-black",
+    "family": "Archivo Black",
+    "category": "display",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 47,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "abril-fatface",
+    "family": "Abril Fatface",
+    "category": "display",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 46,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "pacifico",
+    "family": "Pacifico",
+    "category": "handwriting",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 45,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "dancing-script",
+    "family": "Dancing Script",
+    "category": "handwriting",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 44,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "caveat",
+    "family": "Caveat",
+    "category": "handwriting",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 43,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "satisfy",
+    "family": "Satisfy",
+    "category": "handwriting",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 42,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "great-vibes",
+    "family": "Great Vibes",
+    "category": "handwriting",
+    "weights": [
+      400
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 41,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "jetbrains-mono",
+    "family": "JetBrains Mono",
+    "category": "monospace",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": true,
+    "license": "OFL-1.1",
+    "popularity": 40,
+    "sourceVersion": "1"
+  },
+  {
+    "id": "ibm-plex-mono",
+    "family": "IBM Plex Mono",
+    "category": "monospace",
+    "weights": [
+      400,
+      500,
+      600,
+      700
+    ],
+    "subsets": [
+      "latin",
+      "latin-ext"
+    ],
+    "variable": false,
+    "license": "OFL-1.1",
+    "popularity": 39,
+    "sourceVersion": "1"
+  }
+]

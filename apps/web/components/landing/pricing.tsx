@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { buttonVariants } from "@/components/ui/button";
 import { PLAN_DEFINITIONS } from "@/lib/plans";
 import { PLAN_COPY } from "@/lib/plan-copy";
 import { cn } from "@/lib/utils";
+import { buttonVariants } from "@/components/ui/button";
+import { getViewer } from "@/lib/viewer";
 
-export function LandingPricing() {
+export async function LandingPricing() {
+  const viewer = await getViewer();
+
   return (
     <section
       id="pricing"
@@ -26,14 +29,20 @@ export function LandingPricing() {
             const copy = PLAN_COPY[plan.id];
             const highlighted = plan.id === "basic";
 
+            const href = viewer
+              ? plan.id === "free"
+                ? "/dashboard"
+                : plan.id === "enterprise"
+                  ? "/request-demo?interest=enterprise"
+                  : "/dashboard/plan?upgrade=" + plan.id
+              : copy.ctaHref ?? "/signup";
+
             return (
               <div
                 key={plan.id}
                 className={cn(
                   "relative flex flex-col rounded-dialog bg-surface p-7",
-                  highlighted
-                    ? "border-2 border-primary shadow-raised"
-                    : "border border-border",
+                  highlighted ? "border-2 border-primary shadow-raised" : "border border-border",
                 )}
               >
                 {highlighted ? (
@@ -53,10 +62,10 @@ export function LandingPricing() {
                 </p>
 
                 <Link
-                  href={copy.ctaHref ?? "/signup"}
+                  href={href}
                   className={cn(buttonVariants({ variant: copy.ctaVariant, size: "md" }), "mt-5 w-full")}
                 >
-                  {copy.cta}
+                  {viewer ? (plan.id === "free" ? "Go to dashboard" : plan.id === "enterprise" ? copy.cta : copy.cta) : copy.cta}
                 </Link>
 
                 <div className="my-6 border-t border-border" />
@@ -64,12 +73,7 @@ export function LandingPricing() {
                 <ul className="flex flex-col gap-3">
                   {copy.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2.5">
-                      <Check
-                        size={18}
-                        strokeWidth={1.75}
-                        className="mt-0.5 shrink-0 text-success"
-                        aria-hidden
-                      />
+                      <Check size={18} strokeWidth={1.75} className="mt-0.5 shrink-0 text-success" aria-hidden />
                       <span className="text-[15px] text-text">{feature}</span>
                     </li>
                   ))}

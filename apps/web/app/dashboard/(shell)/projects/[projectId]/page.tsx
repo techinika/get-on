@@ -68,6 +68,19 @@ export default async function OverviewPage({ params }: Params) {
     p_project_id: projectId,
   });
 
+  const { data: contactInstall } = await supabase
+    .from("plugin_installs")
+    .select("state")
+    .eq("project_id", projectId)
+    .eq("plugin_id", "contact")
+    .maybeSingle();
+
+  const { count: unreadMessages } = await supabase
+    .from("contact_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", projectId)
+    .eq("status", "new");
+
   const pageRows = pages ?? [];
   const homepage = pageRows.find((page) => page.is_homepage) ?? pageRows[0] ?? null;
   const plan = planLimits(data.currentTeam.planId);
@@ -101,6 +114,16 @@ export default async function OverviewPage({ params }: Params) {
   }
 
   const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
+  const contactEnabled = contactInstall?.state === "active";
+  const contactFormCount = pageRows.reduce(
+    (total, page) =>
+      total +
+      blocksOf(page.blocks).filter(
+        (block) => (block as { type?: string } | null)?.type === "contact-form",
+      ).length,
+    0,
+  );
+  const hasContactForm = contactFormCount > 0;
 
   return (
     <AppPage width="default">
@@ -140,6 +163,9 @@ export default async function OverviewPage({ params }: Params) {
             subdomain={project.subdomain}
             detailsDone={detailsDone}
             customDomainAllowed={plan.customDomainAllowed}
+            homepageId={homepage?.id ?? null}
+            contactEnabled={contactEnabled}
+            hasContactForm={hasContactForm}
           />
         </div>
 
@@ -160,6 +186,7 @@ export default async function OverviewPage({ params }: Params) {
             pagesCount={used}
             homepageReady={homepageReady}
             detailsReady={detailsDone}
+            contactFormPluginOff={!contactEnabled && hasContactForm}
             lastPublishedAt={livePublish?.live_at ?? livePublish?.created_at ?? null}
           />
 
@@ -175,6 +202,21 @@ export default async function OverviewPage({ params }: Params) {
           />
 
           <StatCard label="Storage" value={`0 MB of ${plan.storageMb} MB`} />
+
+          {contactEnabled ? (
+            <AppCard className="p-4">
+              <p className="text-sm text-text-muted">Messages</p>
+              <p className="text-stat-number text-text">
+                {(unreadMessages ?? 0) > 0 ? `${unreadMessages} new` : "No new messages"}
+              </p>
+              <Link
+                href={`/dashboard/projects/${project.id}/messages`}
+                className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline"
+              >
+                Open messages
+              </Link>
+            </AppCard>
+          ) : null}
 
           <AppCard className="bg-info-soft p-4">
             <p className="text-sm text-info-text">Stuck? We are happy to help.</p>

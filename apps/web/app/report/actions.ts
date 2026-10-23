@@ -1,7 +1,8 @@
 "use server";
 
 import { headers } from "next/headers";
-import { sendEmail } from "@/lib/email";
+import { abuseReportAlertEmail } from "@get-on/email";
+import { sendEmail } from "@/lib/email/send";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeSiteName, reportSchema, REPORT_REASON_LABELS } from "@/lib/report";
@@ -152,20 +153,26 @@ export async function submitReport(form: FormData): Promise<ReportResult> {
     if (reviewError) console.error("[report] could not mark project for review", reviewError);
   }
 
-  const abuseEmail = process.env.ABUSE_EMAIL ?? "abuse@get-on.tech";
+  const abuseEmail = process.env.TEAM_EMAIL ?? process.env.ABUSE_EMAIL ?? "team@get-on.tech";
+  const alert = abuseReportAlertEmail({
+    site: `${project.subdomain}.get-on.tech`,
+    reason: REPORT_REASON_LABELS[parsed.data.reason] ?? parsed.data.reason,
+    fields: [
+      { label: "Website", value: `${project.subdomain}.get-on.tech` },
+      { label: "Reason", value: REPORT_REASON_LABELS[parsed.data.reason] ?? parsed.data.reason },
+      { label: "Details", value: parsed.data.details || "Not given" },
+      { label: "Reporter email", value: parsed.data.email || "Not given" },
+      { label: "Reports from different people in 24 hours", value: String(distinctReporters.size) },
+    ],
+  });
   await sendEmail({
     to: abuseEmail,
     replyTo: parsed.data.email || undefined,
-    subject: `New report: ${project.name} (${parsed.data.reason})`,
-    text: [
-      "A new website report came in.",
-      "",
-      `Website: ${project.subdomain}.get-on.tech`,
-      `Reason: ${REPORT_REASON_LABELS[parsed.data.reason] ?? parsed.data.reason}`,
-      `Details: ${parsed.data.details || "Not given"}`,
-      `Reporter email: ${parsed.data.email || "Not given"}`,
-      `Reports from different people in 24 hours: ${distinctReporters.size}`,
-    ].join("\n"),
+    fromName: "Get-On",
+    kind: "abuse_report_alert",
+    subject: alert.subject,
+    text: alert.text,
+    html: alert.html,
   });
 
   return { ok: true };
