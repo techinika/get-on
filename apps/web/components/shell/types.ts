@@ -27,9 +27,16 @@ export type ShellProject = {
   contactEnabled?: boolean;
   /** New contact messages waiting for the team. */
   unreadMessages?: number;
+  /** The homepage page id, used for the quick preview link. */
+  homepageId?: string | null;
+  /** True when the saved content has changed since the live version. */
+  hasUnpublishedChanges?: boolean;
+  /** The public address of the website, when publishing is configured. */
+  siteUrl?: string | null;
 };
 
 export type ShellUsage = {
   websites: number;
   members: number;
+  storageBytes?: number;
 };

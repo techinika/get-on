@@ -137,7 +137,11 @@ export default async function OverviewPage({ params }: Params) {
         actions={
           <>
             <Link
-              href={`/dashboard/projects/${project.id}/pages`}
+              href={
+                homepage
+                  ? `/dashboard/projects/${project.id}/pages/${homepage.id}`
+                  : `/dashboard/projects/${project.id}/pages`
+              }
               className={buttonVariants({ variant: "secondary", size: "md" })}
             >
               <Eye size={20} strokeWidth={1.75} aria-hidden />
@@ -166,6 +170,7 @@ export default async function OverviewPage({ params }: Params) {
             homepageId={homepage?.id ?? null}
             contactEnabled={contactEnabled}
             hasContactForm={hasContactForm}
+            published={project.status === "published"}
           />
         </div>
 
@@ -201,7 +206,13 @@ export default async function OverviewPage({ params }: Params) {
             progressLabel="Pages used"
           />
 
-          <StatCard label="Storage" value={`0 MB of ${plan.storageMb} MB`} />
+          <StatCard
+            label="Storage"
+            value={`${Math.max(
+              0,
+              Math.round(((data.usage.storageBytes ?? 0) / (1024 * 1024)) * 10) / 10,
+            )} MB of ${plan.storageMb} MB`}
+          />
 
           {contactEnabled ? (
             <AppCard className="p-4">

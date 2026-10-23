@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const password = String(formData.get("password") ?? "");
 
   const redirectTo = new URL("/dashboard", request.url);
-  const response = NextResponse.redirect(redirectTo);
+  const response = NextResponse.redirect(redirectTo, 303);
 
   const supabase = await createRouteClient(response);
   const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -16,6 +16,7 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.redirect(
       new URL(`/login?error=${encodeURIComponent(toFriendlyAuthError(error.message))}`, request.url),
+      303,
     );
   }
 

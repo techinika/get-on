@@ -38,16 +38,18 @@ export function Switch({
         disabled={disabled}
         onClick={() => onCheckedChange(!checked)}
         className={cn(
-          "relative mt-0.5 h-7 w-12 shrink-0 rounded-pill border-[1.5px] transition-colors duration-150",
-          checked ? "border-primary bg-primary" : "border-border-strong bg-surface-muted",
-          disabled && "opacity-50",
+          "group relative mt-0.5 h-[26px] w-[46px] shrink-0 rounded-pill border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+          checked
+            ? "border-primary bg-primary shadow-[inset_0_1px_1px_rgba(255,255,255,0.18)]"
+            : "border-border-strong bg-surface-muted",
+          disabled && "cursor-not-allowed opacity-40",
         )}
       >
         <span
           aria-hidden
           className={cn(
-            "absolute top-0.5 h-[22px] w-[22px] rounded-full bg-white shadow-sm transition-transform duration-150",
-            checked ? "translate-x-[22px]" : "translate-x-0.5",
+            "absolute left-[3px] top-[3px] h-[18px] w-[18px] rounded-full bg-white shadow-[0_1px_2px_rgba(16,24,40,0.12),0_1px_1px_rgba(16,24,40,0.08)] transition-transform duration-200 will-change-transform",
+            checked ? "translate-x-[20px]" : "translate-x-0",
           )}
         />
       </button>

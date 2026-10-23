@@ -13,6 +13,7 @@ import {
   FileText,
   Gift,
   Globe,
+  History,
   Image as ImageIcon,
   LayoutDashboard,
   LayoutGrid,
@@ -209,9 +210,13 @@ export function ShellSidebar({
     if (project?.contactEnabled) router.prefetch(`${projectBase}/messages`);
   }, [projectId, project?.contactEnabled, router]);
 
+  const projectRoot = project ? `/dashboard/projects/${project.id}` : null;
+
   function isActive(href: string | undefined) {
     if (!href) return false;
-    if (href === "/dashboard") return pathname === "/dashboard";
+    // The overview and the websites index are roots, so they must match
+    // exactly. Otherwise every child route would keep them highlighted.
+    if (href === "/dashboard" || href === projectRoot) return pathname === href;
     return pathname === href || pathname.startsWith(`${href}/`);
   }
 
@@ -368,28 +373,77 @@ export function ShellSidebar({
           <div className="flex-1" />
 
           <div className="mt-4 border-t border-border pt-3">
-            <Link
-              href={`${base}/pages`}
-              title={collapsed ? "Preview" : undefined}
-              className={cn(
-                "flex h-11 w-full items-center justify-center gap-2 rounded-input border-[1.5px] border-border-strong bg-surface text-[15px] font-semibold text-text transition-colors hover:bg-surface-muted",
-                collapsed && "mx-auto w-12 px-0",
-              )}
-            >
-              <Eye size={20} strokeWidth={1.75} aria-hidden />
-              {collapsed ? null : "Preview"}
-            </Link>
-            <Link
-              href={`${base}`}
-              title={collapsed ? "Publish" : undefined}
-              className={cn(
-                "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary transition-colors hover:bg-primary-hover",
-                collapsed && "mx-auto w-12 px-0",
-              )}
-            >
-              <Rocket size={20} strokeWidth={1.75} aria-hidden />
-              {collapsed ? null : "Publish"}
-            </Link>
+            {project.status === "published" ? (
+              <>
+                <a
+                  href={project.siteUrl ?? `https://${project.subdomain}.get-on.tech`}
+                  target="_blank"
+                  rel="noreferrer"
+                  title={collapsed ? "View website" : undefined}
+                  className={cn(
+                    "flex h-11 w-full items-center justify-center gap-2 rounded-input border-[1.5px] border-border-strong bg-surface text-[15px] font-semibold text-text transition-colors hover:bg-surface-muted",
+                    collapsed && "mx-auto w-12 px-0",
+                  )}
+                >
+                  <Eye size={20} strokeWidth={1.75} aria-hidden />
+                  {collapsed ? null : "View website"}
+                </a>
+                {project.hasUnpublishedChanges ? (
+                  <Link
+                    href={`${base}/publish`}
+                    title={collapsed ? "Publish changes" : undefined}
+                    className={cn(
+                      "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary transition-colors hover:bg-primary-hover",
+                      collapsed && "mx-auto w-12 px-0",
+                    )}
+                  >
+                    <Rocket size={20} strokeWidth={1.75} aria-hidden />
+                    {collapsed ? null : "Publish changes"}
+                  </Link>
+                ) : (
+                  <Link
+                    href={`${base}/publish`}
+                    title={collapsed ? "Version history" : undefined}
+                    className={cn(
+                      "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input border-[1.5px] border-border-strong bg-surface text-[15px] font-semibold text-text transition-colors hover:bg-surface-muted",
+                      collapsed && "mx-auto w-12 px-0",
+                    )}
+                  >
+                    <History size={20} strokeWidth={1.75} aria-hidden />
+                    {collapsed ? null : "Version history"}
+                  </Link>
+                )}
+              </>
+            ) : (
+              <>
+                <Link
+                  href={
+                    project.homepageId
+                      ? `${base}/pages/${project.homepageId}`
+                      : `${base}/pages`
+                  }
+                  title={collapsed ? "Preview" : undefined}
+                  className={cn(
+                    "flex h-11 w-full items-center justify-center gap-2 rounded-input border-[1.5px] border-border-strong bg-surface text-[15px] font-semibold text-text transition-colors hover:bg-surface-muted",
+                    collapsed && "mx-auto w-12 px-0",
+                  )}
+                >
+                  <Eye size={20} strokeWidth={1.75} aria-hidden />
+                  {collapsed ? null : "Preview"}
+                </Link>
+                <Link
+                  href={`${base}/publish`}
+                  title={collapsed ? "Publish" : undefined}
+                  className={cn(
+                    "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary transition-colors hover:bg-primary-hover",
+                    collapsed && "mx-auto w-12 px-0",
+                  )}
+                >
+                  <Rocket size={20} strokeWidth={1.75} aria-hidden />
+                  {collapsed ? null : "Publish"}
+                </Link>
+              </>
+            )}
           </div>
         </>
       ) : (
