@@ -26,6 +26,7 @@ export type AppShellProps = {
   usage: ShellUsage;
   /** Server-rendered sidebar state (from the `gs_sidebar` cookie). */
   sidebar: "expanded" | "collapsed";
+  isAdmin?: boolean;
   children: React.ReactNode;
 };
 
@@ -46,6 +47,7 @@ export function AppShell({
   projects,
   usage,
   sidebar,
+  isAdmin = false,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -131,19 +133,20 @@ export function AppShell({
         project={project}
         collapsed={collapsed}
         onToggleCollapsed={toggleSidebar}
+        isAdmin={isAdmin}
       />
 
       <main
         id="main-content"
         className={cn(
-          "min-h-[calc(100dvh-56px)] min-[640px]:min-h-[calc(100dvh-64px)]",
+          "min-h-[calc(100dvh-56px)] min-[640px]:min-h-[calc(100dvh-64px)] pt-14 min-[640px]:pt-16",
           "min-[1024px]:ml-[var(--sidebar-w)]",
         )}
       >
         {children}
       </main>
 
-      <ShellBottomTabs project={project} />
+      <ShellBottomTabs project={project} onOpenHelp={() => setHelpOpen(true)} />
 
       <NavigationProgress />
 

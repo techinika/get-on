@@ -18,7 +18,13 @@ function storagePattern() {
 }
 
 const nextConfig: NextConfig = {
-  transpilePackages: ["@get-on/blocks", "@get-on/renderer"],
+  transpilePackages: [
+    "@get-on/blocks",
+    "@get-on/publisher",
+    "@get-on/renderer",
+    "@get-on/site-server",
+  ],
+  serverExternalPackages: ["sharp"],
   // Tailwind CSS v4 runs through the Turbopack loader, so the utilities in
   // app/globals.css are generated on every build.
   turbopack: {

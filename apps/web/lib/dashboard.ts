@@ -92,12 +92,40 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       .eq("team_id", currentTeam.id),
   ]);
 
+  const projectIds = (projects ?? []).map((project) => project.id);
+  let contactProjects = new Set<string>();
+  let unreadByProject = new Map<string, number>();
+
+  if (projectIds.length > 0) {
+    const [{ data: installs }, { data: unread }] = await Promise.all([
+      supabase
+        .from("plugin_installs")
+        .select("project_id")
+        .eq("plugin_id", "contact")
+        .eq("state", "active")
+        .in("project_id", projectIds),
+      supabase
+        .from("contact_messages")
+        .select("project_id")
+        .eq("status", "new")
+        .in("project_id", projectIds),
+    ]);
+    contactProjects = new Set((installs ?? []).map((row) => String(row.project_id)));
+    unreadByProject = new Map();
+    for (const row of unread ?? []) {
+      const key = String(row.project_id);
+      unreadByProject.set(key, (unreadByProject.get(key) ?? 0) + 1);
+    }
+  }
+
   const shellProjects: ShellProject[] = (projects ?? []).map((project) => ({
     id: project.id,
     name: project.name,
     subdomain: project.subdomain,
     status: project.status === "published" ? "published" : "draft",
     updatedAt: project.updated_at ?? project.created_at ?? null,
+    contactEnabled: contactProjects.has(project.id),
+    unreadMessages: unreadByProject.get(project.id) ?? 0,
   }));
 
   return {

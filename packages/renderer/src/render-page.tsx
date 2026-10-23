@@ -1,21 +1,26 @@
-import React from 'react';
-import { RenderBlock } from './render-block';
+import React from "react";
+import { RenderBlock, type RenderContext } from "./render-block";
 
 export function RenderPage({
   content,
   header,
   footer,
+  ctx,
 }: {
-  content: any;
+  content: unknown;
   header?: React.ReactNode;
   footer?: React.ReactNode;
+  ctx?: RenderContext;
 }) {
-  const blocks = Array.isArray(content?.blocks) ? content.blocks : [];
+  const blocks =
+    content && typeof content === "object" && "blocks" in content
+      ? ((content as { blocks?: unknown[] }).blocks ?? [])
+      : [];
   return (
     <div>
       {header}
-      {blocks.map((block: any) => (
-        <RenderBlock key={block.id} block={block} />
+      {blocks.map((block, index) => (
+        <RenderBlock key={index} block={block} ctx={ctx} />
       ))}
       {footer}
     </div>

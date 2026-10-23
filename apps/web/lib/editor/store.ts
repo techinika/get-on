@@ -26,7 +26,7 @@ function clone(content: EditorContent): EditorContent {
 
 export const useEditorStore = create<EditorState>()(
   immer((set) => ({
-    content: { schemaVersion: 2, blocks: [] },
+    content: { schemaVersion: 3, blocks: [] },
     selectedBlockId: null,
     device: 'computer',
     panel: null,

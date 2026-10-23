@@ -58,9 +58,9 @@ finished page.
 | `LEGAL_ENTITY` | Registered company name | `[Company legal name]` |
 | `COMPANY_COUNTRY` | Country of registration | `[Country]` |
 | `COMPANY_ADDRESS` | Registered address | `[Registered address]` |
-| `PRIVACY_EMAIL` | Privacy questions and data requests | `privacy@get-on.tech` |
-| `ABUSE_EMAIL` | Abuse reports | `abuse@get-on.tech` |
-| `SUPPORT_EMAIL` | Support questions | `support@get-on.tech` |
+| `PRIVACY_EMAIL` | Privacy questions and data requests | `team@get-on.tech` |
+| `ABUSE_EMAIL` | Abuse reports | `team@get-on.tech` |
+| `SUPPORT_EMAIL` | Support questions | `team@get-on.tech` |
 | `LEGAL_EFFECTIVE_DATE` | Date shown as "Last updated" | today, at build time |
 | `LEGAL_REVIEW_PENDING` | Shows the draft banner and highlights | `true` |
 

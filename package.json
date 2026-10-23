@@ -4,11 +4,20 @@
   "packageManager": "pnpm@12.14.0",
   "scripts": {
     "dev": "pnpm --filter web dev",
+    "dev:sites": "pnpm --filter web dev:sites",
+    "dev:all": "pnpm --filter web dev:all",
+    "seed:site": "pnpm --filter web seed:site",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test",
+    "test": "pnpm --filter web test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test && pnpm --filter @get-on/sites-worker test",
     "test:e2e": "pnpm --filter web test:e2e",
-    "screenshots": "pnpm --filter web screenshots"
+    "screenshots": "pnpm --filter web screenshots",
+    "job:email": "pnpm --filter web job:email",
+    "job:cleanup": "pnpm --filter web job:cleanup"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "typescript-eslint": "^8.71.2"
   }
 }

@@ -17,11 +17,13 @@ import {
   LayoutDashboard,
   LayoutGrid,
   LayoutTemplate,
+  Mail,
   PanelLeftClose,
   PanelLeftOpen,
   Puzzle,
   Rocket,
   Settings,
+  Shield,
   UserCircle,
   Users,
 } from "lucide-react";
@@ -46,6 +48,7 @@ type NavEntry = {
   icon: IconType;
   href?: string;
   soon?: boolean;
+  badge?: number;
 };
 
 function NavLink({
@@ -74,6 +77,17 @@ function NavLink({
         <span className="shrink-0 rounded-pill bg-surface-muted px-2 py-0.5 text-[11px] font-bold text-text-muted">
           Soon
         </span>
+      ) : null}
+      {entry.badge && entry.badge > 0 && !collapsed ? (
+        <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-pill bg-primary px-1.5 text-[11px] font-bold text-on-primary">
+          {entry.badge > 99 ? "99+" : entry.badge}
+        </span>
+      ) : null}
+      {entry.badge && entry.badge > 0 && collapsed ? (
+        <span
+          aria-hidden
+          className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-primary ring-2 ring-sidebar-bg"
+        />
       ) : null}
     </>
   );
@@ -131,6 +145,7 @@ export type ShellSidebarProps = {
   project: ShellProject | null;
   collapsed: boolean;
   onToggleCollapsed: () => void;
+  isAdmin?: boolean;
 };
 
 export function ShellSidebar({
@@ -140,6 +155,7 @@ export function ShellSidebar({
   project,
   collapsed,
   onToggleCollapsed,
+  isAdmin = false,
 }: ShellSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -163,7 +179,20 @@ export function ShellSidebar({
     { key: "overview", label: "Overview", icon: LayoutDashboard, href: base },
     { key: "pages", label: "Pages", icon: FileText, href: `${base}/pages` },
     { key: "pictures", label: "Pictures", icon: ImageIcon, href: `${base}/images` },
-    { key: "plugins", label: "Plugins", icon: Puzzle, soon: true },
+    { key: "plugins", label: "Plugins", icon: Puzzle, href: `${base}/plugins` },
+  ];
+  const pluginEntries: NavEntry[] = project?.contactEnabled
+    ? [
+        {
+          key: "messages",
+          label: "Messages",
+          icon: Mail,
+          href: `${base}/messages`,
+          badge: project.unreadMessages ?? 0,
+        },
+      ]
+    : [];
+  const projectTailEntries: NavEntry[] = [
     { key: "settings", label: "Settings", icon: Settings, soon: true },
   ];
 
@@ -176,7 +205,9 @@ export function ShellSidebar({
     router.prefetch(projectBase);
     router.prefetch(`${projectBase}/pages`);
     router.prefetch(`${projectBase}/images`);
-  }, [projectId, router]);
+    router.prefetch(`${projectBase}/plugins`);
+    if (project?.contactEnabled) router.prefetch(`${projectBase}/messages`);
+  }, [projectId, project?.contactEnabled, router]);
 
   function isActive(href: string | undefined) {
     if (!href) return false;
@@ -318,6 +349,21 @@ export function ShellSidebar({
               />
             ))}
           </nav>
+          {pluginEntries.length > 0 ? (
+            <>
+              <SectionLabel collapsed={collapsed}>Your plugins</SectionLabel>
+              <nav aria-label="Your plugins" className="flex flex-col">
+                {pluginEntries.map((entry) => (
+                  <NavLink key={entry.key} entry={entry} active={isActive(entry.href)} collapsed={collapsed} />
+                ))}
+              </nav>
+            </>
+          ) : null}
+          <nav aria-label="Website settings" className="flex flex-col">
+            {projectTailEntries.map((entry) => (
+              <NavLink key={entry.key} entry={entry} active={isActive(entry.href)} collapsed={collapsed} />
+            ))}
+          </nav>
 
           <div className="flex-1" />
 
@@ -333,17 +379,17 @@ export function ShellSidebar({
               <Eye size={20} strokeWidth={1.75} aria-hidden />
               {collapsed ? null : "Preview"}
             </Link>
-            <span
-              title="Publishing is coming soon"
-              aria-disabled="true"
+            <Link
+              href={`${base}`}
+              title={collapsed ? "Publish" : undefined}
               className={cn(
-                "mt-2 flex h-11 w-full cursor-not-allowed items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary opacity-50",
+                "mt-2 flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary text-[15px] font-semibold text-on-primary transition-colors hover:bg-primary-hover",
                 collapsed && "mx-auto w-12 px-0",
               )}
             >
               <Rocket size={20} strokeWidth={1.75} aria-hidden />
               {collapsed ? null : "Publish"}
-            </span>
+            </Link>
           </div>
         </>
       ) : (
@@ -370,6 +416,24 @@ export function ShellSidebar({
           </nav>
 
           <div className="flex-1" />
+
+          {isAdmin ? (
+            <div className="mb-2">
+              <Link
+                href="/admin"
+                title={collapsed ? "Admin" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <Shield size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Admin
+                </span>
+              </Link>
+            </div>
+          ) : null}
 
           {planId === "enterprise" ? (
             collapsed ? (

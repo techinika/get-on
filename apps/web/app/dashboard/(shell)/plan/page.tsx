@@ -18,11 +18,19 @@ import { cn } from "@/lib/utils";
 
 const PLAN_ORDER: PlanId[] = ["free", "basic", "pro", "enterprise"];
 
-export default async function PlanPage() {
+export default async function PlanPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ upgrade?: string }>;
+}) {
   const data = await getShellData();
   if (!data) {
     redirect("/login");
   }
+
+  const params = await searchParams;
+  const upgrade = params.upgrade as PlanId | undefined;
+  const upgradePlan = upgrade && PLAN_BY_ID[upgrade] ? PLAN_BY_ID[upgrade] : null;
 
   const plan = PLAN_BY_ID[data.currentTeam.planId] ?? PLAN_BY_ID.free;
   const copy = PLAN_COPY[plan.id];
@@ -62,6 +70,35 @@ export default async function PlanPage() {
         description={`Your plan applies to everyone in ${data.currentTeam.name}.`}
       />
 
+      {upgradePlan ? (
+        <InfoBox className="mb-6">
+          <div className="flex flex-col gap-3 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between">
+            <div>
+              <p className="text-base font-semibold text-text">
+                Subscribe to {upgradePlan.name}
+              </p>
+              <p className="mt-1 text-sm text-text-muted">
+                Subscription checkout is not set up yet. To continue, choose a plan or contact us — we&apos;ll guide you through the next steps.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {upgradePlan.id === "enterprise" ? (
+                <Link href="/request-demo?interest=enterprise" className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
+                  Request a demo
+                </Link>
+              ) : (
+                <Link href="/request-demo?interest=upgrade" className={cn(buttonVariants({ variant: "primary", size: "md" }))}>
+                  Request to subscribe
+                </Link>
+              )}
+              <Link href="/dashboard/plan" className={cn(buttonVariants({ variant: "secondary", size: "md" }))}>
+                View plans
+              </Link>
+            </div>
+          </div>
+        </InfoBox>
+      ) : null}
+
       <AppCard className="p-6">
         <div className="grid grid-cols-1 gap-6 min-[768px]:grid-cols-12">
           <div className="min-[768px]:col-span-7">
@@ -78,27 +115,22 @@ export default async function PlanPage() {
 
           <div className="min-[768px]:col-span-5">
             <ul className="flex flex-col gap-4">
-              {usage.map((row) => {
-                const percent =
-                  row.limit === null || row.limit === 0
-                    ? 0
-                    : Math.min(100, (row.used / row.limit) * 100);
+              {usage.map((item) => {
+                const limit = item.limit ?? 0;
                 return (
-                  <li key={row.label}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-text">{row.label}</span>
-                      <span className="text-sm text-text-muted">
-                        {row.used} of {row.limit === null ? "unlimited" : row.limit}
+                  <li key={item.label} className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-text">{item.label}</span>
+                      <span className="text-text-muted">
+                        {item.used} / {limit === 0 ? "—" : limit}
                       </span>
                     </div>
-                    {row.limit === null ? null : (
+                    {limit > 0 ? (
                       <Progress
-                        className="mt-1.5"
-                        value={percent}
-                        warning={percent >= 80}
-                        label={`${row.label} usage`}
+                        value={Math.min(100, Math.round((item.used / limit) * 100))}
+                        label={`${item.label} used`}
                       />
-                    )}
+                    ) : null}
                   </li>
                 );
               })}
@@ -107,45 +139,25 @@ export default async function PlanPage() {
         </div>
       </AppCard>
 
-      <div className="mt-4">
-        <InfoBox variant="info">
-          <span className="font-semibold">Payments are coming soon.</span> When they are ready, you
-          will be able to upgrade here in a few taps.
-        </InfoBox>
-      </div>
-
-      <Section title="Compare plans" className="mt-8">
-        <AppCard className="overflow-x-auto p-0">
-          <table className="w-full min-w-[720px] border-collapse text-left">
-            <caption className="sr-only">Compare Get-On plans</caption>
+      <Section
+        title="Compare plans"
+        description="Change your plan at any time from your team settings."
+      >
+        <AppCard className="overflow-x-auto">
+          <table className="w-full min-w-[720px] text-sm">
             <thead>
-              <tr>
-                <th scope="col" className="sticky left-0 z-10 w-[200px] bg-surface px-4 py-4">
-                  <span className="text-[15px] font-semibold text-text">What you get</span>
-                </th>
-                {PLAN_ORDER.map((id) => {
-                  const current = id === plan.id;
+              <tr className="border-b border-border">
+                <th className="px-6 py-4 text-left text-label-caps text-text-muted">Feature</th>
+                {PLAN_ORDER.map((planId) => {
+                  const planDef = PLAN_BY_ID[planId];
+                  const planBadge = PLAN_BADGE[planId];
                   return (
-                    <th
-                      key={id}
-                      scope="col"
-                      className={cn(
-                        "w-40 px-4 py-4 align-top",
-                        current && "bg-primary-soft",
-                      )}
-                    >
-                      <span className="block text-card-title text-text">
-                        {PLAN_BY_ID[id].name}
-                      </span>
-                      <span className="mt-0.5 block text-sm text-text-muted">
-                        ${PLAN_BY_ID[id].priceUsdMonthly}
-                        {PLAN_BY_ID[id].priceUsdMonthly > 0 ? " / month" : ""}
-                      </span>
-                      {current ? (
-                        <Badge variant="primary" className="mt-2">
-                          Current plan
-                        </Badge>
-                      ) : null}
+                    <th key={planId} className="px-6 py-4 text-left">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-text">{planDef.name}</span>
+                        <Badge variant={planBadge.variant}>{planBadge.label}</Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-text-muted">{PLAN_COPY[planId].priceLabel}</p>
                     </th>
                   );
                 })}
@@ -153,37 +165,18 @@ export default async function PlanPage() {
             </thead>
             <tbody>
               {COMPARE_ROWS.map((row) => (
-                <tr key={row.label} className="border-t border-border">
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-10 bg-surface px-4 py-3 text-left text-[15px] font-medium text-text"
-                  >
-                    {row.label}
-                  </th>
-                  {PLAN_ORDER.map((id) => {
-                    const value = row.values[id];
+                <tr key={row.label} className="border-b border-border last:border-b-0">
+                  <th className="px-6 py-3 text-left font-medium text-text">{row.label}</th>
+                  {PLAN_ORDER.map((planId) => {
+                    const value = row.values[planId];
                     return (
-                      <td
-                        key={id}
-                        className={cn(
-                          "px-4 py-3 text-center text-[15px] text-text",
-                          id === plan.id && "bg-primary-soft",
-                        )}
-                      >
-                        {value === true ? (
-                          <Check
-                            size={18}
-                            strokeWidth={2}
-                            aria-label="Yes"
-                            className="mx-auto text-success"
-                          />
-                        ) : value === false ? (
-                          <Minus
-                            size={18}
-                            strokeWidth={2}
-                            aria-label="No"
-                            className="mx-auto text-text-muted"
-                          />
+                      <td key={planId} className="px-6 py-3 text-text-muted">
+                        {typeof value === "boolean" ? (
+                          value ? (
+                            <Check size={18} strokeWidth={1.75} className="text-success" aria-label="Included" />
+                          ) : (
+                            <Minus size={18} strokeWidth={1.75} className="text-text-muted" aria-label="Not included" />
+                          )
                         ) : (
                           value
                         )}
@@ -192,50 +185,51 @@ export default async function PlanPage() {
                   })}
                 </tr>
               ))}
-              <tr className="border-t border-border">
-                <th scope="row" className="sticky left-0 z-10 bg-surface px-4 py-5" />
-                {PLAN_ORDER.map((id) => {
-                  const current = id === plan.id;
-                  const isEnterprise = id === "enterprise";
+            </tbody>
+            <tfoot>
+              <tr>
+                <td className="px-6 py-4" />
+                {PLAN_ORDER.map((planId) => {
+                  const copyPlan = PLAN_COPY[planId];
+                  const href =
+                    planId === data.currentTeam.planId
+                      ? "/dashboard/plan"
+                      : planId === "free"
+                        ? "/dashboard"
+                        : planId === "enterprise"
+                          ? "/request-demo?interest=enterprise"
+                          : `/dashboard/plan?upgrade=${planId}`;
                   return (
-                    <td
-                      key={id}
-                      className={cn("px-4 py-5 text-center", id === plan.id && "bg-primary-soft")}
-                    >
-                      {current ? (
-                        <span className="text-sm text-text-muted">Your plan</span>
-                      ) : isEnterprise ? (
-                        <Link
-                          href="/request-demo?interest=enterprise"
-                          className={buttonVariants({ variant: "primary", size: "md" })}
-                        >
-                          Talk to us
-                        </Link>
-                      ) : (
-                        <span
-                          title="Payments are coming soon"
-                          aria-disabled="true"
-                          className="inline-flex h-11 cursor-not-allowed items-center justify-center rounded-input border-[1.5px] border-border-strong bg-surface px-5 text-base font-semibold text-text opacity-60"
-                        >
-                          Upgrade
-                        </span>
-                      )}
+                    <td key={planId} className="px-6 py-4">
+                      <Link
+                        href={href}
+                        className={cn(
+                          buttonVariants({
+                            variant: planId === data.currentTeam.planId ? "ghost" : copyPlan.ctaVariant,
+                            size: "md",
+                          }),
+                          "w-full",
+                        )}
+                      >
+                        {planId === data.currentTeam.planId ? "Current plan" : copyPlan.cta}
+                      </Link>
                     </td>
                   );
                 })}
               </tr>
-            </tbody>
+            </tfoot>
           </table>
         </AppCard>
       </Section>
 
-      <Section title="Billing history" className="mt-8">
-        <AppEmptyState
-          compact
-          icon={<Info size={40} strokeWidth={1.75} aria-hidden />}
-          title="No invoices yet"
-          description="Your receipts will show up here once payments start."
-        />
+      <Section title="Billing details">
+        <AppCard className="p-6">
+          <AppEmptyState
+            title="Billing not connected yet"
+            description="Payments are not enabled in this build. When ready, you can update payment details here."
+            icon={<Info size={28} strokeWidth={1.75} aria-hidden />}
+          />
+        </AppCard>
       </Section>
     </AppPage>
   );

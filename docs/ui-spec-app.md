@@ -1,6 +1,9 @@
 # Get-On UI Specification v1 - Dashboard app
+See `docs/ui-spec-plugins.md` for the plugin system.
 
 For all `/dashboard` screens except the editor, the wizard and the preview, this document overrides `docs/ui-spec.md`.
+
+Publishing, the published site, the publish UI and the safety and moderation screens are specified in `docs/ui-spec-publish.md`.
 
 ## 3. Information architecture and routes
 | Route | Level | Page | Container |
@@ -244,7 +247,7 @@ Menu width 280, radius 16, padding 6. Header block (padding 12, bottom divider):
 - Server action `submitDemoRequest(formData)` with a shared Zod schema (also used in the client for instant validation): trim all strings; name 2 to 80 characters; email valid and at most 254; phone optional, 6 to 20 characters of digits, spaces, plus, dash and parentheses; business name 2 to 80; message at most 500; consent must be true.
 - Spam protection: hidden honeypot field named `website` (positioned off screen, `tabindex="-1"`, `autocomplete="off"`, `aria-hidden`); reject silently (respond as success) when it is filled. A signed time token rendered with the form; reject if submitted in under 3 seconds or older than 2 hours. Cloudflare Turnstile verification when `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` exist (invisible mode); skipped otherwise.
 - Rate limits, from the database: at most 3 requests per `ip_hash` per hour and 5 per email per day. `ip_hash = sha256(ip + IP_HASH_SALT)`; never store raw IPs. Over the limit returns the friendly error below.
-- On success: insert, then send two emails through `lib/email.ts` (a small provider-neutral interface; the default adapter uses Resend with `RESEND_API_KEY`; when no key exists, log the email to the console in development and still succeed):
+- On success: insert, then send two emails through `lib/email.ts` (a small provider-neutral interface; the default adapter uses Amazon SES (team@get-on.tech) via the email layer; when no key exists, log the email to the console in development and still succeed):
   1. To `SUPPORT_EMAIL`: subject "New demo request: {business name}"; plain text and simple HTML with every field, a "Reply to {email}" line and the interest.
   2. To the requester: subject "We got your demo request"; short, warm text: "Hi {first name}, thanks for asking about Get-On. We will email you within 1 working day to agree a time that suits you. If anything changes, just reply to this email." Sign-off "The Get-On team". Include a footer line with the privacy link. Reply-to is `SUPPORT_EMAIL`.
   Email failures are logged and do not fail the request.

@@ -1,0 +1,29 @@
+{
+  "name": "@get-on/publisher",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@get-on/blocks": "workspace:*",
+    "@get-on/renderer": "workspace:*",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "sharp": "^0.35.5"
+  },
+  "devDependencies": {
+    "@get-on/site-server": "workspace:*",
+    "@types/node": "^20.19.43",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.3.0",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

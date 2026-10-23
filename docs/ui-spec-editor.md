@@ -1,3 +1,7 @@
+For the editor,  overrides this file where they conflict.
+
+For the editor,  overrides this file where they conflict.
+
 # Get-On UI Specification v1 - Editor
 
 This document covers the Visual page editor, site look, images library, version history and preview. It extends `docs/ui-spec.md` (app scaffolding, auth, landing, dashboard, wizard, project area) and `docs/ui-spec-app.md` (the dashboard app refresh, which takes precedence for every `/dashboard` screen except the editor, the wizard and the preview).

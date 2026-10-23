@@ -17,10 +17,22 @@ export type DialogProps = {
   icon?: React.ReactNode;
   /** 480 for forms, 440 for confirmations (spec §1.4). */
   width?: "default" | "form";
+  /** Progress dialogs cannot be closed with Escape or the backdrop. */
+  dismissible?: boolean;
   className?: string;
 };
 
-export function Dialog({ open, onClose, title, children, footer, icon, width = "default", className }: DialogProps) {
+export function Dialog({
+  open,
+  onClose,
+  title,
+  children,
+  footer,
+  icon,
+  width = "default",
+  dismissible = true,
+  className,
+}: DialogProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const previouslyFocused = React.useRef<HTMLElement | null>(null);
 
@@ -34,7 +46,7 @@ export function Dialog({ open, onClose, title, children, footer, icon, width = "
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        onClose();
+        if (dismissible) onClose();
         return;
       }
       if (e.key !== "Tab" || !panel) return;
@@ -61,13 +73,17 @@ export function Dialog({ open, onClose, title, children, footer, icon, width = "
       document.body.style.overflow = prevOverflow;
       previouslyFocused.current?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open, onClose, dismissible]);
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-scrim" onClick={onClose} aria-hidden />
+      <div
+        className="absolute inset-0 bg-scrim"
+        onClick={dismissible ? onClose : undefined}
+        aria-hidden
+      />
       <div
         ref={panelRef}
         role="dialog"
@@ -84,14 +100,16 @@ export function Dialog({ open, onClose, title, children, footer, icon, width = "
         {icon ? <div className="mb-4">{icon}</div> : null}
         <div className="flex items-start justify-between gap-4">
           <h2 className="text-h3 pt-1">{title}</h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close"
-            className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-input text-text-muted transition-colors hover:bg-surface-muted"
-          >
-            <X size={20} strokeWidth={1.75} aria-hidden />
-          </button>
+          {dismissible ? (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-input text-text-muted transition-colors hover:bg-surface-muted"
+            >
+              <X size={20} strokeWidth={1.75} aria-hidden />
+            </button>
+          ) : null}
         </div>
         <div className="mt-4">{children}</div>
         {footer ? <div className="mt-6 flex flex-wrap justify-end gap-3">{footer}</div> : null}

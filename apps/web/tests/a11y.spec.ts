@@ -13,6 +13,7 @@ const ROUTES: [name: string, path: string][] = [
   ["forgot-password", "/forgot-password"],
   ["not-found", "/does-not-exist"],
   ["request-demo", "/request-demo"],
+  ["report", "/report"],
   ["terms", "/terms"],
   ["privacy", "/privacy"],
   ["cookies", "/cookies"],
@@ -24,6 +25,7 @@ const PUBLIC_ROUTES: [name: string, path: string][] = [
   ["signup", "/signup"],
   ["login", "/login"],
   ["request-demo", "/request-demo"],
+  ["report", "/report"],
   ["terms", "/terms"],
   ["privacy", "/privacy"],
 ];

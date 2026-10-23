@@ -23,6 +23,10 @@ export type ShellProject = {
   subdomain: string;
   status: "draft" | "published";
   updatedAt?: string | null;
+  /** True when the Contact plugin is on for this website. */
+  contactEnabled?: boolean;
+  /** New contact messages waiting for the team. */
+  unreadMessages?: number;
 };
 
 export type ShellUsage = {

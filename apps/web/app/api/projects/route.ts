@@ -1,32 +1,10 @@
 import { NextResponse } from "next/server";
+import { generateStarterContent } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam, planLimits } from "@/lib/team";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { friendlyError } from "@/lib/errors";
 import { invalidateQuickFind } from "@/lib/project-activity";
-
-type Block =
-  | { id: string; type: "heading"; text: string }
-  | { id: string; type: "text"; text: string }
-  | { id: string; type: "button"; text: string }
-  | { id: string; type: "contact-details"; phone?: string; email?: string; address?: string };
-
-function starterBlocks(name: string, about: string): Block[] {
-  const blocks: Block[] = [
-    { id: "b1", type: "heading", text: name },
-  ];
-  if (about.trim()) {
-    blocks.push({ id: "b2", type: "text", text: about.trim().slice(0, 300) });
-  } else {
-    blocks.push({
-      id: "b2",
-      type: "text",
-      text: `Welcome to ${name}. We are getting our website ready — check back soon.`,
-    });
-  }
-  blocks.push({ id: "b3", type: "button", text: "Contact us" });
-  return blocks;
-}
 
 export async function POST(request: Request) {
   const current = await getCurrentTeam();
@@ -45,6 +23,7 @@ export async function POST(request: Request) {
   const businessType = String((body as Record<string, unknown>).businessType ?? "");
   const startChoice = String((body as Record<string, unknown>).startChoice ?? "blank");
   const contact = ((body as Record<string, unknown>).contact ?? {}) as Record<string, string>;
+  const includeContactForm = (body as Record<string, unknown>).includeContactForm === true;
 
   if (!name) {
     return NextResponse.json({ error: "NAME_REQUIRED" }, { status: 400 });
@@ -104,13 +83,34 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
 
+  if (includeContactForm) {
+    const { error: pluginError } = await supabase.rpc("enable_plugin", {
+      p_project_id: project.id,
+      p_plugin_id: "contact",
+    });
+    if (pluginError) {
+      await supabase.from("projects").delete().eq("id", project.id);
+      return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
+    }
+  }
+
+  const content = generateStarterContent({
+    businessName: name,
+    businessType,
+    description: about,
+    phone: contact.phone ?? "",
+    email: contact.email ?? "",
+    address: contact.address ?? "",
+    includeContactForm,
+  });
+
   const { error: pageError } = await supabase.from("pages").insert({
     project_id: project.id,
     title: "Home",
     path: "/",
     position: 0,
     is_homepage: true,
-    blocks: starterBlocks(name, about),
+    blocks: content.blocks,
   });
 
   if (pageError) {

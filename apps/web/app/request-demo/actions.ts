@@ -2,7 +2,8 @@
 
 import { headers } from "next/headers";
 import { demoRequestSchema, RATE_LIMIT_PER_DAY, RATE_LIMIT_PER_HOUR } from "@/lib/demo-request";
-import { escapeHtml, sendEmail } from "@/lib/email";
+import { demoRequestAckEmail, demoRequestAlertEmail } from "@get-on/email";
+import { sendEmail } from "@/lib/email/send";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
 import { createAdminClient } from "@/lib/supabase/admin";
 import env from "@/lib/env";
@@ -37,18 +38,6 @@ async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
 
 function firstName(fullName: string): string {
   return fullName.trim().split(/\s+/)[0] ?? fullName.trim();
-}
-
-function adminEmailHtml(rows: { label: string; value: string }[]): string {
-  const body = rows
-    .map(
-      (row) =>
-        `<tr><td style="padding:6px 12px 6px 0;color:#6b5f57;font-size:14px;">${escapeHtml(
-          row.label,
-        )}</td><td style="padding:6px 0;font-size:14px;">${escapeHtml(row.value)}</td></tr>`,
-    )
-    .join("");
-  return `<table style="font-family:Arial,Helvetica,sans-serif;font-size:14px;">${body}</table>`;
 }
 
 /** Stores a demo request and emails the team and the requester. */
@@ -172,34 +161,26 @@ export async function submitDemoRequest(form: FormData): Promise<DemoRequestResu
     { label: "Interest", value: text(form, "interest").trim() || "Not given" },
   ];
 
+  const alert = demoRequestAlertEmail({ businessName: input.businessName, fields: rows });
   await sendEmail({
     to: supportEmail,
     replyTo: input.email,
-    subject: `New demo request: ${input.businessName}`,
-    text: [
-      `A new demo request came in.`,
-      "",
-      `Reply to ${input.email}`,
-      ...rows.map((row) => `${row.label}: ${row.value}`),
-      "",
-      `Interest: ${text(form, "interest").trim() || "Not given"}`,
-    ].join("\n"),
-    html: adminEmailHtml(rows),
+    fromName: "Get-On",
+    kind: "demo_request_alert",
+    subject: alert.subject,
+    text: alert.text,
+    html: alert.html,
   });
 
+  const ack = demoRequestAckEmail({ firstName: firstName(input.fullName), email: input.email });
   await sendEmail({
     to: input.email,
     replyTo: supportEmail,
-    subject: "We got your demo request",
-    text: [
-      `Hi ${firstName(input.fullName)},`,
-      "",
-      "Thanks for asking about Get-On. We will email you within 1 working day to agree a time that suits you. If anything changes, just reply to this email.",
-      "",
-      "The Get-On team",
-      "",
-      `You asked us to contact you, so we will only use your details to arrange your demo. Read our Privacy Policy: ${env.siteUrl}/privacy`,
-    ].join("\n"),
+    fromName: "Get-On",
+    kind: "demo_request_ack",
+    subject: ack.subject,
+    text: `${ack.text}\n\nYou asked us to contact you, so we will only use your details to arrange your demo. Read our Privacy Policy: ${env.siteUrl}/privacy`,
+    html: ack.html,
   });
 
   return { ok: true };

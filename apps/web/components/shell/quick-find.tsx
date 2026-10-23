@@ -11,6 +11,7 @@ type Group = { label: string; items: QuickFindItem[] };
 type QuickFindResponse = {
   websites: QuickFindItem[];
   pages: QuickFindItem[];
+  project: QuickFindItem[];
   goTo: QuickFindItem[];
 };
 
@@ -45,6 +46,7 @@ export function QuickFind({ open, onClose, projectId, returnFocusRef }: QuickFin
   const [data, setData] = React.useState<QuickFindResponse>({
     websites: [],
     pages: [],
+    project: [],
     goTo: [],
   });
   const [activeIndex, setActiveIndex] = React.useState(0);
@@ -53,6 +55,7 @@ export function QuickFind({ open, onClose, projectId, returnFocusRef }: QuickFin
     const result: Group[] = [];
     if (data.websites.length > 0) result.push({ label: "Websites", items: data.websites });
     if (data.pages.length > 0) result.push({ label: "Pages", items: data.pages });
+    if ((data.project ?? []).length > 0) result.push({ label: "This website", items: data.project ?? [] });
     if (data.goTo.length > 0) result.push({ label: "Go to", items: data.goTo });
     return result;
   }, [data]);

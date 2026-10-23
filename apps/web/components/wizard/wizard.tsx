@@ -73,6 +73,10 @@ function restoredState(): WizardState | null {
         ...DEFAULT_STATE.contact,
         ...(isRecord(parsed.contact) ? parsed.contact : {}),
       },
+      includeContactForm:
+        typeof parsed.includeContactForm === "boolean"
+          ? parsed.includeContactForm
+          : DEFAULT_STATE.includeContactForm,
       addressStatus: DEFAULT_STATE.addressStatus,
     };
   } catch {
@@ -229,6 +233,7 @@ export function Wizard() {
             email: state.contact.email.trim(),
             address: state.contact.address.trim(),
           },
+          includeContactForm: state.includeContactForm,
           ...(state.logoData ? { logoData: state.logoData } : {}),
         }),
       });
@@ -348,6 +353,10 @@ export function Wizard() {
                 logoError={state.logoError}
                 onLogoChange={(logoData) => setState((prev) => ({ ...prev, logoData }))}
                 onLogoError={(logoError) => setState((prev) => ({ ...prev, logoError }))}
+                includeContactForm={state.includeContactForm}
+                onIncludeContactFormChange={(includeContactForm) =>
+                  setState((prev) => ({ ...prev, includeContactForm }))
+                }
               />
             ) : null}
 
@@ -356,6 +365,7 @@ export function Wizard() {
                 name={state.name.trim()}
                 address={effectiveAddress}
                 businessType={state.businessType}
+                includeContactForm={state.includeContactForm}
                 submitError={submitError}
                 limitReached={limitReached}
                 onEditStep={setStep}

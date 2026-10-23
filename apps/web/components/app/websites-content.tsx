@@ -7,6 +7,7 @@ import {
   Globe,
   LayoutTemplate,
   LifeBuoy,
+  Mail,
   MoreVertical,
   Plus,
   Sparkles,
@@ -35,6 +36,7 @@ export type WebsiteSummary = {
   subdomain: string;
   status: "draft" | "published";
   updatedAt: string | null;
+  unreadMessages?: number;
 };
 
 export type WebsitesContentProps = {
@@ -313,9 +315,19 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
             <span className="truncate">{website.subdomain}.get-on.tech</span>
           </p>
           <div className="mt-3 flex items-center justify-between gap-2">
-            <span className="truncate text-xs text-text-muted">
-              Edited {relativeTime(website.updatedAt)}
-            </span>
+            {(website.unreadMessages ?? 0) > 0 ? (
+              <Link
+                href={`${href}/messages`}
+                className="relative z-10 flex h-6 items-center gap-1 rounded-pill bg-accent-soft px-2 text-xs font-bold text-accent-text hover:underline"
+              >
+                <Mail size={12} strokeWidth={2} aria-hidden />
+                {website.unreadMessages} new
+              </Link>
+            ) : (
+              <span className="truncate text-xs text-text-muted">
+                Edited {relativeTime(website.updatedAt)}
+              </span>
+            )}
             <div className="relative z-10">
               <button
                 type="button"
