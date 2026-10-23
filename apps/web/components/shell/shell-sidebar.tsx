@@ -166,7 +166,7 @@ export function ShellSidebar({
 
   const teamEntries: NavEntry[] = [
     { key: "websites", label: "Websites", icon: LayoutGrid, href: "/dashboard" },
-    { key: "templates", label: "Templates", icon: LayoutTemplate, soon: true },
+    { key: "templates", label: "Templates", icon: LayoutTemplate, href: "/dashboard/templates" },
   ];
   const teamGroupEntries: NavEntry[] = [
     { key: "members", label: "Members", icon: Users, href: "/dashboard/team" },
@@ -180,6 +180,7 @@ export function ShellSidebar({
     { key: "overview", label: "Overview", icon: LayoutDashboard, href: base },
     { key: "pages", label: "Pages", icon: FileText, href: `${base}/pages` },
     { key: "pictures", label: "Pictures", icon: ImageIcon, href: `${base}/images` },
+    { key: "templates", label: "Templates", icon: LayoutTemplate, href: `${base}/templates` },
     { key: "plugins", label: "Plugins", icon: Puzzle, href: `${base}/plugins` },
   ];
   const pluginEntries: NavEntry[] = project?.contactEnabled
