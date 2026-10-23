@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("fullName") ?? "").trim();
 
-  const response = NextResponse.redirect(new URL("/dashboard/new", request.url));
+  const response = NextResponse.redirect(new URL("/dashboard/new", request.url), 303);
 
   const supabase = await createRouteClient(response);
   const { data, error } = await supabase.auth.signUp({
@@ -23,6 +23,7 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.redirect(
       new URL(`/signup?error=${encodeURIComponent(toFriendlyAuthError(error.message))}`, request.url),
+      303,
     );
   }
 
@@ -34,6 +35,7 @@ export async function POST(request: Request) {
         `/login?message=${encodeURIComponent("Check your email to confirm your account, then log in.")}`,
         request.url,
       ),
+      303,
     );
   }
 

@@ -33,6 +33,8 @@ export type PublishCardProps = {
   detailsReady: boolean;
   contactFormPluginOff: boolean;
   lastPublishedAt: string | null;
+  /** Hide the "Version history" links when the card already sits on that page. */
+  showHistoryLink?: boolean;
   className?: string;
 };
 
@@ -47,6 +49,7 @@ export function PublishCard({
   detailsReady,
   contactFormPluginOff,
   lastPublishedAt,
+  showHistoryLink = true,
   className,
 }: PublishCardProps) {
   const router = useRouter();
@@ -141,7 +144,7 @@ export function PublishCard({
               </MenuItem>
             </>
           ) : null}
-          {hasLiveVersion ? (
+          {hasLiveVersion && showHistoryLink ? (
             <>
               <MenuSeparator />
               <MenuItem
@@ -188,7 +191,7 @@ export function PublishCard({
           </Button>
         )}
 
-        {hasLiveVersion ? (
+        {hasLiveVersion && showHistoryLink ? (
           <Link
             href={`/dashboard/projects/${projectId}/publish`}
             className="text-center text-sm font-semibold text-primary hover:underline"

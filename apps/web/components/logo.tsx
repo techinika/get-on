@@ -1,25 +1,24 @@
+import Image from "next/image";
 import Link from "next/link";
-import { ArrowUpRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export function LogoMark({ className }: { className?: string }) {
   return (
-    <span
+    <Image
+      src="/logo.svg"
+      alt=""
+      width={32}
+      height={32}
       aria-hidden
-      className={cn(
-        "flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-primary text-on-primary",
-        className,
-      )}
-    >
-      <ArrowUpRight size={18} strokeWidth={1.75} />
-    </span>
+      className={cn("h-8 w-8 shrink-0 rounded-[10px]", className)}
+    />
   );
 }
 
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-heading text-[22px] font-bold leading-none", className)}>
-      Get-On
+    <span className={cn("font-heading text-[22px] font-bold leading-none tracking-tight", className)}>
+      GETON
     </span>
   );
 }
@@ -38,7 +37,7 @@ export function Logo({
     <Link
       href={href}
       aria-label="Get-On home"
-      className={cn("inline-flex items-center gap-2", className)}
+      className={cn("inline-flex items-center gap-2.5", className)}
     >
       <LogoMark />
       <Wordmark className={wordmarkClassName} />
@@ -49,9 +48,9 @@ export function Logo({
 /** Logo with white wordmark for the dark footer. */
 export function LogoInverse({ className }: { className?: string }) {
   return (
-    <Link href="/" aria-label="Get-On home" className={cn("inline-flex items-center gap-2", className)}>
+    <Link href="/" aria-label="Get-On home" className={cn("inline-flex items-center gap-2.5", className)}>
       <LogoMark />
-      <Wordmark className="text-[#FFFFFF]" />
+      <Wordmark className="text-white" />
     </Link>
   );
 }

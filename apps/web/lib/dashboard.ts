@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 import { initialsFrom } from "@/lib/viewer";
+import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import type {
   ShellProject,
   ShellRole,
@@ -83,7 +84,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   const [{ data: projects }, { count: memberCount }] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, subdomain, status, created_at, updated_at")
+      .select("id, name, subdomain, status, content_revision, created_at, updated_at")
       .eq("team_id", currentTeam.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -95,38 +96,85 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   const projectIds = (projects ?? []).map((project) => project.id);
   let contactProjects = new Set<string>();
   let unreadByProject = new Map<string, number>();
+  let storageBytes = 0;
+  let liveRevisions = new Map<string, number>();
+  const homepageByProject = new Map<string, string>();
 
   if (projectIds.length > 0) {
-    const [{ data: installs }, { data: unread }] = await Promise.all([
-      supabase
-        .from("plugin_installs")
-        .select("project_id")
-        .eq("plugin_id", "contact")
-        .eq("state", "active")
-        .in("project_id", projectIds),
-      supabase
-        .from("contact_messages")
-        .select("project_id")
-        .eq("status", "new")
-        .in("project_id", projectIds),
-    ]);
+    const [{ data: installs }, { data: unread }, { data: mediaRows }, { data: liveRows }, { data: pageRows }] =
+      await Promise.all([
+        supabase
+          .from("plugin_installs")
+          .select("project_id")
+          .eq("plugin_id", "contact")
+          .eq("state", "active")
+          .in("project_id", projectIds),
+        supabase
+          .from("contact_messages")
+          .select("project_id")
+          .eq("status", "new")
+          .in("project_id", projectIds),
+        supabase
+          .from("media")
+          .select("size_bytes")
+          .in("project_id", projectIds)
+          .is("deleted_at", null),
+        supabase
+          .from("publishes")
+          .select("project_id, content_revision")
+          .eq("status", "live")
+          .in("project_id", projectIds),
+        supabase
+          .from("pages")
+          .select("id, project_id, is_homepage, position")
+          .in("project_id", projectIds)
+          .order("position", { ascending: true }),
+      ]);
     contactProjects = new Set((installs ?? []).map((row) => String(row.project_id)));
     unreadByProject = new Map();
     for (const row of unread ?? []) {
       const key = String(row.project_id);
       unreadByProject.set(key, (unreadByProject.get(key) ?? 0) + 1);
     }
+    for (const row of mediaRows ?? []) {
+      storageBytes += typeof row.size_bytes === "number" ? row.size_bytes : 0;
+    }
+    liveRevisions = new Map(
+      (liveRows ?? []).map((row) => [
+        String(row.project_id),
+        Number(row.content_revision ?? 0),
+      ]),
+    );
+    for (const row of pageRows ?? []) {
+      const key = String(row.project_id);
+      if (!homepageByProject.has(key) || row.is_homepage) {
+        homepageByProject.set(key, String(row.id));
+      }
+    }
   }
 
-  const shellProjects: ShellProject[] = (projects ?? []).map((project) => ({
-    id: project.id,
-    name: project.name,
-    subdomain: project.subdomain,
-    status: project.status === "published" ? "published" : "draft",
-    updatedAt: project.updated_at ?? project.created_at ?? null,
-    contactEnabled: contactProjects.has(project.id),
-    unreadMessages: unreadByProject.get(project.id) ?? 0,
-  }));
+  const publishConfig = readPublishConfig();
+
+  const shellProjects: ShellProject[] = (projects ?? []).map((project) => {
+    const status = project.status === "published" ? "published" : "draft";
+    const liveRevision = liveRevisions.get(project.id);
+    const hasUnpublishedChanges =
+      status === "published" &&
+      liveRevision !== undefined &&
+      Number(project.content_revision ?? 0) !== liveRevision;
+    return {
+      id: project.id,
+      name: project.name,
+      subdomain: project.subdomain,
+      status,
+      updatedAt: project.updated_at ?? project.created_at ?? null,
+      contactEnabled: contactProjects.has(project.id),
+      unreadMessages: unreadByProject.get(project.id) ?? 0,
+      homepageId: homepageByProject.get(project.id) ?? null,
+      hasUnpublishedChanges,
+      siteUrl: siteAddress(publishConfig, project.subdomain),
+    };
+  });
 
   return {
     user: {
@@ -141,6 +189,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     usage: {
       websites: shellProjects.length,
       members: memberCount ?? 0,
+      storageBytes,
     },
   };
 });

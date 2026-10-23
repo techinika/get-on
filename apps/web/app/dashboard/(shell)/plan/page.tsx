@@ -36,6 +36,8 @@ export default async function PlanPage({
   const copy = PLAN_COPY[plan.id];
   const badge = PLAN_BADGE[plan.id];
 
+  const storageBytes = data.usage.storageBytes ?? 0;
+  const storageMbUsed = Math.max(0, Math.round((storageBytes / (1024 * 1024)) * 10) / 10);
   const usage = [
     {
       label: "Websites",
@@ -54,7 +56,7 @@ export default async function PlanPage({
     },
     {
       label: "Storage (MB)",
-      used: 0,
+      used: storageMbUsed,
       limit: plan.storageMb,
     },
   ];
@@ -122,12 +124,21 @@ export default async function PlanPage({
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-text">{item.label}</span>
                       <span className="text-text-muted">
-                        {item.used} / {limit === 0 ? "—" : limit}
+                        {item.label === "Storage (MB)"
+                          ? `${item.used} MB / ${limit === 0 ? "—" : `${limit} MB`}`
+                          : `${item.used} / ${limit === 0 ? "—" : limit}`}
                       </span>
                     </div>
                     {limit > 0 ? (
                       <Progress
-                        value={Math.min(100, Math.round((item.used / limit) * 100))}
+                        value={Math.min(
+                          100,
+                          Math.round(
+                            item.label === "Storage (MB)"
+                              ? (storageBytes / (limit * 1024 * 1024)) * 100
+                              : (item.used / limit) * 100,
+                          ),
+                        )}
                         label={`${item.label} used`}
                       />
                     ) : null}

@@ -12,10 +12,12 @@ export async function POST(request: Request) {
   if (error) {
     return NextResponse.redirect(
       new URL(`/reset-password?error=${encodeURIComponent(toFriendlyAuthError(error.message))}`, request.url),
+      303,
     );
   }
 
   return NextResponse.redirect(
     new URL("/login?message=Your password has been updated.", request.url),
+    303,
   );
 }

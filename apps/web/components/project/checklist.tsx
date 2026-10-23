@@ -18,6 +18,8 @@ type ChecklistProps = {
   homepageId: string | null;
   contactEnabled: boolean;
   hasContactForm: boolean;
+  /** True when the website currently has a live version. */
+  published: boolean;
 };
 
 type Item = {
@@ -53,6 +55,7 @@ export function Checklist({
   homepageId,
   contactEnabled,
   hasContactForm,
+  published,
 }: ChecklistProps) {
   const viewedKey = `get-on-viewed-pages:${projectId}`;
   const [userChoice, setUserChoice] = React.useState<boolean | null>(null);
@@ -123,7 +126,9 @@ export function Checklist({
       id: "publish",
       title: "Publish your website",
       description: "Make it live for everyone.",
-      href: `/dashboard/projects/${projectId}`,
+      href: `/dashboard/projects/${projectId}/publish`,
+      completable: true,
+      done: published,
     },
   ];
 

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
+import { PublishCard } from "@/components/project/publish-card";
 import {
   PublishHistory,
   type PublishHistoryRow,
@@ -11,8 +12,24 @@ import { buttonVariants } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { siteStateOf } from "@/lib/publishing/status";
 
 type Params = { params: Promise<{ projectId: string }> };
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  subdomain: string;
+  status: string;
+  settings: unknown;
+  review_state: string | null;
+  suspended_at: string | null;
+};
+
+type ProjectSettings = {
+  contact?: { phone?: string; email?: string; address?: string };
+  logoData?: string | null;
+};
 
 export default async function PublishHistoryPage({ params }: Params) {
   const { projectId } = await params;
@@ -22,25 +39,80 @@ export default async function PublishHistoryPage({ params }: Params) {
   }
 
   const supabase = await createClient();
-  const { data: project } = await supabase
+  const { data: row } = await supabase
     .from("projects")
-    .select("id, name, subdomain")
+    .select("id, name, subdomain, status, settings, review_state, suspended_at")
     .eq("id", projectId)
     .eq("team_id", data.currentTeam.id)
     .maybeSingle();
 
+  const project = row as ProjectRow | null;
   if (!project) {
     notFound();
   }
 
-  const { data: publishes } = await supabase
-    .from("publishes")
-    .select("id, status, created_at, live_at, pages_count, error_code")
-    .eq("project_id", projectId)
-    .order("created_at", { ascending: false })
-    .limit(20);
+  const [{ data: publishes }, { data: pages }, { data: livePublish }, { data: hasChanges }, { data: contactInstall }] =
+    await Promise.all([
+      supabase
+        .from("publishes")
+        .select("id, status, created_at, live_at, pages_count, error_code")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(20),
+      supabase
+        .from("pages")
+        .select("id, title, is_homepage, blocks")
+        .eq("project_id", projectId),
+      supabase
+        .from("publishes")
+        .select("id, created_at, live_at")
+        .eq("project_id", projectId)
+        .eq("status", "live")
+        .maybeSingle(),
+      supabase.rpc("project_has_unpublished_changes", { p_project_id: projectId }),
+      supabase
+        .from("plugin_installs")
+        .select("state")
+        .eq("project_id", projectId)
+        .eq("plugin_id", "contact")
+        .maybeSingle(),
+    ]);
 
   const address = siteAddress(readPublishConfig(), project.subdomain);
+  const pageRows = pages ?? [];
+  const homepage = pageRows.find((page) => page.is_homepage) ?? pageRows[0] ?? null;
+  const settings = (project.settings ?? {}) as ProjectSettings;
+  const contact = settings.contact ?? {};
+  const detailsDone = Boolean(
+    (contact.phone ?? "").trim() ||
+      (contact.email ?? "").trim() ||
+      (contact.address ?? "").trim() ||
+      settings.logoData,
+  );
+
+  function blocksOf(value: unknown): unknown[] {
+    if (Array.isArray(value)) return value;
+    if (value && typeof value === "object" && Array.isArray((value as { blocks?: unknown[] }).blocks)) {
+      return (value as { blocks: unknown[] }).blocks;
+    }
+    return [];
+  }
+
+  const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
+  const contactEnabled = contactInstall?.state === "active";
+  const hasContactForm = pageRows.some((page) =>
+    blocksOf(page.blocks).some(
+      (block) => (block as { type?: string } | null)?.type === "contact-form",
+    ),
+  );
+  const hasLiveVersion = livePublish !== null;
+  const siteState = siteStateOf({
+    published: project.status === "published",
+    hasLiveVersion,
+    hasChanges: hasChanges === true,
+    reviewState: project.review_state,
+    suspendedAt: project.suspended_at,
+  });
 
   return (
     <AppPage width="default">
@@ -62,6 +134,22 @@ export default async function PublishHistoryPage({ params }: Params) {
           </Link>
         }
       />
+
+      <div className="mb-6">
+        <PublishCard
+          projectId={project.id}
+          name={project.name}
+          address={address}
+          state={siteState}
+          hasLiveVersion={hasLiveVersion}
+          pagesCount={pageRows.length}
+          homepageReady={homepageReady}
+          detailsReady={detailsDone}
+          contactFormPluginOff={!contactEnabled && hasContactForm}
+          lastPublishedAt={livePublish?.live_at ?? livePublish?.created_at ?? null}
+          showHistoryLink={false}
+        />
+      </div>
 
       <PublishHistory
         projectId={project.id}

@@ -109,8 +109,8 @@ export function ShellBottomTabs({
         <ul className={cn(project ? "grid-cols-5" : "grid-cols-4", "grid")}>
           {tabs.map((tab) => {
             const active =
-              tab.href === "/dashboard"
-                ? pathname === "/dashboard"
+              tab.href === "/dashboard" || tab.href === base
+                ? pathname === tab.href
                 : tab.href
                   ? pathname === tab.href || pathname.startsWith(`${tab.href}/`)
                   : moreOpen;
