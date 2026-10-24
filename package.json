@@ -25,7 +25,13 @@
     "job:activity-trim": "pnpm --filter web job:activity-trim",
     "job:redirects-resync": "pnpm --filter web job:redirects-resync",
     "job:backfill-media-hashes": "pnpm --filter web job:backfill-media-hashes",
-    "job:all": "pnpm --filter web job:all"
+    "job:all": "pnpm --filter web job:all",
+    "job:domains": "pnpm --filter web job:domains",
+    "job:domains-poll": "pnpm --filter web job:domains-poll",
+    "job:domains-health": "pnpm --filter web job:domains-health",
+    "job:domains-verify": "pnpm --filter web job:domains-verify",
+    "job:domains-plan": "pnpm --filter web job:domains-plan",
+    "job:migrate-pointers": "pnpm --filter web job:migrate-pointers"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

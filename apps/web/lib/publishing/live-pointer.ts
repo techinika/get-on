@@ -81,7 +81,12 @@ export function redirectsFromRows(rows: RedirectRow[]): SiteRedirect[] {
 
 export async function patchLivePointer(
   subdomain: string,
-  patch: Partial<Pick<SitePointer, "pause" | "redirects">>,
+  patch: Partial<
+    Pick<
+      SitePointer,
+      "pause" | "redirects" | "primaryHost" | "freeHost" | "redirectToPrimary"
+    >
+  >,
 ): Promise<boolean> {
   const config = readPublishConfig();
   const hostname = siteHostname(config, subdomain);
