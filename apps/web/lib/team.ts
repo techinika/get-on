@@ -1,5 +1,5 @@
 import { getShellData } from "@/lib/dashboard";
-import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
+import { PLAN_DEFINITIONS, type PlanId } from "@/lib/plans";
 import type { ShellRole } from "@/components/shell/types";
 
 export type CurrentTeam = {
@@ -31,5 +31,5 @@ export async function getCurrentTeam(): Promise<
 }
 
 export function planLimits(planId: PlanId) {
-  return PLAN_BY_ID[planId] ?? PLAN_BY_ID.free;
+  return PLAN_DEFINITIONS.find((plan) => plan.id === planId) ?? PLAN_DEFINITIONS[0];
 }

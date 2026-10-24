@@ -93,6 +93,8 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       .eq("team_id", currentTeam.id),
   ]);
 
+  const visibleProjects = (projects ?? []).filter((p: any) => !p.deleted_at);
+
   const projectIds = (projects ?? []).map((project) => project.id);
   let contactProjects = new Set<string>();
   let unreadByProject = new Map<string, number>();
@@ -155,7 +157,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
 
   const publishConfig = readPublishConfig();
 
-  const shellProjects: ShellProject[] = (projects ?? []).map((project) => {
+  const shellProjects: ShellProject[] = (visibleProjects).map((project) => {
     const status = project.status === "published" ? "published" : "draft";
     const liveRevision = liveRevisions.get(project.id);
     const hasUnpublishedChanges =

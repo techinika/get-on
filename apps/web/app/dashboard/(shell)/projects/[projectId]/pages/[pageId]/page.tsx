@@ -84,7 +84,7 @@ export default async function PageEditorPage({ params }: Params) {
             </Link>
             <h1 className="text-h1 mt-1">Editing: {page.title}</h1>
             <p className="mt-1 text-sm text-text-muted">
-              Preview with the renderer. Canvas editor coming soon.
+              Edit your page with the preview below. Make changes from Pages or use the design tools as you go.
             </p>
           </div>
           <Link

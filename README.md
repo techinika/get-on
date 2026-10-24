@@ -150,6 +150,9 @@ E2E_ENABLE_SIGNUP=1 pnpm test:e2e
 `.github/workflows/ci.yml` runs install, lint, typecheck, unit tests and build on every pull request.
 
 ## Status
-The visual editor is the remaining piece of work. The blocks and renderer packages exist, and the editor route shows what is on a page, but the canvas, inspector, version history and the public site preview are not built yet. See `docs/ui-spec-editor.md`.
+The page editor shows a live preview of blocks. Use Pages and Templates to update content and design. See `docs/ui-spec-editor.md`.
 
 The dashboard, the wizard, publishing, the local site server, the Cloudflare Worker, the report flow, the admin console, the request-a-demo form and the legal pages are built. The legal copy still carries `[[DECISION: ...]]` markers and placeholders, and `docs/legal.md` lists what has to be decided before launch.
+
+## Settings
+See docs/settings.md and docs/ui-spec-settings.md for website settings, backups, transfers, redirects, visitor stats, and analytics.

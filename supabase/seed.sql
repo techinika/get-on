@@ -13,10 +13,10 @@ insert into public.plans (
   watermark_required
 )
 values
-  ('free', 'Free', 0, 1, 1, 1, 1, 10, 100, 0, false, true),
-  ('basic', 'Basic', 7.99, 2, 5, 1, 2, 100, 1024, 1000, true, false),
-  ('pro', 'Pro', 13.99, 5, null, 5, 5, 400, 5120, 5000, true, false),
-  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1500, 25600, 25000, true, false)
+  ('free', 'Free', 0, 1, 1, 1, 1, 0, 100, 100, false, true),
+  ('basic', 'Basic', 7.99, 3, 10, 3, 5, 50, 500, 500, false, false),
+  ('pro', 'Pro', 13.99, 10, 50, 10, 15, 200, 2048, 2000, true, false),
+  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1000, 10240, 10000, true, false)
 on conflict (id) do update
 set
   name = excluded.name,

@@ -169,8 +169,8 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
         <ul className="mt-6 grid grid-cols-1 gap-4 min-[480px]:grid-cols-2 min-[1024px]:grid-cols-3">
           {media.map((item) => (
             <li key={item.id}>
-              <AppCard className="overflow-hidden p-0">
-                <div className="relative aspect-[4/3] w-full bg-surface-muted">
+              <AppCard className="p-0">
+                <div className="relative aspect-[4/3] w-full overflow-hidden rounded-t-card bg-surface-muted">
                   <Image
                     src={publicMediaUrl(item.path)}
                     alt={item.filename ?? "Picture"}
@@ -202,14 +202,14 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
                   >
                     <MenuItem
                       onClick={() =>
-                        toast("Editing picture details is not ready yet. The editor is coming soon.", "info")
+                        toast("Picture details can be updated from the Images library.", "info")
                       }
                     >
                       Edit details
                     </MenuItem>
                     <MenuItem
                       onClick={() =>
-                        toast("Placing a picture on a page is not ready yet. The editor is coming soon.", "info")
+                        toast("Add images to pages from the editor view or Images library.", "info")
                       }
                     >
                       Use on page

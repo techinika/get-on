@@ -11,7 +11,7 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "TEAM_NOT_FOUND" }, { status: 401 });
   }
   if (current.team.role === "viewer") {
-    return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
+    return NextResponse.json({ error: "NOT_ALLOWED" }, { status: 403 });
   }
 
   const { projectId } = await params;
@@ -28,12 +28,28 @@ export async function DELETE(_request: Request, { params }: Params) {
     return NextResponse.json({ error: "PROJECT_NOT_FOUND" }, { status: 404 });
   }
 
-  const { error } = await supabase.from("projects").delete().eq("id", projectId);
-  if (error) {
-    return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
+  try {
+    // Try soft delete if column exists
+    const { error } = await supabase
+      .from("projects")
+      .update({ deleted_at: new Date().toISOString() })
+      .eq("id", projectId)
+      .eq("team_id", current.team.teamId);
+    if (error) {
+      // Fallback to hard delete if no soft delete column
+      const { error: deleteError } = await supabase.from("projects").delete().eq("id", projectId);
+      if (deleteError) {
+        return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
+      }
+    }
+    invalidateQuickFind(current.team.teamId);
+    return NextResponse.json({ ok: true });
+  } catch {
+    const { error: deleteError } = await supabase.from("projects").delete().eq("id", projectId);
+    if (deleteError) {
+      return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
+    }
+    invalidateQuickFind(current.team.teamId);
+    return NextResponse.json({ ok: true });
   }
-
-  invalidateQuickFind(current.team.teamId);
-
-  return NextResponse.json({ ok: true });
 }

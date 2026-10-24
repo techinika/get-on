@@ -279,7 +279,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
 
   return (
     <>
-      <AppCard interactive className="relative flex flex-col overflow-hidden">
+      <AppCard interactive className="relative flex flex-col">
         <div className="relative aspect-[16/10] overflow-hidden">
           <div aria-hidden className="absolute inset-0" style={{ background: gradientFor(website.id) }} />
           <div className="absolute inset-3 overflow-hidden rounded-input bg-white/90">

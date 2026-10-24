@@ -55,7 +55,7 @@ export default async function PublishHistoryPage({ params }: Params) {
     await Promise.all([
       supabase
         .from("publishes")
-        .select("id, status, created_at, live_at, pages_count, error_code")
+        .select("id, status, created_at, live_at, pages_count, error_code, created_by")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false })
         .limit(20),
@@ -77,6 +77,21 @@ export default async function PublishHistoryPage({ params }: Params) {
         .eq("plugin_id", "contact")
         .maybeSingle(),
     ]);
+
+  const createdByIds = Array.from(
+    new Set(((publishes ?? []) as Array<{ created_by?: string | null }>).map((row) => row.created_by).filter((id): id is string => Boolean(id))),
+  );
+  const { data: profiles } = createdByIds.length
+    ? await supabase.from("profiles").select("id, full_name").in("id", createdByIds)
+    : { data: [] as Array<{ id: string; full_name: string | null }> };
+  const profileMap = new Map((profiles ?? []).map((profile) => [profile.id, profile.full_name ?? null]));
+  const publishRows = ((publishes ?? []) as Array<Record<string, unknown>>).map((row) => {
+    const id = row.created_by as string | null | undefined;
+    return {
+      ...row,
+      created_by_name: id ? profileMap.get(id) ?? null : null,
+    };
+  });
 
   const address = siteAddress(readPublishConfig(), project.subdomain);
   const pageRows = pages ?? [];
@@ -153,7 +168,7 @@ export default async function PublishHistoryPage({ params }: Params) {
 
       <PublishHistory
         projectId={project.id}
-        rows={(publishes ?? []) as PublishHistoryRow[]}
+        rows={(publishRows ?? []) as PublishHistoryRow[]}
         address={address}
       />
     </AppPage>

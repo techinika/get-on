@@ -1,3 +1,13 @@
+# See also
+See also `docs/ui-spec-settings.md` for the Settings area.
+- docs/ui-spec-settings.md
+
+See also `docs/ui-spec-templates.md` for the templates system.
+
+See also  for the templates system.
+
+See also  for the templates system.
+
 # Get-On UI Specification v1 - Dashboard app
 See `docs/ui-spec-plugins.md` for the plugin system.
 

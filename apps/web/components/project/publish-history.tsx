@@ -16,6 +16,7 @@ export type PublishHistoryRow = {
   live_at: string | null;
   pages_count: number | null;
   error_code: string | null;
+  created_by_name?: string | null;
 };
 
 const LABELS: Record<string, { label: string; variant: "live" | "neutral" | "draft" | "danger" }> = {
@@ -93,9 +94,9 @@ export function PublishHistory({
                 <p className="mt-0.5 text-sm text-text-muted">
                   {row.status === "failed"
                     ? "Something went wrong. Your previous website stayed online."
-                    : row.pages_count
-                      ? `${row.pages_count} page${row.pages_count === 1 ? "" : "s"}`
-                      : "Website version"}
+                    : [row.pages_count ? `${row.pages_count} page${row.pages_count === 1 ? "" : "s"}` : "Website version", row.created_by_name ? `by ${row.created_by_name}` : null]
+                        .filter(Boolean)
+                        .join(" · ")}
                 </p>
               </div>
               {restorable ? (

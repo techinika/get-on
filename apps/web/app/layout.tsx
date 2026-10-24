@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import "./globals.css";
+import "@get-on/renderer/styles.css";
 import { themeInitScript } from "@/lib/theme";
 
 const bricolage = Bricolage_Grotesque({
