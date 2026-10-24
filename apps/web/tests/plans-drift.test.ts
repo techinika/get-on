@@ -16,9 +16,9 @@ const SEED = readFileSync(
 
 function parseSeedPlans(): Map<string, Record<string, string>> {
   const plans = new Map<string, Record<string, string>>();
-  // Rows look like: ('free', 'Free', 0.00, 1, 1, 1, 1, 10, 100, 0, false, true),
+  // Rows look like: ('free', 'Free', 0.00, 1, 1, 1, 1, 10, 100, 0, false, 0, true),
   const rowRe =
-    /\('([a-z]+)',\s*'([^']+)',\s*([0-9.]+),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+),\s*(\d+),\s*(\d+),\s*(true|false),\s*(true|false)\)/g;
+    /\('([a-z]+)',\s*'([^']+)',\s*([0-9.]+),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+),\s*(\d+),\s*(\d+),\s*(true|false),\s*(\d+),\s*(true|false)\)/g;
   for (const m of SEED.matchAll(rowRe)) {
     plans.set(m[1]!, {
       name: m[2]!,
@@ -31,7 +31,8 @@ function parseSeedPlans(): Map<string, Record<string, string>> {
       storage: m[9]!,
       emails: m[10]!,
       customDomain: m[11]!,
-      watermark: m[12]!,
+      customDomainsPerSite: m[12]!,
+      watermark: m[13]!,
     });
   }
   return plans;
@@ -64,6 +65,7 @@ describe("plan definitions match the database seed", () => {
       expect(plan.storageMb).toBe(Number(row.storage));
       expect(plan.monthlyEmails).toBe(Number(row.emails));
       expect(plan.customDomainAllowed).toBe(bool(row.customDomain));
+      expect(plan.customDomainsPerSite).toBe(Number(row.customDomainsPerSite));
       expect(plan.watermarkRequired).toBe(bool(row.watermark));
     },
   );

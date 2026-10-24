@@ -39,7 +39,7 @@ export const PLAN_COPY: Record<PlanId, PlanCopy> = {
     features: [
       "2 websites",
       "Up to 5 pages each",
-      "Use your own domain",
+      "1 custom domain per website",
       "2 extra features (plugins)",
       "No Get-On badge",
       "Standard support",
@@ -54,7 +54,7 @@ export const PLAN_COPY: Record<PlanId, PlanCopy> = {
     features: [
       "5 websites",
       "Unlimited pages",
-      "Use your own domain",
+      "Up to 3 custom domains per website",
       "5 extra features (plugins)",
       "Up to 5 team members",
       "Priority support",
@@ -72,7 +72,7 @@ export const PLAN_COPY: Record<PlanId, PlanCopy> = {
       "Unlimited pages",
       "Unlimited team members",
       "Unlimited extra features",
-      "Use your own domain",
+      "Up to 10 custom domains per website",
       "Highest-priority support",
     ],
   },
@@ -89,7 +89,10 @@ export const COMPARE_ROWS: CompareRow[] = [
   { label: "Pages per website", values: { free: "1", basic: "5", pro: "Unlimited", enterprise: "Unlimited" } },
   { label: "Team members", values: { free: "1", basic: "1", pro: "5", enterprise: "Unlimited" } },
   { label: "Extra features (plugins)", values: { free: "1", basic: "2", pro: "5", enterprise: "Unlimited" } },
-  { label: "Your own domain", values: { free: false, basic: true, pro: true, enterprise: true } },
+  {
+    label: "Custom domains per website",
+    values: { free: "—", basic: "1", pro: "3", enterprise: "10" },
+  },
   { label: "No Get-On badge", values: { free: false, basic: true, pro: true, enterprise: true } },
   {
     label: "Support priority",
