@@ -1,6 +1,6 @@
 # Get-On UI Specification - Website settings completion
 
-See also `docs/ui-spec.md`, `docs/ui-spec-app.md`, `docs/ui-spec-publish.md`.
+See also `docs/ui-spec.md`, `docs/ui-spec-app.md`, `docs/ui-spec-publish.md`, and `docs/ui-spec-domains.md` (this replaces the Address settings spec).
 
 ## 7. Settings UI specification (atom level)
 Tokens and components come from `docs/ui-spec.md` and `docs/ui-spec-app.md`. Reuse; do not duplicate.
