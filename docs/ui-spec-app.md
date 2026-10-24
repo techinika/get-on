@@ -2,6 +2,10 @@
 See also `docs/ui-spec-settings.md` for the Settings area.
 - docs/ui-spec-settings.md
 
+# See also
+See also `docs/ui-spec-settings.md` for the Settings area.
+- docs/ui-spec-settings.md
+
 See also `docs/ui-spec-templates.md` for the templates system.
 
 See also  for the templates system.

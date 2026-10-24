@@ -14,7 +14,18 @@
     "test:e2e": "pnpm --filter web test:e2e",
     "screenshots": "pnpm --filter web screenshots",
     "job:email": "pnpm --filter web job:email",
-    "job:cleanup": "pnpm --filter web job:cleanup"
+    "job:cleanup": "pnpm --filter web job:cleanup",
+    "job:backups": "pnpm --filter web job:backups",
+    "job:backup-gc": "pnpm --filter web job:backup-gc",
+    "job:exports-cleanup": "pnpm --filter web job:exports-cleanup",
+    "job:imports-cleanup": "pnpm --filter web job:imports-cleanup",
+    "job:transfers-expire": "pnpm --filter web job:transfers-expire",
+    "job:deleted-purge": "pnpm --filter web job:deleted-purge",
+    "job:subdomain-release": "pnpm --filter web job:subdomain-release",
+    "job:activity-trim": "pnpm --filter web job:activity-trim",
+    "job:redirects-resync": "pnpm --filter web job:redirects-resync",
+    "job:backfill-media-hashes": "pnpm --filter web job:backfill-media-hashes",
+    "job:all": "pnpm --filter web job:all"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

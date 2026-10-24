@@ -74,3 +74,15 @@ The site design system is prepared for a future "dark-mode" plugin:
 - docs/settings.md
 - docs/ui-spec-settings.md
 
+
+## Website settings core rules
+1. Heavy changes never run at the same time on one website (publish, apply template, import, restore, transfer and delete). Read-only jobs do not block.
+2. Nothing overwrites without a safety copy. Restore, import (replace/add), template apply, deletion create a safety backup first.
+3. Nothing auto-publishes except explicit publish actions. Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
+4. Backups and export files never contain secrets (no keys/tokens/emails/payment data). Contact messages included only when explicitly switched on.
+5. Imported files are untrusted: validate structure/size, defend against zip tricks, re-encode pictures, verify PDFs, validate blocks, never execute/trust paths/ids.
+6. Transfers move the website only; receiver must accept; limits checked on acceptance.
+7. Published pages have no client JavaScript except Google Analytics when the owner enables it (loads first-party script and Google tag only after consent or if "count everyone"). Strict CSP otherwise.
+8. Visitor stats are cookie-free and first-party: no IP stored, daily rotating salt, respect DNT/GPC, bots excluded.
+9. Every settings page says when a change takes effect ("Applies right away" or "Applies when you publish"); changes needing publish mark unpublished changes.
+10. Deleted websites are recoverable for 14 days, then permanently purged; web address held for 30 more days.

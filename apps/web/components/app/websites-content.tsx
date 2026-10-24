@@ -86,14 +86,22 @@ export function WebsitesContent({
         title="Websites"
         description={`Everything in ${teamName}.`}
         actions={
-          <Link
-            href="/dashboard/new"
-            onClick={createWebsite}
-            className={cn(buttonVariants({ variant: "primary", size: "md" }), "w-full min-[640px]:w-auto")}
-          >
-            <Plus size={20} strokeWidth={1.75} aria-hidden />
-            Create website
-          </Link>
+          <div className="flex w-full flex-col gap-2 min-[640px]:w-auto min-[640px]:flex-row">
+            <Link
+              href="/dashboard/new"
+              onClick={createWebsite}
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "w-full min-[640px]:w-auto")}
+            >
+              <Plus size={20} strokeWidth={1.75} aria-hidden />
+              Create website
+            </Link>
+            <Link
+              href="/dashboard/new?import=1"
+              className={cn(buttonVariants({ variant: "secondary", size: "md" }), "w-full min-[640px]:w-auto")}
+            >
+              Import from a file
+            </Link>
+          </div>
         }
       />
 

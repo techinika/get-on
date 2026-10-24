@@ -1,1 +1,1 @@
-console.log('job:all');
+export {}

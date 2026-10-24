@@ -2,7 +2,6 @@
 See also `docs/ui-spec-settings.md` for the Settings area.
 - docs/ui-spec-settings.md
 
-# Get-On UI Specification v1 - Publishing
 
 This document covers publishing a website to `https://{name}.get-on.tech`, the published site itself, the publishing dashboard UI and the safety and moderation screens. It extends `docs/ui-spec.md` (app scaffolding, auth, landing, dashboard, wizard, project area), `docs/ui-spec-app.md` (the dashboard app refresh) and `docs/ui-spec-editor.md` (the editor, site look, images library, version history and preview).
 

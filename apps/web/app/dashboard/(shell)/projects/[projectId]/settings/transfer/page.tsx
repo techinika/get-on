@@ -1,28 +1,18 @@
-import { AppCard } from "@/components/app/card";
+import { SettingsPageHeader } from "@/components/settings/settings-page-header";
+import { TransferForm } from "./transfer-form";
 
 type Params = { params: Promise<{ projectId: string }> };
 
 export default async function SettingsPage({ params }: Params) {
-  const { projectId } = await params;
+  await params;
   return (
     <div>
-      <header className="mb-6">
-        <div className="text-sm text-text-muted">
-          <a className="text-primary hover:underline" href={`/dashboard/projects/${projectId}/settings`}>
-            Settings
-          </a>
-          {" / "}
-          <span>Settings</span>
-        </div>
-        <h1 className="mt-2 font-heading text-[22px] font-bold text-text">Settings</h1>
-        <p className="mt-1 text-[15px] text-text-muted">Manage your settings.</p>
-        <div className="mt-3 inline-flex h-7 items-center rounded-full bg-surface-muted px-2.5 text-xs font-semibold text-text-muted">
-          Applies right away
-        </div>
-      </header>
-      <AppCard className="max-w-[760px] p-6">
-        <p className="text-[15px] text-text-muted">Settings coming soon.</p>
-      </AppCard>
+      <SettingsPageHeader
+        title="Transfer this website"
+        description="Move this website to another team. Everything on the website moves with it."
+        timing="right"
+      />
+      <TransferForm />
     </div>
   );
 }

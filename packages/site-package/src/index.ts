@@ -42,3 +42,5 @@ export function validateManifest(input: unknown): SitePackageManifest {
 export function migrateContent(doc: SiteDocument, _from: number): SiteDocument {
   return doc;
 }
+
+export * from "./export";

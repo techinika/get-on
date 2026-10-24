@@ -229,6 +229,28 @@ export default async function OverviewPage({ params }: Params) {
             </AppCard>
           ) : null}
 
+          <AppCard className="p-4">
+            <p className="text-sm font-semibold text-text">Visitors</p>
+            <p className="mt-1 text-sm text-text-muted">Last 7 days</p>
+            <Link
+              href={`/dashboard/projects/${project.id}/visitors`}
+              className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline"
+            >
+              See all
+            </Link>
+          </AppCard>
+
+          <AppCard className="p-4">
+            <p className="text-sm font-semibold text-text">Backups</p>
+            <p className="mt-1 text-sm text-text-muted">Safe copies of your website</p>
+            <Link
+              href={`/dashboard/projects/${project.id}/settings/backups`}
+              className="mt-2 inline-flex text-sm font-semibold text-primary hover:underline"
+            >
+              All backups
+            </Link>
+          </AppCard>
+
           <AppCard className="bg-info-soft p-4">
             <p className="text-sm text-info-text">Stuck? We are happy to help.</p>
             <OpenHelpButton className="mt-2" />
