@@ -6,7 +6,7 @@ import { getCurrentTeam } from "@/lib/team";
 import { logActivity } from "@/lib/activity";
 import { PLANS } from "@/lib/plans/constants";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import {
   patchLivePointer,
   pauseFromSettings,
@@ -46,7 +46,7 @@ async function findProject(
 ) {
   const { data } = await supabase
     .from("projects")
-    .select("id, name, subdomain, status, deleted_at")
+    .select("id, name, subdomain, primary_host, status, deleted_at")
     .eq("id", projectId)
     .eq("team_id", teamId)
     .maybeSingle();
@@ -341,7 +341,7 @@ export async function previewSitemap(projectId: string): Promise<SitemapResult> 
     .select("path, is_hidden, hide_from_search")
     .eq("project_id", projectId)
     .order("position", { ascending: true });
-  const base = siteAddress(readPublishConfig(), project.subdomain);
+  const base = primaryAddress(readPublishConfig(), project.subdomain, project.primary_host);
   const entries = (pages ?? []).filter(
     (page) => !page.is_hidden && page.hide_from_search !== true,
   );
@@ -368,7 +368,7 @@ export async function checkSitemap(projectId: string): Promise<SitemapResult> {
     return { ok: false, error: "Publish your website first, then check the sitemap." };
   }
 
-  const url = `${siteAddress(readPublishConfig(), project.subdomain)}/sitemap.xml`;
+  const url = `${primaryAddress(readPublishConfig(), project.subdomain, project.primary_host)}/sitemap.xml`;
   try {
     const response = await fetch(url, {
       cache: "no-store",

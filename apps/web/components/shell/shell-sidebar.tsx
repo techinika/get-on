@@ -168,6 +168,7 @@ export function ShellSidebar({
   const teamEntries: NavEntry[] = [
     { key: "websites", label: "Websites", icon: LayoutGrid, href: "/dashboard" },
     { key: "templates", label: "Templates", icon: LayoutTemplate, href: "/dashboard/templates" },
+    { key: "domains", label: "Domains", icon: Globe, href: "/dashboard/domains" },
   ];
   const teamGroupEntries: NavEntry[] = [
     { key: "members", label: "Members", icon: Users, href: "/dashboard/team" },

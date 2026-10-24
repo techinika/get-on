@@ -15,6 +15,7 @@ type ChecklistProps = {
   /** True when any of phone, email, address or logo exists in project settings. */
   detailsDone: boolean;
   customDomainAllowed: boolean;
+  customDomainLive: boolean;
   homepageId: string | null;
   contactEnabled: boolean;
   hasContactForm: boolean;
@@ -52,6 +53,7 @@ export function Checklist({
   subdomain,
   detailsDone,
   customDomainAllowed,
+  customDomainLive,
   homepageId,
   contactEnabled,
   hasContactForm,
@@ -111,10 +113,15 @@ export function Checklist({
     {
       id: "domain",
       title: "Use your own domain",
-      description: `Replace ${subdomain}.get-on.tech with yourbusiness.com.`,
-      href: customDomainAllowed ? undefined : "/#pricing",
+      description: customDomainLive
+        ? "Your website has its own address."
+        : `Replace ${subdomain}.get-on.tech with yourbusiness.com.`,
+      href: customDomainAllowed
+        ? `/dashboard/projects/${projectId}/settings/address`
+        : "/dashboard/plan",
       upgrade: !customDomainAllowed,
-      soon: customDomainAllowed,
+      completable: customDomainAllowed,
+      done: customDomainLive,
     },
     {
       id: "analytics",

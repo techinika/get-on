@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { SearchForm } from "./search-form";
 
 type Params = { params: Promise<{ projectId: string }> };
@@ -23,7 +23,7 @@ export default async function SettingsPage({ params }: Params) {
     const [{ data: project }, { data: settings }] = await Promise.all([
       supabase
         .from("projects")
-        .select("name, subdomain")
+        .select("name, subdomain, primary_host")
         .eq("id", projectId)
         .eq("team_id", current.team.teamId)
         .maybeSingle(),
@@ -35,7 +35,11 @@ export default async function SettingsPage({ params }: Params) {
     ]);
     siteName = project?.name ?? "";
     if (project?.subdomain) {
-      siteUrl = siteAddress(readPublishConfig(), project.subdomain);
+      siteUrl = primaryAddress(
+        readPublishConfig(),
+        project.subdomain,
+        project.primary_host,
+      );
     }
     initial = {
       title: settings?.seo_site_title ?? "",

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AppCard } from "@/components/app/card";
+import { InfoBox } from "@/components/app/info-box";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
@@ -21,7 +22,15 @@ type Initial = {
   includeImages?: boolean;
 };
 
-export function SitemapForm({ projectId, initial = {} }: { projectId: string; initial?: Initial }) {
+export function SitemapForm({
+  projectId,
+  initial = {},
+  connectedHost = null,
+}: {
+  projectId: string;
+  initial?: Initial;
+  connectedHost?: string | null;
+}) {
   const { toast } = useToast();
   const [saving, setSaving] = useState(false);
   const [checking, setChecking] = useState(false);
@@ -64,6 +73,11 @@ export function SitemapForm({ projectId, initial = {} }: { projectId: string; in
   return (
     <>
       <form action={onSubmit} className="flex flex-col gap-6">
+        {connectedHost ? (
+          <InfoBox variant="info" className="max-w-[760px]">
+            Your website now uses {connectedHost}. Publish so search engines see the new address.
+          </InfoBox>
+        ) : null}
         <AppCard className="max-w-[760px] p-6">
           <div className="flex flex-col gap-4">
             <div>

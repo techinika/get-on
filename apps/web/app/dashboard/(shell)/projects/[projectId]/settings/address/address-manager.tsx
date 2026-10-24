@@ -211,11 +211,24 @@ export function AddressManager({
                   </span>
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <p className="text-[17px] font-semibold text-text">{domain.displayName}</p>
+                      <Link
+                        href={`/dashboard/projects/${projectId}/settings/address/domains/${domain.id}`}
+                        className="break-all text-[17px] font-semibold text-text hover:text-primary hover:underline"
+                      >
+                        {domain.displayName}
+                      </Link>
                       <DomainStatusBadge status={domain.status} />
                       <Badge variant="primary">{domain.role === "primary" ? "Main domain" : "Also redirects"}</Badge>
                     </div>
                     <p className="mt-1 text-[13px] text-text-muted">{statusLine(domain, hosts)}</p>
+                    {domain.status === "plan_lapsed" ? (
+                      <div className="mt-2">
+                        <InfoBox variant="warning">
+                          Your domain is paused because your plan no longer includes it.{" "}
+                          <Link href="/dashboard/plan" className="font-semibold underline">See plans</Link>
+                        </InfoBox>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
                 {canManage ? (
@@ -306,7 +319,8 @@ export function AddressManager({
           <div className="mt-4">
             {atLimit ? (
               <InfoBox variant="warning">
-                Your {planName} plan includes {limit} domain{limit === 1 ? "" : "s"} for each website.
+                Your {planName} plan includes {limit} domain{limit === 1 ? "" : "s"} for each website.{" "}
+                <Link href="/dashboard/plan" className="font-semibold underline">See plans</Link>
               </InfoBox>
             ) : canManage ? (
               <Link href={connectHref}>

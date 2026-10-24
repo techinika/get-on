@@ -82,6 +82,16 @@ export function siteAddress(
     : `https://${hostname}`;
 }
 
+/** The address owners should use: the live main domain, else the free address. */
+export function primaryAddress(
+  config: PublishConfig,
+  subdomain: string,
+  primaryHost?: string | null,
+): string {
+  const host = (primaryHost ?? "").trim().toLowerCase();
+  return host ? `https://${host}` : siteAddress(config, subdomain);
+}
+
 /** Throws a stable code instead of leaking which setting is missing. */
 export function requireCloudflareConfig(config: PublishConfig): {
   accountId: string;

@@ -27,6 +27,8 @@ export default async function DashboardPage() {
         status: project.status,
         updatedAt: project.updatedAt ?? null,
         unreadMessages: project.unreadMessages ?? 0,
+        siteUrl: project.siteUrl ?? null,
+        primaryHost: project.primaryHost ?? null,
       }))}
     />
   );

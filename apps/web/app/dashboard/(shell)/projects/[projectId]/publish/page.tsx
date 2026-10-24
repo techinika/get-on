@@ -11,7 +11,7 @@ import {
 import { buttonVariants } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
 
 type Params = { params: Promise<{ projectId: string }> };
@@ -21,6 +21,7 @@ type ProjectRow = {
   name: string;
   subdomain: string;
   status: string;
+  primary_host: string | null;
   settings: unknown;
   review_state: string | null;
   suspended_at: string | null;
@@ -41,7 +42,7 @@ export default async function PublishHistoryPage({ params }: Params) {
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("projects")
-    .select("id, name, subdomain, status, settings, review_state, suspended_at")
+    .select("id, name, subdomain, status, primary_host, settings, review_state, suspended_at")
     .eq("id", projectId)
     .eq("team_id", data.currentTeam.id)
     .maybeSingle();
@@ -93,7 +94,11 @@ export default async function PublishHistoryPage({ params }: Params) {
     };
   });
 
-  const address = siteAddress(readPublishConfig(), project.subdomain);
+  const address = primaryAddress(
+    readPublishConfig(),
+    project.subdomain,
+    project.primary_host,
+  );
   const pageRows = pages ?? [];
   const homepage = pageRows.find((page) => page.is_homepage) ?? pageRows[0] ?? null;
   const settings = (project.settings ?? {}) as ProjectSettings;
