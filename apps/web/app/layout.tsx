@@ -1,19 +1,20 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
-import { Bricolage_Grotesque, Figtree } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
+import "@get-on/renderer/styles.css";
 import { themeInitScript } from "@/lib/theme";
 
-const bricolage = Bricolage_Grotesque({
-  subsets: ["latin"],
-  weight: ["600", "700"],
+const bricolage = localFont({
+  src: "./fonts/bricolage-grotesque-latin.woff2",
+  weight: "600 700",
   display: "swap",
   variable: "--font-bricolage",
 });
 
-const figtree = Figtree({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+const figtree = localFont({
+  src: "./fonts/figtree-latin.woff2",
+  weight: "400 700",
   display: "swap",
   variable: "--font-figtree",
 });

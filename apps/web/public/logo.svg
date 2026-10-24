@@ -1,14 +1,23 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0F766E"/>
-      <stop offset="1" stop-color="#0B6B4F"/>
-    </linearGradient>
-  </defs>
-  <rect width="512" height="512" rx="112" fill="url(#g)"/>
-  <g fill="white">
-    <path d="M162 176h188v36h-146v44h124v34h-124v70h-42V176z"/>
-    <path d="M356 176h42v144h96v40H356V176z"/>
+<svg width="640" height="160" viewBox="0 0 320 80" fill="#0B6B4F" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GET-ON">
+  <g>
+    <rect x="0" y="8" width="50" height="13"/>
+    <rect x="0" y="8" width="13" height="64"/>
+    <rect x="0" y="59" width="50" height="13"/>
+    <rect x="37" y="46" width="13" height="26"/>
+    <rect x="24" y="33" width="26" height="13"/>
+    <rect x="60" y="8" width="13" height="64"/>
+    <rect x="60" y="8" width="44" height="13"/>
+    <rect x="60" y="30" width="32" height="13"/>
+    <rect x="60" y="59" width="44" height="13"/>
+    <rect x="114" y="8" width="48" height="13"/>
+    <rect x="131" y="8" width="14" height="64"/>
+    <path d="M174 30 L198 30 L192 45 L168 45 Z"/>
+    <rect x="206" y="8" width="52" height="13"/>
+    <rect x="206" y="59" width="52" height="13"/>
+    <rect x="206" y="8" width="13" height="64"/>
+    <rect x="245" y="8" width="13" height="64"/>
+    <rect x="268" y="8" width="13" height="64"/>
+    <rect x="307" y="8" width="13" height="64"/>
+    <path d="M281 8 L294 8 L320 72 L307 72 Z"/>
   </g>
-  <circle cx="156" cy="310" r="10" fill="#22D3EE" opacity="0.9"/>
 </svg>

@@ -84,7 +84,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   const [{ data: projects }, { count: memberCount }] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, subdomain, status, content_revision, created_at, updated_at")
+      .select("id, name, subdomain, status, content_revision, created_at, updated_at, deleted_at")
       .eq("team_id", currentTeam.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -93,7 +93,11 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       .eq("team_id", currentTeam.id),
   ]);
 
-  const projectIds = (projects ?? []).map((project) => project.id);
+  const visibleProjects = (projects ?? []).filter(
+    (project: { deleted_at?: string | null }) => !project.deleted_at,
+  );
+
+  const projectIds = visibleProjects.map((project) => project.id);
   let contactProjects = new Set<string>();
   let unreadByProject = new Map<string, number>();
   let storageBytes = 0;
@@ -155,7 +159,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
 
   const publishConfig = readPublishConfig();
 
-  const shellProjects: ShellProject[] = (projects ?? []).map((project) => {
+  const shellProjects: ShellProject[] = (visibleProjects).map((project) => {
     const status = project.status === "published" ? "published" : "draft";
     const liveRevision = liveRevisions.get(project.id);
     const hasUnpublishedChanges =

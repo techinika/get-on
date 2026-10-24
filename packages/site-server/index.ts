@@ -5,9 +5,17 @@ export { RESERVED_SUBDOMAINS, isReservedSubdomain } from "./src/reserved";
 export {
   notFoundPage,
   notPublishedPage,
+  pausedPage,
   suspendedPage,
 } from "./src/platform-pages";
-export type { SiteFile, SitePointer, SiteState, SiteStore } from "./src/types";
+export type {
+  SiteFile,
+  SitePause,
+  SitePointer,
+  SiteRedirect,
+  SiteState,
+  SiteStore,
+} from "./src/types";
 export type { HandleOptions } from "./src/handle";
 export {
   signFormToken,

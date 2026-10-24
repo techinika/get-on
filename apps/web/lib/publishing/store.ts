@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { BuiltFile } from "@get-on/publisher";
 import {
+  createNodeStore,
   sharedPath,
   sitePath,
   writeNodePointer,
@@ -22,6 +23,8 @@ export type PublishStore = {
   ): Promise<void>;
   /** Writes files shared by every website, such as the fonts. */
   writeShared(files: Record<string, BuiltFile>): Promise<void>;
+  /** The live pointer for a host name, or null when there is none. */
+  getPointer(hostname: string): Promise<SitePointer | null>;
   /** Flips the live pointer for a host name. */
   writePointer(hostname: string, pointer: SitePointer): Promise<void>;
 };
@@ -145,6 +148,23 @@ function cloudflareStore(config: PublishConfig): PublishStore {
         putObject(sharedKey(filePath), file),
       );
     },
+    async getPointer(hostname) {
+      const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
+        kvNamespaceId,
+      )}/values/${encodeURIComponent(`host:${hostname}`)}`;
+      const response = await fetch(url, { headers });
+      if (response.status === 404) return null;
+      if (!response.ok) {
+        console.error(`[publish] could not read pointer ${hostname}: ${response.status}`);
+        return null;
+      }
+      try {
+        const parsed = JSON.parse(await response.text()) as SitePointer;
+        return parsed?.siteId && parsed?.publishId ? parsed : null;
+      } catch {
+        return null;
+      }
+    },
     async writePointer(hostname, pointer) {
       const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
         kvNamespaceId,
@@ -163,6 +183,8 @@ function cloudflareStore(config: PublishConfig): PublishStore {
 }
 
 function localStore(config: PublishConfig): PublishStore {
+  const reader = createNodeStore(config.localDir);
+
   async function writeFileAt(filePath: string, file: BuiltFile): Promise<void> {
     await mkdir(path.dirname(filePath), { recursive: true });
     await writeFile(filePath, file.body);
@@ -188,6 +210,9 @@ function localStore(config: PublishConfig): PublishStore {
       await eachLimit(Object.entries(files), 6, ([filePath, file]) =>
         writeFileAt(sharedPath(config.localDir, filePath), file),
       );
+    },
+    async getPointer(hostname) {
+      return reader.getPointer(hostname);
     },
     async writePointer(hostname, pointer) {
       await writeNodePointer(config.localDir, hostname, pointer);

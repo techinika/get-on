@@ -15,7 +15,18 @@
     "dev:all": "node scripts/dev-all.mjs",
     "seed:site": "tsx scripts/seed-site.ts",
     "job:email": "tsx scripts/email-queue.ts",
-    "job:cleanup": "tsx scripts/cleanup-spam.ts"
+    "job:cleanup": "tsx scripts/cleanup-spam.ts",
+    "job:backups": "tsx scripts/jobs/backups.ts",
+    "job:backup-gc": "tsx scripts/jobs/backup-gc.ts",
+    "job:exports-cleanup": "tsx scripts/jobs/exports-cleanup.ts",
+    "job:imports-cleanup": "tsx scripts/jobs/imports-cleanup.ts",
+    "job:transfers-expire": "tsx scripts/jobs/transfers-expire.ts",
+    "job:deleted-purge": "tsx scripts/jobs/deleted-purge.ts",
+    "job:subdomain-release": "tsx scripts/jobs/subdomain-release.ts",
+    "job:activity-trim": "tsx scripts/jobs/activity-trim.ts",
+    "job:redirects-resync": "tsx scripts/jobs/redirects-resync.ts",
+    "job:backfill-media-hashes": "tsx scripts/jobs/backfill-media-hashes.ts",
+    "job:all": "tsx scripts/jobs/all.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -27,6 +38,7 @@
     "@get-on/publisher": "workspace:*",
     "@get-on/renderer": "workspace:*",
     "@get-on/site-server": "workspace:*",
+    "@get-on/templates": "workspace:*",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tiptap/extension-link": "^2.10.3",

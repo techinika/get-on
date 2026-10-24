@@ -86,14 +86,22 @@ export function WebsitesContent({
         title="Websites"
         description={`Everything in ${teamName}.`}
         actions={
-          <Link
-            href="/dashboard/new"
-            onClick={createWebsite}
-            className={cn(buttonVariants({ variant: "primary", size: "md" }), "w-full min-[640px]:w-auto")}
-          >
-            <Plus size={20} strokeWidth={1.75} aria-hidden />
-            Create website
-          </Link>
+          <div className="flex w-full flex-col gap-2 min-[640px]:w-auto min-[640px]:flex-row">
+            <Link
+              href="/dashboard/new"
+              onClick={createWebsite}
+              className={cn(buttonVariants({ variant: "primary", size: "md" }), "w-full min-[640px]:w-auto")}
+            >
+              <Plus size={20} strokeWidth={1.75} aria-hidden />
+              Create website
+            </Link>
+            <Link
+              href="/dashboard/new?import=1"
+              className={cn(buttonVariants({ variant: "secondary", size: "md" }), "w-full min-[640px]:w-auto")}
+            >
+              Import from a file
+            </Link>
+          </div>
         }
       />
 
@@ -279,7 +287,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
 
   return (
     <>
-      <AppCard interactive className="relative flex flex-col overflow-hidden">
+      <AppCard interactive className="relative flex flex-col">
         <div className="relative aspect-[16/10] overflow-hidden">
           <div aria-hidden className="absolute inset-0" style={{ background: gradientFor(website.id) }} />
           <div className="absolute inset-3 overflow-hidden rounded-input bg-white/90">

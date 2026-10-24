@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  BarChart3,
   Check,
   ChevronsUpDown,
   CircleCheck,
@@ -166,7 +167,7 @@ export function ShellSidebar({
 
   const teamEntries: NavEntry[] = [
     { key: "websites", label: "Websites", icon: LayoutGrid, href: "/dashboard" },
-    { key: "templates", label: "Templates", icon: LayoutTemplate, soon: true },
+    { key: "templates", label: "Templates", icon: LayoutTemplate, href: "/dashboard/templates" },
   ];
   const teamGroupEntries: NavEntry[] = [
     { key: "members", label: "Members", icon: Users, href: "/dashboard/team" },
@@ -178,8 +179,10 @@ export function ShellSidebar({
   ];
   const projectEntries: NavEntry[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard, href: base },
+    { key: "visitors", label: "Visitors", icon: BarChart3, href: `${base}/visitors` },
     { key: "pages", label: "Pages", icon: FileText, href: `${base}/pages` },
     { key: "pictures", label: "Pictures", icon: ImageIcon, href: `${base}/images` },
+    { key: "templates", label: "Templates", icon: LayoutTemplate, href: `${base}/templates` },
     { key: "plugins", label: "Plugins", icon: Puzzle, href: `${base}/plugins` },
   ];
   const pluginEntries: NavEntry[] = project?.contactEnabled
@@ -194,7 +197,7 @@ export function ShellSidebar({
       ]
     : [];
   const projectTailEntries: NavEntry[] = [
-    { key: "settings", label: "Settings", icon: Settings, soon: true },
+    { key: "settings", label: "Settings", icon: Settings, href: `${base}/settings` },
   ];
 
   // Prefetch the project routes when the sidebar mounts, so the first click
@@ -204,6 +207,7 @@ export function ShellSidebar({
     if (!projectId) return;
     const projectBase = `/dashboard/projects/${projectId}`;
     router.prefetch(projectBase);
+    router.prefetch(`${projectBase}/visitors`);
     router.prefetch(`${projectBase}/pages`);
     router.prefetch(`${projectBase}/images`);
     router.prefetch(`${projectBase}/plugins`);

@@ -23,16 +23,22 @@ export function pageSeo(options: {
     options.settings.seo?.title?.trim() || options.settings.businessName;
   const pageTitle = options.pageTitle?.trim() || siteTitle;
 
+  const format = options.settings.seo?.titleFormat?.trim() || "{page} | {site}";
+  const formattedTitle = format
+    .replaceAll("{page}", pageTitle)
+    .replaceAll("{site}", siteTitle)
+    .trim();
   const title = options.seoTitle?.trim()
     ? options.seoTitle.trim()
     : options.isHome || pageTitle === siteTitle
       ? siteTitle
-      : `${pageTitle} | ${siteTitle}`;
+      : formattedTitle || `${pageTitle} | ${siteTitle}`;
 
   const description =
     options.seoDescription?.trim() ||
     options.pageDescription?.trim() ||
     options.settings.seo?.description?.trim() ||
+    options.settings.tagline?.trim() ||
     "";
 
   return {

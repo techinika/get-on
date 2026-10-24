@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   CreditCard,
   Ellipsis,
   FileText,
@@ -11,8 +12,8 @@ import {
   Image as ImageIcon,
   LayoutDashboard,
   LayoutGrid,
+  LayoutTemplate,
   Mail,
-  Puzzle,
   Settings,
   Users,
   X,
@@ -87,11 +88,12 @@ export function ShellBottomTabs({
         { key: "overview", label: "Overview", icon: LayoutDashboard, href: base },
         { key: "pages", label: "Pages", icon: FileText, href: `${base}/pages` },
         { key: "pictures", label: "Pictures", icon: ImageIcon, href: `${base}/images` },
-        { key: "plugins", label: "Plugins", icon: Puzzle, href: `${base}/plugins` },
+        { key: "templates", label: "Templates", icon: LayoutTemplate, href: `${base}/templates` },
         { key: "more", label: "More", icon: Ellipsis },
       ]
     : [
         { key: "websites", label: "Websites", icon: LayoutGrid, href: "/dashboard" },
+        { key: "templates", label: "Templates", icon: LayoutTemplate, href: "/dashboard/templates" },
         { key: "team", label: "Team", icon: Users, href: "/dashboard/team" },
         { key: "plan", label: "Plan", icon: CreditCard, href: "/dashboard/plan" },
         { key: "account", label: "Account", icon: Users, href: "/dashboard/account" },
@@ -106,7 +108,7 @@ export function ShellBottomTabs({
           hidden ? "translate-y-full" : "translate-y-0",
         )}
       >
-        <ul className={cn(project ? "grid-cols-5" : "grid-cols-4", "grid")}>
+        <ul className={cn(project ? "grid-cols-5" : "grid-cols-5", "grid")}>
           {tabs.map((tab) => {
             const active =
               tab.href === "/dashboard" || tab.href === base
@@ -211,6 +213,26 @@ export function ShellBottomTabs({
                   </Link>
                 </li>
               ) : null}
+              <li>
+                <Link
+                  href={`${base}/visitors`}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex min-h-14 items-center gap-3 border-b border-border px-5 text-base font-semibold text-text"
+                >
+                  <BarChart3 size={22} strokeWidth={1.75} aria-hidden className="text-text-muted" />
+                  <span className="flex-1">Visitors</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={`${base}/templates`}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex min-h-14 items-center gap-3 border-b border-border px-5 text-base font-semibold text-text"
+                >
+                  <LayoutTemplate size={22} strokeWidth={1.75} aria-hidden className="text-text-muted" />
+                  <span className="flex-1">Templates</span>
+                </Link>
+              </li>
               <li>
                 <Link
                   href={`${base}/settings`}

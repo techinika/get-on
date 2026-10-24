@@ -58,5 +58,31 @@ The site design system is prepared for a future "dark-mode" plugin:
 - A database needs every migration applied before the app works. `supabase db push` does it, or paste the files into the Supabase SQL editor in order.
 
 ## Known gaps
-- The visual editor is a placeholder: the blocks and renderer packages exist, but there is no canvas, inspector, version history UI or public site route yet.
+- The page editor shows a live preview of blocks; continue using Pages and Templates to update content and design.
 - Signed-in screenshots and the dashboard need a database with every migration applied and email confirmation switched off (or confirmed accounts).
+
+## Templates (added)
+- Templates are blueprints copied into websites (no live link). Versions immutable. Apply never publishes.
+- Default template (Starter) is always available and protected. Five system templates: Starter, Software company, Law firm, Restaurant, Developer portfolio.
+- Personal templates per team with limits; workspaces use the same editor in template mode.
+- Sample content is never copied as real business facts; sample claims warn before publishing.
+- Plan limits adapted, not bypassed. Restore points for 30 days on replace operations.
+- AI hooks only (no AI calls).
+
+
+## See also
+- docs/settings.md
+- docs/ui-spec-settings.md
+
+
+## Website settings core rules
+1. Heavy changes never run at the same time on one website (publish, apply template, import, restore, transfer and delete). Read-only jobs do not block.
+2. Nothing overwrites without a safety copy. Restore, import (replace/add), template apply, deletion create a safety backup first.
+3. Nothing auto-publishes except explicit publish actions. Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
+4. Backups and export files never contain secrets (no keys/tokens/emails/payment data). Contact messages included only when explicitly switched on.
+5. Imported files are untrusted: validate structure/size, defend against zip tricks, re-encode pictures, verify PDFs, validate blocks, never execute/trust paths/ids.
+6. Transfers move the website only; receiver must accept; limits checked on acceptance.
+7. Published pages have no client JavaScript except Google Analytics when the owner enables it (loads first-party script and Google tag only after consent or if "count everyone"). Strict CSP otherwise.
+8. Visitor stats are cookie-free and first-party: no IP stored, daily rotating salt, respect DNT/GPC, bots excluded.
+9. Every settings page says when a change takes effect ("Applies right away" or "Applies when you publish"); changes needing publish mark unpublished changes.
+10. Deleted websites are recoverable for 14 days, then permanently purged; web address held for 30 more days.

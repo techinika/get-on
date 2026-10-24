@@ -1,14 +1,14 @@
 <svg width="180" height="180" viewBox="0 0 180 180" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="180" y2="180" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#0F766E"/>
-      <stop offset="1" stop-color="#0B6B4F"/>
-    </linearGradient>
-  </defs>
-  <rect width="180" height="180" rx="40" fill="url(#g)"/>
-  <g fill="white">
-    <path d="M57 62h66v12.6H73.2v15.4h43.4v11.9H73.2v24.5H57V62z"/>
-    <path d="M125 62h14.7v50.4h33.6v14H125V62z"/>
+  <rect width="180" height="180" rx="40" fill="#0B6B4F"/>
+  <g fill="#FFFFFF" transform="translate(27 45) scale(1.13)">
+    <rect x="0" y="8" width="50" height="13"/>
+    <rect x="0" y="8" width="13" height="64"/>
+    <rect x="0" y="59" width="50" height="13"/>
+    <rect x="37" y="46" width="13" height="26"/>
+    <rect x="24" y="33" width="26" height="13"/>
+    <rect x="60" y="8" width="52" height="13"/>
+    <rect x="60" y="59" width="52" height="13"/>
+    <rect x="60" y="8" width="13" height="64"/>
+    <rect x="99" y="8" width="13" height="64"/>
   </g>
-  <circle cx="55" cy="109" r="3.5" fill="#22D3EE" opacity="0.9"/>
 </svg>

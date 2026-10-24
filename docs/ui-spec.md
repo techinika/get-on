@@ -257,7 +257,7 @@ Step 6, title "You are all set", sub "Check the details, then create your websit
 - Loading state: three skeleton rows of 72 px.
 
 ### 8.1 Editor placeholder `.../pages/[pageId]`
-- Back link "Pages" (arrow-left), H1 "Editing: {title}". Notice box (info style, info icon): "The visual editor is coming soon. For now you can see what is on this page below."
+- Back link "Pages" (arrow-left), H1 "Editing: {title}". Notice box (info style, info icon): "Edit your page with the preview below. Use Pages and Templates to update content and design."
 - Card "What is on this page": renders the stored blocks read-only in a simple preview (heading block as H2 text, text block as paragraph, button block as a disabled pill button, contact-details block as a small list) inside a bordered white frame with 24 padding. Below, a collapsible "Developer view" (native details) with the block JSON in a monospace code block (14 px, bg --surface-muted, radius 12, padding 16, horizontal scroll).
 
 ## 9. Global states and patterns

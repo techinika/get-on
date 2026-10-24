@@ -244,7 +244,7 @@ export function PagesList({ project, teamName, planName, pageLimit, pages }: Pag
         </div>
       ) : null}
 
-      <AppCard className="overflow-hidden p-0">
+      <AppCard className="overflow-visible p-0">
         <ul>
           {items.map((page, index) => {
             const isDragging = dragId === page.id;

@@ -1,0 +1,38 @@
+export const PLANS = {
+  free: {
+    name: "Free",
+    backup_auto_frequency: "weekly",
+    backup_auto_keep: 1,
+    backup_manual_max: 1,
+    backup_storage_mb: 100,
+    redirects_max: 3,
+    exports_per_day: 3,
+  },
+  basic: {
+    name: "Basic",
+    backup_auto_frequency: "daily",
+    backup_auto_keep: 7,
+    backup_manual_max: 3,
+    backup_storage_mb: 500,
+    redirects_max: 25,
+    exports_per_day: 5,
+  },
+  pro: {
+    name: "Pro",
+    backup_auto_frequency: "daily",
+    backup_auto_keep: 14,
+    backup_manual_max: 10,
+    backup_storage_mb: 2048,
+    redirects_max: 100,
+    exports_per_day: 10,
+  },
+  enterprise: {
+    name: "Enterprise",
+    backup_auto_frequency: "daily",
+    backup_auto_keep: 30,
+    backup_manual_max: 25,
+    backup_storage_mb: 10240,
+    redirects_max: 500,
+    exports_per_day: 20,
+  },
+};

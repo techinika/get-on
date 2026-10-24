@@ -1,12 +1,28 @@
 /** The shape of the live pointer stored in KV (or the local pointer file). */
 export type SiteState = "live" | "unpublished" | "suspended";
 
+export type SitePause = {
+  title: string;
+  text: string;
+  since?: string;
+};
+
+export type SiteRedirect = {
+  from: string;
+  to: string;
+  code: number;
+};
+
 export type SitePointer = {
   siteId: string;
   publishId: string;
   state: SiteState;
   builtAt: string;
   plan: string;
+  /** A friendly message that replaces the website while it is paused. */
+  pause?: SitePause | null;
+  /** Old addresses that are sent to a new page or a full link. */
+  redirects?: SiteRedirect[];
 };
 
 export type SiteFile = {

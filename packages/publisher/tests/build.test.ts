@@ -213,6 +213,25 @@ describe("buildSite", () => {
     expect(html).toContain("Made with");
   });
 
+  it("uses the owner's page-not-found message", async () => {
+    const base = input();
+    const result = await buildSite({
+      ...base,
+      settings: {
+        ...base.settings,
+        customNotFound: {
+          title: "We moved that page",
+          text: "Try the menu above.",
+          button: "Back to the start",
+        },
+      },
+    });
+    const html = htmlOf(result.files, "404.html");
+    expect(html).toContain("We moved that page");
+    expect(html).toContain("Try the menu above.");
+    expect(html).toContain("Back to the start");
+  });
+
   it("shows the Get-On mark on a free website", async () => {
     const result = await buildSite(input());
     expect(htmlOf(result.files, "index.html")).toContain("Made with");

@@ -11,6 +11,10 @@ import {
   parseTheme,
   usedImageIds,
 } from "@/lib/publishing/build-input";
+import {
+  pauseFromSettings,
+  redirectsFromRows,
+} from "@/lib/publishing/live-pointer";
 import { createPublishStore } from "@/lib/publishing/store";
 import { displayAddress, siteStateOf } from "@/lib/publishing/status";
 
@@ -162,6 +166,33 @@ describe("site input", () => {
     const snapshot = buildSnapshot(project, { seo_site_title: "Rose Bakery" }, [page]);
     expect(snapshot.project).toEqual({ name: "Rose Bakery", subdomain: "rosebakery" });
     expect((snapshot.pages as unknown[]).length).toBe(1);
+  });
+});
+
+describe("live pointer settings", () => {
+  it("reads a pause message from the saved settings", () => {
+    expect(
+      pauseFromSettings({
+        enabled: true,
+        title: "Back soon",
+        text: "We are making bread.",
+        since: "2026-10-24T10:00:00.000Z",
+      }),
+    ).toEqual({
+      title: "Back soon",
+      text: "We are making bread.",
+      since: "2026-10-24T10:00:00.000Z",
+    });
+    expect(pauseFromSettings({ enabled: false })).toBeNull();
+  });
+
+  it("cleans moved pages before they reach the live pointer", () => {
+    expect(
+      redirectsFromRows([
+        { from_path: "/Old-Menu/", to_value: "/menu", code: 301 },
+        { from_path: "/bad", to_value: "javascript:alert(1)", code: 301 },
+      ]),
+    ).toEqual([{ from: "/old-menu", to: "/menu", code: 301 }]);
   });
 });
 

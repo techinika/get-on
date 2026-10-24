@@ -4,6 +4,7 @@ import {
   notFoundPage,
   notPublishedPage,
   parseHost,
+  pausedPage,
   suspendedPage,
   type SiteFile,
   type SitePointer,
@@ -240,6 +241,58 @@ describe("handleSiteRequest", () => {
     expect(await response.text()).toContain("missing");
   });
 
+  it("shows the pause message while the owner makes changes", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        pause: { title: "Back after lunch", text: "We are baking new bread." },
+      },
+      files: { "index.html": file("<html>home</html>") },
+    });
+    const response = await handleSiteRequest(
+      request("http://rosebakery.get-on.tech/"),
+      store,
+    );
+    expect(response.status).toBe(503);
+    expect(response.headers.get("retry-after")).toBe("3600");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    const html = await response.text();
+    expect(html).toContain("Back after lunch");
+    expect(html).toContain("We are baking new bread.");
+    expect(html).not.toContain("<script");
+  });
+
+  it("sends an old address to the new one", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        redirects: [{ from: "/old-menu", to: "/menu", code: 301 }],
+      },
+      files: {},
+    });
+    const response = await handleSiteRequest(
+      request("http://rosebakery.get-on.tech/old-menu?ref=menu"),
+      store,
+    );
+    expect(response.status).toBe(301);
+    expect(response.headers.get("location")).toBe("/menu?ref=menu");
+  });
+
+  it("refuses an unsafe moved-page target", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        redirects: [{ from: "/old", to: "javascript:alert(1)", code: 301 }],
+      },
+      files: {},
+    });
+    const response = await handleSiteRequest(
+      request("http://rosebakery.get-on.tech/old"),
+      store,
+    );
+    expect(response.status).toBe(404);
+  });
+
   it("caches images and fonts for a long time", async () => {
     const store = memoryStore({
       pointer: livePointer,
@@ -364,6 +417,7 @@ describe("platform pages", () => {
     for (const html of [
       notFoundPage(),
       notPublishedPage(),
+      pausedPage("Back soon", "Please come back later."),
       suspendedPage("rosebakery"),
     ]) {
       expect(html).not.toContain("<script");

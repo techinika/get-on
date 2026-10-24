@@ -17,6 +17,7 @@ export type WizardState = {
   businessType: string;
   about: string;
   startChoice: StartChoice;
+  templateSlug: string | null;
   contact: { phone: string; email: string; address: string };
   includeContactForm: boolean;
   logoData: string | null;
@@ -35,6 +36,7 @@ export const DEFAULT_STATE: WizardState = {
   businessType: "",
   about: "",
   startChoice: "blank",
+  templateSlug: null,
   contact: { phone: "", email: "", address: "" },
   includeContactForm: true,
   logoData: null,

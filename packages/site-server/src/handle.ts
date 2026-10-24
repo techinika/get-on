@@ -3,6 +3,7 @@ import { DEFAULT_ROOT_DOMAIN, parseHost } from "./host";
 import {
   notFoundPage,
   notPublishedPage,
+  pausedPage,
   suspendedPage,
 } from "./platform-pages";
 import {
@@ -176,6 +177,45 @@ function redirect(location: string): Response {
   });
 }
 
+function movedResponse(location: string, code: number): Response | null {
+  if (!location || /[\r\n]/.test(location)) return null;
+  if (location.startsWith("/")) {
+    if (
+      location.startsWith("//") ||
+      location.includes("\\") ||
+      location.includes("..")
+    ) {
+      return null;
+    }
+  } else {
+    try {
+      const url = new URL(location);
+      if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    } catch {
+      return null;
+    }
+  }
+  const status = code === 301 || code === 302 || code === 307 || code === 308
+    ? code
+    : 301;
+  return new Response(null, {
+    status,
+    headers: {
+      Location: location,
+      "Cache-Control": "public, max-age=60",
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
+function withSearch(location: string, search: string): string {
+  if (!search || location.includes("?")) return location;
+  const hashAt = location.indexOf("#");
+  return hashAt === -1
+    ? `${location}${search}`
+    : `${location.slice(0, hashAt)}${search}${location.slice(hashAt)}`;
+}
+
 function badRequest(): Response {
   return new Response("Bad request", {
     status: 400,
@@ -326,6 +366,24 @@ export async function handleSiteRequest(
       404,
       cacheControlFor("", "platform"),
     );
+  }
+
+  if (pointer.pause) {
+    return platformResponse(
+      pausedPage(pointer.pause.title, pointer.pause.text),
+      503,
+      "no-store",
+      { "Retry-After": "3600" },
+    );
+  }
+
+  const moved = pointer.redirects?.find((item) => item.from === path);
+  if (moved) {
+    const response = movedResponse(
+      withSearch(moved.to, url.search),
+      moved.code,
+    );
+    if (response) return response;
   }
 
   const filePath = filePathFor(path);

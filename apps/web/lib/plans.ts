@@ -1,88 +1,139 @@
 export type PlanId = "free" | "basic" | "pro" | "enterprise";
 
-export type PlanDefinition = {
+export type Plan = {
   id: PlanId;
   name: string;
-  priceUsdMonthly: number;
+  priceMonthly: number | null;
   maxWebsites: number | null;
   maxPagesPerSite: number | null;
   maxMembers: number | null;
-  maxPlugins: number | null;
+  storageMb: number | null;
   aiCreditsMonthly: number;
-  storageMb: number;
-  monthlyEmails: number;
   customDomainAllowed: boolean;
-  watermarkRequired: boolean;
-  supportPriority: "standard" | "priority" | "highest";
+  watermarked: boolean;
+  backupAutoFrequency: "weekly" | "daily";
+  backupAutoKeep: number;
+  backupManualMax: number;
+  backupStorageMb: number;
+  redirectsMax: number;
+  exportsPerDay: number;
 };
 
-export const PLAN_DEFINITIONS: PlanDefinition[] = [
-  {
+export const PLAN_BY_ID: Record<PlanId, Plan> = {
+  free: {
     id: "free",
     name: "Free",
-    priceUsdMonthly: 0,
+    priceMonthly: null,
     maxWebsites: 1,
     maxPagesPerSite: 1,
     maxMembers: 1,
-    maxPlugins: 1,
-    aiCreditsMonthly: 10,
     storageMb: 100,
-    monthlyEmails: 0,
+    aiCreditsMonthly: 0,
     customDomainAllowed: false,
-    watermarkRequired: true,
-    supportPriority: "standard",
+    watermarked: true,
+    backupAutoFrequency: "weekly",
+    backupAutoKeep: 1,
+    backupManualMax: 1,
+    backupStorageMb: 100,
+    redirectsMax: 3,
+    exportsPerDay: 3,
   },
-  {
+  basic: {
     id: "basic",
     name: "Basic",
-    priceUsdMonthly: 7.99,
-    maxWebsites: 2,
-    maxPagesPerSite: 5,
-    maxMembers: 1,
-    maxPlugins: 2,
-    aiCreditsMonthly: 100,
-    storageMb: 1024,
-    monthlyEmails: 1000,
-    customDomainAllowed: true,
-    watermarkRequired: false,
-    supportPriority: "standard",
+    priceMonthly: 9,
+    maxWebsites: 3,
+    maxPagesPerSite: 10,
+    maxMembers: 3,
+    storageMb: 500,
+    aiCreditsMonthly: 50,
+    customDomainAllowed: false,
+    watermarked: false,
+    backupAutoFrequency: "daily",
+    backupAutoKeep: 7,
+    backupManualMax: 3,
+    backupStorageMb: 500,
+    redirectsMax: 25,
+    exportsPerDay: 5,
   },
-  {
+  pro: {
     id: "pro",
     name: "Pro",
-    priceUsdMonthly: 13.99,
-    maxWebsites: 5,
-    maxPagesPerSite: null,
-    maxMembers: 5,
-    maxPlugins: 5,
-    aiCreditsMonthly: 400,
-    storageMb: 5120,
-    monthlyEmails: 5000,
+    priceMonthly: 29,
+    maxWebsites: 10,
+    maxPagesPerSite: 50,
+    maxMembers: 10,
+    storageMb: 2048,
+    aiCreditsMonthly: 200,
     customDomainAllowed: true,
-    watermarkRequired: false,
-    supportPriority: "priority",
+    watermarked: false,
+    backupAutoFrequency: "daily",
+    backupAutoKeep: 14,
+    backupManualMax: 10,
+    backupStorageMb: 2048,
+    redirectsMax: 100,
+    exportsPerDay: 10,
   },
-  {
+  enterprise: {
     id: "enterprise",
     name: "Enterprise",
-    priceUsdMonthly: 59.99,
+    priceMonthly: null,
     maxWebsites: null,
     maxPagesPerSite: null,
     maxMembers: null,
-    maxPlugins: null,
-    aiCreditsMonthly: 1500,
-    storageMb: 25600,
-    monthlyEmails: 25000,
+    storageMb: 10240,
+    aiCreditsMonthly: 1000,
     customDomainAllowed: true,
+    watermarked: false,
+    backupAutoFrequency: "daily",
+    backupAutoKeep: 30,
+    backupManualMax: 25,
+    backupStorageMb: 10240,
+    redirectsMax: 500,
+    exportsPerDay: 20,
+  },
+};
+
+export function planLimits(planId: string): Plan {
+  return PLAN_BY_ID[(planId as PlanId)] ?? PLAN_BY_ID.free;
+}
+
+export interface PlanDefinition extends Plan {
+  priceUsdMonthly: number;
+  maxPlugins: number | null;
+  monthlyEmails: number;
+  watermarkRequired: boolean;
+  priceMonthlyDisplay?: string;
+}
+
+export const PLAN_DEFINITIONS: PlanDefinition[] = [
+  {
+    ...PLAN_BY_ID.free,
+    priceUsdMonthly: 0,
+    maxPlugins: 1,
+    monthlyEmails: 100,
+    watermarkRequired: true,
+    priceMonthlyDisplay: "Free",
+  },
+  {
+    ...PLAN_BY_ID.basic,
+    priceUsdMonthly: 7.99,
+    maxPlugins: 5,
+    monthlyEmails: 500,
     watermarkRequired: false,
-    supportPriority: "highest",
+  },
+  {
+    ...PLAN_BY_ID.pro,
+    priceUsdMonthly: 13.99,
+    maxPlugins: 15,
+    monthlyEmails: 2000,
+    watermarkRequired: false,
+  },
+  {
+    ...PLAN_BY_ID.enterprise,
+    priceUsdMonthly: 59.99,
+    maxPlugins: null,
+    monthlyEmails: 10000,
+    watermarkRequired: false,
   },
 ];
-
-export const PLAN_BY_ID = Object.fromEntries(
-  PLAN_DEFINITIONS.map((plan) => [plan.id, plan]),
-) as Record<PlanId, PlanDefinition>;
-
-export function describeLimit(value: number | null, label: string) {
-  return value === null ? `Unlimited ${label}` : `${value} ${label}`;
-}

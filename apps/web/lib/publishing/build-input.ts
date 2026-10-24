@@ -42,8 +42,17 @@ export type SourceSettings = {
   show_watermark?: boolean | null;
   seo_site_title?: string | null;
   seo_description?: string | null;
+  seo_title_format?: string | null;
   social_image_url?: string | null;
   search_indexing?: boolean | null;
+  tagline?: string | null;
+  timezone?: string | null;
+  theme_color?: string | null;
+  twitter_handle?: string | null;
+  address_parts?: unknown;
+  verification?: unknown;
+  maintenance?: unknown;
+  custom_404?: unknown;
 };
 
 export type SourcePage = {
@@ -88,9 +97,103 @@ function text(value: string | null | undefined): string | undefined {
   return clean ? clean : undefined;
 }
 
+const SCALES = new Set(["compact", "comfortable", "large"]);
+const DENSITIES = new Set(["compact", "comfortable", "airy"]);
+const BUTTON_SHAPES = new Set(["square", "soft", "round", "pill"]);
+const BUTTON_STYLES = new Set(["solid", "outline", "soft"]);
+const BUTTON_SIZES = new Set(["normal", "large"]);
+const CARD_STYLES = new Set(["flat", "outlined", "shadow"]);
+const COLOR_KEYS = ["primary", "accent", "background", "text", "soft"] as const;
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function colour(value: unknown): string | null {
+  return typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value) ? value : null;
+}
+
+function customNotFound(value: unknown): SiteSettings["customNotFound"] {
+  const row = record(value);
+  const title = text(typeof row.title === "string" ? row.title : undefined);
+  const body = text(typeof row.text === "string" ? row.text : undefined);
+  const button = text(typeof row.button === "string" ? row.button : undefined);
+  if (!title && !body && !button) return null;
+  return { title, text: body, button };
+}
+
+function fontChoice(value: unknown, fallback: { id: string; weight: number }) {
+  const font = record(value);
+  return {
+    id: typeof font.id === "string" && font.id.trim() ? font.id.trim().slice(0, 80) : fallback.id,
+    weight: typeof font.weight === "number" && font.weight >= 100 && font.weight <= 900
+      ? Math.round(font.weight / 100) * 100
+      : fallback.weight,
+  };
+}
+
 export function parseTheme(value: unknown): Theme {
-  const theme =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const theme = record(value);
+
+  const colors = record(theme.colors);
+  const hasColors = COLOR_KEYS.every((key) => colour(colors[key]) !== null);
+  if (theme.version === 2 || hasColors) {
+    const fonts = record(theme.fonts);
+    const buttons = record(theme.buttons);
+    const cards = record(theme.cards);
+    return {
+      version: 2,
+      colors: hasColors
+        ? {
+            primary: colour(colors.primary)!,
+            accent: colour(colors.accent)!,
+            background: colour(colors.background)!,
+            text: colour(colors.text)!,
+            soft: colour(colors.soft)!,
+          }
+        : {
+            primary: "#0B6B4F",
+            accent: "#F5A524",
+            background: "#FFFBF5",
+            text: "#1F1A17",
+            soft: "#E8F5EF",
+          },
+      presetId: typeof theme.presetId === "string" ? theme.presetId : null,
+      fonts: {
+        heading: fontChoice(fonts.heading, { id: "Bricolage Grotesque", weight: 700 }),
+        body: fontChoice(fonts.body, { id: "Figtree", weight: 400 }),
+        scale: SCALES.has(String(fonts.scale))
+          ? (fonts.scale as NonNullable<Theme["fonts"]>["scale"])
+          : "comfortable",
+      },
+      buttons: {
+        shape: BUTTON_SHAPES.has(String(buttons.shape))
+          ? (buttons.shape as NonNullable<Theme["buttons"]>["shape"])
+          : "soft",
+        style: BUTTON_STYLES.has(String(buttons.style))
+          ? (buttons.style as NonNullable<Theme["buttons"]>["style"])
+          : "solid",
+        size: BUTTON_SIZES.has(String(buttons.size))
+          ? (buttons.size as NonNullable<Theme["buttons"]>["size"])
+          : "normal",
+        uppercase: buttons.uppercase === true,
+        shadow: buttons.shadow === true,
+      },
+      cards: {
+        style: CARD_STYLES.has(String(cards.style))
+          ? (cards.style as NonNullable<Theme["cards"]>["style"])
+          : "outlined",
+      },
+      corners: CORNERS.has(String(theme.corners))
+        ? (theme.corners as Theme["corners"])
+        : "soft",
+      density: DENSITIES.has(String(theme.density))
+        ? (theme.density as Theme["density"])
+        : "comfortable",
+      colorMode: "light",
+    };
+  }
+
   return {
     palette: PALETTES.has(String(theme.palette))
       ? (theme.palette as Theme["palette"])
@@ -208,10 +311,23 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     });
   }
 
+  const addressParts = record(settings.address_parts);
+  const formattedAddress = [
+    text(addressParts.street as string | undefined),
+    text(addressParts.city as string | undefined),
+    text(addressParts.region as string | undefined),
+    text(addressParts.postal as string | undefined),
+    text(addressParts.country as string | undefined),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   const siteSettings: SiteSettings = {
     businessName: args.project.name,
+    tagline: text(settings.tagline),
     locale: "en",
     theme,
+    themeColor: colour(settings.theme_color),
     logo: decodedLogo
       ? {
           bytes: decodedLogo.bytes,
@@ -220,15 +336,22 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
       : null,
     phone: text(contact.phone),
     email: text(contact.email),
-    address: text(contact.address),
+    address: text(contact.address) ?? (formattedAddress || undefined),
     hours: text(projectJson.hours),
     businessType: text(projectJson.businessType),
     socialLinks: socialLinks(projectJson.socialLinks),
     seo: {
       title: text(settings.seo_site_title),
       description: text(settings.seo_description),
+      titleFormat: text(settings.seo_title_format),
+      twitterHandle: text(settings.twitter_handle),
       allowIndexing,
     },
+    verification: record(settings.verification) as {
+      gscTag?: string;
+      bing?: string;
+    },
+    customNotFound: customNotFound(settings.custom_404),
     showWatermark: settings.show_watermark !== false,
     plan: args.planId,
   };

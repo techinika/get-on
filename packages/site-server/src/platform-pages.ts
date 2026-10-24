@@ -6,20 +6,33 @@
 
 const FONT_STACK = "Figtree, system-ui, -apple-system, 'Segoe UI', sans-serif";
 
+function escapeHtml(value: string) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
 function shell(options: {
   icon: string;
   title: string;
   text: string;
-  actionLabel: string;
-  actionHref: string;
+  actionLabel?: string;
+  actionHref?: string;
 }) {
+  const action =
+    options.actionLabel && options.actionHref
+      ? `<a class="button" href="${escapeHtml(options.actionHref)}">${escapeHtml(options.actionLabel)}</a>`
+      : "";
   return `<!doctype html>
 <html lang="en" data-color-mode="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
-<title>${options.title} | Get-On</title>
+<title>${escapeHtml(options.title)} | Get-On</title>
 <meta name="robots" content="noindex,nofollow">
 <style>
 *,*::before,*::after{box-sizing:border-box}
@@ -39,9 +52,9 @@ a.button:focus-visible{outline:3px solid #0B6B4F;outline-offset:2px}
 <body>
 <div class="page">
 <div class="icon" aria-hidden="true">${options.icon}</div>
-<h1>${options.title}</h1>
-<p>${options.text}</p>
-<a class="button" href="${options.actionHref}">${options.actionLabel}</a>
+<h1>${escapeHtml(options.title)}</h1>
+<p>${escapeHtml(options.text)}</p>
+${action}
 <p class="footer">Made with <a href="https://get-on.tech">Get-On</a></p>
 </div>
 </body>
@@ -55,6 +68,9 @@ const COMPASS_ICON =
 const SHIELD_ALERT_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>';
 
+const CLOCK_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
+
 /** The address is unknown, reserved, or has never been published. */
 export function notFoundPage(): string {
   return shell({
@@ -63,6 +79,20 @@ export function notFoundPage(): string {
     text: "The address may be misspelt, or the website has not been published yet.",
     actionLabel: "Go to Get-On",
     actionHref: "https://get-on.tech",
+  });
+}
+
+/** The owner has paused a website while making changes. */
+export function pausedPage(
+  title?: string | null,
+  text?: string | null,
+): string {
+  return shell({
+    icon: CLOCK_ICON,
+    title: title?.trim() || "We will be back soon",
+    text:
+      text?.trim() ||
+      "This website is being updated. Please check again in a little while.",
   });
 }
 

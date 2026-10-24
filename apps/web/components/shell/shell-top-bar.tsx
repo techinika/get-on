@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, LifeBuoy, Search } from "lucide-react";
-import { LogoMark, Wordmark } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import { TeamSwitcher } from "@/components/shell/team-switcher";
 import { UserMenu } from "@/components/shell/user-menu";
 import { Badge } from "@/components/ui/badge";
@@ -62,10 +62,13 @@ export function ShellTopBar({
           </>
         ) : (
           <>
-            <Link href="/dashboard" aria-label="Get-On dashboard" className="flex shrink-0 items-center">
-              <LogoMark />
+            <Link
+              href="/dashboard"
+              aria-label="GET-ON dashboard"
+              className="flex shrink-0 items-center text-text"
+            >
+              <Wordmark className="h-6 w-auto min-[640px]:h-7" />
             </Link>
-            <Wordmark className="hidden text-xl min-[1024px]:inline" />
             <span aria-hidden className="hidden h-6 w-px bg-border min-[1024px]:block" />
             <div className={cn(isMobile && project ? "hidden" : "block", "min-w-0")}>
               <TeamSwitcher teams={teams} currentTeamId={currentTeamId} compact={isMobile} />
