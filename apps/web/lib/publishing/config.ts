@@ -51,6 +51,7 @@ export function readPublishConfig(
     localRootDomain: trimmed(env.LOCAL_ROOT_DOMAIN) || "localhost",
     localPort: Number.isFinite(localPort) ? localPort : 8787,
     localDir: path.resolve(
+      /* turbopackIgnore: true */
       trimmed(env.LOCAL_SITES_DIR) || path.join(process.cwd(), ".local-sites"),
     ),
     accountId,
