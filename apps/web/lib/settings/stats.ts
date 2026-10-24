@@ -1,8 +1,3 @@
-export function buildVisitorId(input: { statsSiteKey: string; ip: string; userAgent: string; dailySalt: string }) {
-  // Placeholder - real implementation uses HMAC/sha256
-  return "anon";
-}
-
 export function isBotUa(ua: string) {
   const patterns = [/bot/i, /crawler/i, /spider/i, /slurp/i, /bingpreview/i];
   return patterns.some((p) => p.test(ua));

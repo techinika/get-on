@@ -42,8 +42,17 @@ export type SourceSettings = {
   show_watermark?: boolean | null;
   seo_site_title?: string | null;
   seo_description?: string | null;
+  seo_title_format?: string | null;
   social_image_url?: string | null;
   search_indexing?: boolean | null;
+  tagline?: string | null;
+  timezone?: string | null;
+  theme_color?: string | null;
+  twitter_handle?: string | null;
+  address_parts?: unknown;
+  verification?: unknown;
+  maintenance?: unknown;
+  custom_404?: unknown;
 };
 
 export type SourcePage = {
@@ -102,6 +111,15 @@ function record(value: unknown): Record<string, unknown> {
 
 function colour(value: unknown): string | null {
   return typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value) ? value : null;
+}
+
+function customNotFound(value: unknown): SiteSettings["customNotFound"] {
+  const row = record(value);
+  const title = text(typeof row.title === "string" ? row.title : undefined);
+  const body = text(typeof row.text === "string" ? row.text : undefined);
+  const button = text(typeof row.button === "string" ? row.button : undefined);
+  if (!title && !body && !button) return null;
+  return { title, text: body, button };
 }
 
 function fontChoice(value: unknown, fallback: { id: string; weight: number }) {
@@ -293,10 +311,23 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     });
   }
 
+  const addressParts = record(settings.address_parts);
+  const formattedAddress = [
+    text(addressParts.street as string | undefined),
+    text(addressParts.city as string | undefined),
+    text(addressParts.region as string | undefined),
+    text(addressParts.postal as string | undefined),
+    text(addressParts.country as string | undefined),
+  ]
+    .filter(Boolean)
+    .join(", ");
+
   const siteSettings: SiteSettings = {
     businessName: args.project.name,
+    tagline: text(settings.tagline),
     locale: "en",
     theme,
+    themeColor: colour(settings.theme_color),
     logo: decodedLogo
       ? {
           bytes: decodedLogo.bytes,
@@ -305,15 +336,22 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
       : null,
     phone: text(contact.phone),
     email: text(contact.email),
-    address: text(contact.address),
+    address: text(contact.address) ?? (formattedAddress || undefined),
     hours: text(projectJson.hours),
     businessType: text(projectJson.businessType),
     socialLinks: socialLinks(projectJson.socialLinks),
     seo: {
       title: text(settings.seo_site_title),
       description: text(settings.seo_description),
+      titleFormat: text(settings.seo_title_format),
+      twitterHandle: text(settings.twitter_handle),
       allowIndexing,
     },
+    verification: record(settings.verification) as {
+      gscTag?: string;
+      bing?: string;
+    },
+    customNotFound: customNotFound(settings.custom_404),
     showWatermark: settings.show_watermark !== false,
     plan: args.planId,
   };

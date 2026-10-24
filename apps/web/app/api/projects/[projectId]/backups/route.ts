@@ -25,12 +25,17 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({ backups: data ?? [] });
 }
 
-export async function POST(_req: Request, { params }: Params) {
-  const { projectId } = await params;
+export async function POST() {
   const current = await getCurrentTeam();
   if (!current) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   if (current.team.role !== "owner" && current.team.role !== "admin" && current.team.role !== "editor") {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
-  return NextResponse.json({ ok: true }, { status: 200 });
+  return NextResponse.json(
+    {
+      error: "BACKUP_NOT_READY",
+      message: "Backups are not switched on for this website yet.",
+    },
+    { status: 503 },
+  );
 }

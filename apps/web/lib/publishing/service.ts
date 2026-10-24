@@ -15,6 +15,11 @@ import {
   type SourceProject,
   type SourceSettings,
 } from "./build-input";
+import {
+  pauseFromSettings,
+  redirectsFromRows,
+  type RedirectRow,
+} from "./live-pointer";
 import { createPublishStore } from "./store";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -58,6 +63,7 @@ type LoadedSite = {
   media: SourceMedia[];
   /** The plugins that are switched on for the website. */
   activePlugins: string[];
+  redirects: RedirectRow[];
 };
 
 function asProject(row: Record<string, unknown>): LoadedSite["project"] {
@@ -87,12 +93,17 @@ async function loadSite(
   if (error || !row) return null;
   const project = asProject(row as Record<string, unknown>);
 
-  const [{ data: settings }, { data: pages }, { data: media }, { data: installs }] =
-    await Promise.all([
+  const [
+    { data: settings },
+    { data: pages },
+    { data: media },
+    { data: installs },
+    { data: redirects },
+  ] = await Promise.all([
       supabase
         .from("project_settings")
         .select(
-          "theme, show_watermark, seo_site_title, seo_description, social_image_url, search_indexing",
+          "theme, show_watermark, seo_site_title, seo_description, seo_title_format, social_image_url, search_indexing, tagline, timezone, theme_color, twitter_handle, address_parts, verification, maintenance, custom_404",
         )
         .eq("project_id", projectId)
         .maybeSingle(),
@@ -113,6 +124,10 @@ async function loadSite(
         .select("plugin_id, state")
         .eq("project_id", projectId)
         .eq("state", "active"),
+      supabase
+        .from("redirects")
+        .select("from_path, to_value, code")
+        .eq("project_id", projectId),
     ]);
 
   const activePlugins = (installs ?? []).map((row) =>
@@ -125,6 +140,7 @@ async function loadSite(
     pages: (pages ?? []) as SourcePage[],
     media: (media ?? []) as SourceMedia[],
     activePlugins,
+    redirects: (redirects ?? []) as RedirectRow[],
   };
 }
 
@@ -162,7 +178,7 @@ export async function publishProject(
   const loaded = await loadSite(ctx.supabase, ctx.project.id);
   if (!loaded) throw new PublishError("PROJECT_NOT_FOUND");
 
-  const { project, settings, pages, media, activePlugins } = loaded;
+  const { project, settings, pages, media, activePlugins, redirects } = loaded;
   if (project.suspended_reason) {
     throw new PublishError("SUSPENDED");
   }
@@ -262,6 +278,8 @@ export async function publishProject(
       state: "live",
       builtAt: builtAt.toISOString(),
       plan: ctx.team.planId,
+      pause: pauseFromSettings(settings?.maintenance),
+      redirects: redirectsFromRows(redirects),
     });
 
     const now = new Date().toISOString();
@@ -384,6 +402,8 @@ export async function restorePublish(
       state: "live",
       builtAt: String(target.live_at ?? target.finished_at ?? target.created_at),
       plan: ctx.team.planId,
+      pause: pauseFromSettings(loaded.settings?.maintenance),
+      redirects: redirectsFromRows(loaded.redirects),
     },
   );
 

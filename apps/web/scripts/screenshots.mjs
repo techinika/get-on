@@ -46,6 +46,39 @@ async function shot(page, name, { fullPage = true } = {}) {
   console.log(`captured ${name}`);
 }
 
+
+/**
+ * Settings routes stream in dev, so networkidle can hang. Wait for the
+ * document and give the route a moment to paint instead.
+ */
+async function captureProjectSettings(page, projectPath, width, scheme) {
+  const routes = [
+    ["index", ""],
+    ["business", "/business"],
+    ["address", "/address"],
+    ["publishing", "/publishing"],
+    ["search", "/search"],
+    ["sitemap", "/sitemap"],
+    ["redirects", "/redirects"],
+    ["analytics", "/analytics"],
+    ["backups", "/backups"],
+    ["export-import", "/export-import"],
+    ["transfer", "/transfer"],
+    ["delete", "/delete"],
+    ["activity", "/activity"],
+  ];
+  for (const [name, suffix] of routes) {
+    await page.goto(`${BASE}${projectPath}/settings${suffix}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await page.waitForTimeout(600);
+    await shot(page, `settings-${name}-${width}-${scheme}`);
+  }
+  await page.goto(`${BASE}${projectPath}/visitors`, { waitUntil: "domcontentloaded" });
+  await page.waitForTimeout(600);
+  await shot(page, `visitors-${width}-${scheme}`);
+}
+
 /** Wait until a button with this name is enabled. */
 async function waitForEnabled(page, name, timeout = 20_000) {
   await page.waitForFunction(
@@ -218,6 +251,8 @@ async function captureAuthenticated(contextFactory) {
   await page.goto(`${BASE}${projectPath}/templates`, { waitUntil: "networkidle" });
   await shot(page, "project-templates-360-light");
 
+  await captureProjectSettings(page, projectPath, 360, "light");
+
   await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
   await shot(page, "dashboard-360-light");
 
@@ -287,6 +322,7 @@ async function captureAuthenticated(contextFactory) {
         await shot(p2, `pictures-${width}-${scheme}`);
         await p2.goto(`${BASE}${url}/templates`, { waitUntil: "networkidle" });
         await shot(p2, `project-templates-${width}-${scheme}`);
+        await captureProjectSettings(p2, url, width, scheme);
       }
       await captureWizardSteps(p2, width, scheme);
       await ctx2.close();

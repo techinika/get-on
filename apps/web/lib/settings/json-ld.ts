@@ -1,10 +1,24 @@
+type AddressParts = {
+  street?: string | null;
+  city?: string | null;
+  region?: string | null;
+  postal?: string | null;
+  country?: string | null;
+};
+
+type JsonLd = Record<string, unknown> & {
+  "@context": string;
+  "@type": string;
+  name: string;
+};
+
 export function buildJsonLd(input: {
   businessName?: string | null;
   tagline?: string | null;
   description?: string | null;
   schemaType?: string | null;
   address?: string | null;
-  addressParts?: any;
+  addressParts?: AddressParts | null;
   phone?: string | null;
   email?: string | null;
   priceRange?: string | null;
@@ -15,7 +29,7 @@ export function buildJsonLd(input: {
   url?: string | null;
 }) {
   const type = input.schemaType || "LocalBusiness";
-  const ld: any = {
+  const ld: JsonLd = {
     "@context": "https://schema.org",
     "@type": type,
     name: input.businessName || "",
@@ -32,16 +46,16 @@ export function buildJsonLd(input: {
   if (input.geo?.lat != null && input.geo?.lng != null) {
     ld.geo = { "@type": "GeoCoordinates", latitude: input.geo.lat, longitude: input.geo.lng };
   }
-  if (input.addressParts && typeof input.addressParts === "object") {
-    const a = input.addressParts as any;
-    if (a.street || a.city || a.region || a.postal || a.country) {
+  const address = input.addressParts;
+  if (address && typeof address === "object") {
+    if (address.street || address.city || address.region || address.postal || address.country) {
       ld.address = {
         "@type": "PostalAddress",
-        streetAddress: a.street || undefined,
-        addressLocality: a.city || undefined,
-        addressRegion: a.region || undefined,
-        postalCode: a.postal || undefined,
-        addressCountry: a.country || undefined,
+        streetAddress: address.street || undefined,
+        addressLocality: address.city || undefined,
+        addressRegion: address.region || undefined,
+        postalCode: address.postal || undefined,
+        addressCountry: address.country || undefined,
       };
     }
   } else if (input.address) {

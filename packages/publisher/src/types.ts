@@ -44,7 +44,9 @@ export type SocialLink = {
 
 export type SiteSettings = {
   businessName: string;
+  tagline?: string | null;
   locale?: string;
+  themeColor?: string | null;
   theme: Theme;
   logo?: PublishLogo | null;
   phone?: string | null;
@@ -56,8 +58,19 @@ export type SiteSettings = {
   seo?: {
     title?: string | null;
     description?: string | null;
+    titleFormat?: string | null;
+    twitterHandle?: string | null;
     allowIndexing?: boolean;
   };
+  verification?: {
+    gscTag?: string;
+    bing?: string;
+  } | null;
+  customNotFound?: {
+    title?: string | null;
+    text?: string | null;
+    button?: string | null;
+  } | null;
   showWatermark?: boolean;
   plan?: string;
 };

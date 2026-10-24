@@ -94,16 +94,18 @@ export async function takeSiteOffline(
   if (!publish) return { ok: false, code: "NO_LIVE_VERSION" };
 
   const config = readPublishConfig();
-  await createPublishStore(config).writePointer(
-    siteHostname(config, String(project.subdomain)),
-    {
-      siteId: project.id,
-      publishId: String(publish.id),
-      state: "suspended",
-      builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
-      plan: await teamPlanId(admin, project.team_id),
-    },
-  );
+  const store = createPublishStore(config);
+  const hostname = siteHostname(config, String(project.subdomain));
+  const existing = await store.getPointer(hostname);
+  await store.writePointer(hostname, {
+    siteId: project.id,
+    publishId: String(publish.id),
+    state: "suspended",
+    builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
+    plan: await teamPlanId(admin, project.team_id),
+    ...(existing?.pause ? { pause: existing.pause } : {}),
+    ...(existing?.redirects?.length ? { redirects: existing.redirects } : {}),
+  });
 
   await admin
     .from("projects")
@@ -142,16 +144,18 @@ export async function bringSiteOnline(siteId: string): Promise<AdminActionResult
   if (!publish) return { ok: false, code: "NO_LIVE_VERSION" };
 
   const config = readPublishConfig();
-  await createPublishStore(config).writePointer(
-    siteHostname(config, String(project.subdomain)),
-    {
-      siteId: project.id,
-      publishId: String(publish.id),
-      state: "live",
-      builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
-      plan: await teamPlanId(admin, project.team_id),
-    },
-  );
+  const store = createPublishStore(config);
+  const hostname = siteHostname(config, String(project.subdomain));
+  const existing = await store.getPointer(hostname);
+  await store.writePointer(hostname, {
+    siteId: project.id,
+    publishId: String(publish.id),
+    state: "live",
+    builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
+    plan: await teamPlanId(admin, project.team_id),
+    ...(existing?.pause ? { pause: existing.pause } : {}),
+    ...(existing?.redirects?.length ? { redirects: existing.redirects } : {}),
+  });
 
   const now = new Date().toISOString();
   await admin

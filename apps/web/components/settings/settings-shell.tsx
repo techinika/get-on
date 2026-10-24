@@ -2,65 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  BarChart3,
-  Building2,
-  Clock,
-  CornerUpRight,
-  FileDown,
-  Globe,
-  History,
-  Map,
-  Rocket,
-  Search,
-  Send,
-  Settings as SettingsIcon,
-  ShieldCheck,
-  Trash2,
-} from "lucide-react";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { cn } from "@/lib/utils";
+import { SETTINGS_GROUPS as groups } from "./settings-nav";
 
-const groups = [
-  {
-    label: "Website",
-    items: [
-      { href: "business", label: "Business", icon: Building2 },
-      { href: "address", label: "Address", icon: Globe },
-      { href: "publishing", label: "Publishing", icon: Rocket },
-    ],
-  },
-  {
-    label: "Search and visitors",
-    items: [
-      { href: "search", label: "Search appearance", icon: Search },
-      { href: "sitemap", label: "Sitemap and Google", icon: Map },
-      { href: "redirects", label: "Moved pages", icon: CornerUpRight },
-      { href: "analytics", label: "Visitors and analytics", icon: BarChart3 },
-    ],
-  },
-  {
-    label: "Safety",
-    items: [
-      { href: "backups", label: "Backups", icon: ShieldCheck },
-      { href: "export-import", label: "Export and import", icon: FileDown },
-    ],
-  },
-  {
-    label: "Ownership",
-    items: [
-      { href: "transfer", label: "Transfer", icon: Send },
-      { href: "delete", label: "Delete website", icon: Trash2, danger: true },
-    ],
-  },
-  {
-    label: "History",
-    items: [{ href: "activity", label: "Activity", icon: History }],
-  },
-];
-
-function getProjectId(pathname: string) {
+export function getProjectId(pathname: string) {
   const parts = pathname.split("/");
   const idx = parts.indexOf("projects");
   if (idx >= 0 && parts[idx + 1]) return parts[idx + 1];
@@ -114,7 +61,17 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
             ))}
           </nav>
         </aside>
-        <div className="min-w-0">{children}</div>
+        <div className="min-w-0">
+          {pathname !== base ? (
+            <Link
+              href={base}
+              className="mb-4 inline-flex h-11 items-center gap-1 text-[15px] font-semibold text-primary hover:underline lg:hidden"
+            >
+              All settings
+            </Link>
+          ) : null}
+          {children}
+        </div>
       </div>
     </AppPage>
   );

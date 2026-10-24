@@ -4,7 +4,7 @@ import { ExportImportForm } from "./export-import-form";
 type Params = { params: Promise<{ projectId: string }> };
 
 export default async function SettingsPage({ params }: Params) {
-  await params;
+  const { projectId } = await params;
   return (
     <div>
       <SettingsPageHeader
@@ -12,7 +12,7 @@ export default async function SettingsPage({ params }: Params) {
         description="Download your whole website as one file, or bring one back."
         timing="right"
       />
-      <ExportImportForm />
+      <ExportImportForm projectId={projectId} />
     </div>
   );
 }

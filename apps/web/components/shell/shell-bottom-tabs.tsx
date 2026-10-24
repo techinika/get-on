@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
+  BarChart3,
   CreditCard,
   Ellipsis,
   FileText,
@@ -212,6 +213,16 @@ export function ShellBottomTabs({
                   </Link>
                 </li>
               ) : null}
+              <li>
+                <Link
+                  href={`${base}/visitors`}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex min-h-14 items-center gap-3 border-b border-border px-5 text-base font-semibold text-text"
+                >
+                  <BarChart3 size={22} strokeWidth={1.75} aria-hidden className="text-text-muted" />
+                  <span className="flex-1">Visitors</span>
+                </Link>
+              </li>
               <li>
                 <Link
                   href={`${base}/templates`}

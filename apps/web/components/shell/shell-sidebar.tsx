@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  BarChart3,
   Check,
   ChevronsUpDown,
   CircleCheck,
@@ -178,6 +179,7 @@ export function ShellSidebar({
   ];
   const projectEntries: NavEntry[] = [
     { key: "overview", label: "Overview", icon: LayoutDashboard, href: base },
+    { key: "visitors", label: "Visitors", icon: BarChart3, href: `${base}/visitors` },
     { key: "pages", label: "Pages", icon: FileText, href: `${base}/pages` },
     { key: "pictures", label: "Pictures", icon: ImageIcon, href: `${base}/images` },
     { key: "templates", label: "Templates", icon: LayoutTemplate, href: `${base}/templates` },
@@ -205,6 +207,7 @@ export function ShellSidebar({
     if (!projectId) return;
     const projectBase = `/dashboard/projects/${projectId}`;
     router.prefetch(projectBase);
+    router.prefetch(`${projectBase}/visitors`);
     router.prefetch(`${projectBase}/pages`);
     router.prefetch(`${projectBase}/images`);
     router.prefetch(`${projectBase}/plugins`);

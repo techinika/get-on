@@ -1,7 +1,5 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-
 export function SettingsPageHeader({ title, description, timing }: { title: string; description: string; timing: "right" | "publish" }) {
   return (
     <header className="mb-6">

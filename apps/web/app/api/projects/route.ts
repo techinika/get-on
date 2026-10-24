@@ -70,6 +70,7 @@ export async function POST(request: Request) {
       name,
       subdomain: address,
       status: "draft",
+      stats_site_key: crypto.randomUUID().replaceAll("-", "").slice(0, 16),
       settings: {
         businessType,
         about: about.trim().slice(0, 300),
