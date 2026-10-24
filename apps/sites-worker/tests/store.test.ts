@@ -185,3 +185,35 @@ describe("cloudflare store", () => {
     expect(bucket.calls).toEqual([]);
   });
 });
+
+describe("v2 pointers", () => {
+  it("resolves a host mapping to the full site pointer", async () => {
+    const kv = fakeKv({
+      "host:www.example.com": { v: 2, siteId: "site-1" },
+      "site:site-1": { ...pointer, primaryHost: "www.example.com" },
+    });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      siteId: "site-1",
+      primaryHost: "www.example.com",
+    });
+  });
+
+  it("refuses a mapping that points at a missing site", async () => {
+    const kv = fakeKv({ "host:www.example.com": { v: 2, siteId: "site-1" } });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toBeNull();
+  });
+
+  it("refuses a site pointer for another website", async () => {
+    const kv = fakeKv({
+      "host:www.example.com": { v: 2, siteId: "site-1" },
+      "site:site-1": { ...pointer, siteId: "site-2" },
+    });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toBeNull();
+  });
+});

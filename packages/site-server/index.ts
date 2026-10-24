@@ -3,6 +3,8 @@ export { parseHost, DEFAULT_ROOT_DOMAIN } from "./src/host";
 export { contentTypeFor } from "./src/content-type";
 export { RESERVED_SUBDOMAINS, isReservedSubdomain } from "./src/reserved";
 export {
+  domainNotConnectedPage,
+  domainPausedPage,
   notFoundPage,
   notPublishedPage,
   pausedPage,
@@ -10,6 +12,7 @@ export {
 } from "./src/platform-pages";
 export type {
   SiteFile,
+  SiteHostPointer,
   SitePause,
   SitePointer,
   SiteRedirect,

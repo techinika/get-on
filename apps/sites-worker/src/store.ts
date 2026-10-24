@@ -13,10 +13,22 @@ export function pointerKey(hostname: string): string {
   return `host:${hostname}`;
 }
 
+export function sitePointerKey(siteId: string): string {
+  return `site:${siteId}`;
+}
+
 function isState(value: unknown): value is SiteState {
   return (
     value === "live" || value === "unpublished" || value === "suspended"
   );
+}
+
+function parseHostMapping(value: unknown): { v: 2; siteId: string } | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  if (record.v !== 2 || typeof record.siteId !== "string") return null;
+  if (!ID_RE.test(record.siteId)) return null;
+  return { v: 2, siteId: record.siteId };
 }
 
 function parsePointer(value: unknown): SitePointer | null {
@@ -27,13 +39,38 @@ function parsePointer(value: unknown): SitePointer | null {
     typeof record.publishId === "string" ? record.publishId : "";
   if (!ID_RE.test(siteId) || !ID_RE.test(publishId)) return null;
   if (!isState(record.state)) return null;
-  return {
+  const pointer: SitePointer = {
     siteId,
     publishId,
     state: record.state,
     builtAt: typeof record.builtAt === "string" ? record.builtAt : "",
     plan: typeof record.plan === "string" ? record.plan : "free",
   };
+  if (typeof record.primaryHost === "string") pointer.primaryHost = record.primaryHost;
+  if (typeof record.freeHost === "string") pointer.freeHost = record.freeHost;
+  if (record.redirectToPrimary === true) pointer.redirectToPrimary = true;
+  if (record.planLapsed === true) pointer.planLapsed = true;
+  if (
+    record.pause &&
+    typeof record.pause === "object" &&
+    typeof (record.pause as { title?: unknown }).title === "string" &&
+    typeof (record.pause as { text?: unknown }).text === "string"
+  ) {
+    pointer.pause = record.pause as SitePointer["pause"];
+  }
+  if (Array.isArray(record.redirects)) {
+    pointer.redirects = record.redirects.filter(
+      (item): item is NonNullable<SitePointer["redirects"]>[number] =>
+        Boolean(
+          item &&
+            typeof item === "object" &&
+            typeof (item as { from?: unknown }).from === "string" &&
+            typeof (item as { to?: unknown }).to === "string" &&
+            typeof (item as { code?: unknown }).code === "number",
+        ),
+    );
+  }
+  return pointer;
 }
 
 function safePath(path: string): string | null {
@@ -85,7 +122,18 @@ export function createCloudflareStore(
         type: "json",
         cacheTtl: 60,
       });
-      return parsePointer(value);
+
+      const direct = parsePointer(value);
+      if (direct) return direct;
+
+      const mapping = parseHostMapping(value);
+      if (!mapping) return null;
+      const site = await bindings.kv.get(sitePointerKey(mapping.siteId), {
+        type: "json",
+        cacheTtl: 60,
+      });
+      const pointer = parsePointer(site);
+      return pointer?.siteId === mapping.siteId ? pointer : null;
     },
 
     async getFile(

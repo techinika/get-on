@@ -57,6 +57,8 @@ type LoadedSite = {
     content_revision: number;
     review_state: string;
     suspended_reason: string | null;
+    primary_host: string | null;
+    redirect_free_address: boolean;
   };
   settings: SourceSettings | null;
   pages: SourcePage[];
@@ -75,6 +77,9 @@ function asProject(row: Record<string, unknown>): LoadedSite["project"] {
     content_revision: Number(row.content_revision ?? 0),
     review_state: String(row.review_state ?? "none"),
     suspended_reason: (row.suspended_reason as string | null) ?? null,
+    primary_host:
+      typeof row.primary_host === "string" ? row.primary_host : null,
+    redirect_free_address: row.redirect_free_address !== false,
   };
 }
 
@@ -85,7 +90,7 @@ async function loadSite(
   const { data: row, error } = await supabase
     .from("projects")
     .select(
-      "id, name, subdomain, settings, content_revision, review_state, suspended_reason",
+      "id, name, subdomain, settings, content_revision, review_state, suspended_reason, primary_host, redirect_free_address",
     )
     .eq("id", projectId)
     .maybeSingle();
@@ -247,6 +252,7 @@ export async function publishProject(
       publishId,
       rootDomain:
         config.kind === "local" ? config.localRootDomain : config.rootDomain,
+      primaryHost: project.primary_host,
       activePlugins,
       builtAt,
     });
@@ -280,6 +286,9 @@ export async function publishProject(
       plan: ctx.team.planId,
       pause: pauseFromSettings(settings?.maintenance),
       redirects: redirectsFromRows(redirects),
+      primaryHost: project.primary_host ?? null,
+      freeHost: hostname,
+      redirectToPrimary: project.redirect_free_address,
     });
 
     const now = new Date().toISOString();

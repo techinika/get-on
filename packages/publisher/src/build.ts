@@ -88,7 +88,7 @@ export async function buildSite(
 ): Promise<BuildSiteResult> {
   const warnings: string[] = [];
   const rootDomain = input.rootDomain ?? "get-on.tech";
-  const baseUrl = `https://${input.subdomain}.${rootDomain}`;
+  const baseUrl = `https://${input.primaryHost || `${input.subdomain}.${rootDomain}`}`;
 
   const fonts = prepareFonts(input.fonts ?? []);
   const images = await prepareImages(input.images ?? []);
@@ -388,7 +388,7 @@ async function buildOgImage(
         : "#1F1A17";
   const text = input.settings.businessName;
 
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="${background}"/><text x="60" y="330" font-family="Figtree, system-ui, sans-serif" font-size="72" font-weight="700" fill="#FFFFFF">${escapeXml(text)}</text><text x="60" y="400" font-family="Figtree, system-ui, sans-serif" font-size="32" fill="#F5A524">${escapeXml(input.subdomain + "." + (input.rootDomain ?? "get-on.tech"))}</text></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"><rect width="1200" height="630" fill="${background}"/><text x="60" y="330" font-family="Figtree, system-ui, sans-serif" font-size="72" font-weight="700" fill="#FFFFFF">${escapeXml(text)}</text><text x="60" y="400" font-family="Figtree, system-ui, sans-serif" font-size="32" fill="#F5A524">${escapeXml(input.primaryHost || input.subdomain + "." + (input.rootDomain ?? "get-on.tech"))}</text></svg>`;
 
   try {
     const body = await sharp(Buffer.from(svg))

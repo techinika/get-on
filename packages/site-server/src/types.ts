@@ -23,6 +23,23 @@ export type SitePointer = {
   pause?: SitePause | null;
   /** Old addresses that are sent to a new page or a full link. */
   redirects?: SiteRedirect[];
+  /** The custom main address visitors should end up on. */
+  primaryHost?: string | null;
+  /** The free address that may redirect to the main address. */
+  freeHost?: string | null;
+  /** Whether the free address sends visitors to the main address. */
+  redirectToPrimary?: boolean;
+  /** The plan no longer includes this domain, so serving pauses. */
+  planLapsed?: boolean;
+};
+
+/**
+ * The small mapping stored at `host:{hostname}`. The full site pointer lives
+ * at `site:{siteId}`, so adding an address never copies the whole pointer.
+ */
+export type SiteHostPointer = {
+  v: 2;
+  siteId: string;
 };
 
 export type SiteFile = {

@@ -98,6 +98,8 @@ export type BuildSiteInput = {
   publishId: string;
   subdomain: string;
   rootDomain?: string;
+  /** The custom main address, when one is live. */
+  primaryHost?: string | null;
   settings: SiteSettings;
   pages: PublishPage[];
   images?: PublishImage[];

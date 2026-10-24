@@ -1,6 +1,8 @@
 import { contentTypeFor } from "./content-type";
 import { DEFAULT_ROOT_DOMAIN, parseHost } from "./host";
 import {
+  domainNotConnectedPage,
+  domainPausedPage,
   notFoundPage,
   notPublishedPage,
   pausedPage,
@@ -14,7 +16,7 @@ import {
   signFormToken,
   signWorkerRequest,
 } from "./forms";
-import type { SiteFile, SiteStore } from "./types";
+import type { SiteFile, SitePointer, SiteStore } from "./types";
 
 export type HandleOptions = {
   /** The domain customer websites live under, for example get-on.tech. */
@@ -166,6 +168,17 @@ export function filePathFor(path: string): string {
   return clean;
 }
 
+function permanentRedirect(location: string): Response {
+  return new Response(null, {
+    status: 301,
+    headers: {
+      Location: location,
+      "Cache-Control": "public, max-age=300",
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
 function redirect(location: string): Response {
   return new Response(null, {
     status: 308,
@@ -288,6 +301,47 @@ export async function handleSiteRequest(
   store: SiteStore,
   options: HandleOptions = {},
 ): Promise<Response> {
+  const host = parseHost(
+    request.headers.get("host"),
+    options.rootDomain ?? DEFAULT_ROOT_DOMAIN,
+  );
+  const response = await serveSiteRequest(request, store, options);
+
+  // A customer domain must not pin its subdomains or ask browsers to preload.
+  if (host.ok && host.custom) {
+    const headers = new Headers(response.headers);
+    headers.set("Strict-Transport-Security", "max-age=31536000");
+    return new Response(response.body, {
+      status: response.status,
+      statusText: response.statusText,
+      headers,
+    });
+  }
+
+  return response;
+}
+
+function canonicalTarget(
+  pointer: SitePointer,
+  host: { hostname: string; custom?: boolean },
+): string | null {
+  const primary = pointer.primaryHost?.toLowerCase().replace(/\.$/, "");
+  if (!primary || primary === host.hostname) return null;
+
+  const freeHost = pointer.freeHost?.toLowerCase().replace(/\.$/, "");
+  const isFreeAddress = freeHost === host.hostname;
+  if (host.custom !== true && !(isFreeAddress && pointer.redirectToPrimary === true)) {
+    return null;
+  }
+
+  return primary;
+}
+
+async function serveSiteRequest(
+  request: Request,
+  store: SiteStore,
+  options: HandleOptions = {},
+): Promise<Response> {
   const rootDomain = options.rootDomain ?? DEFAULT_ROOT_DOMAIN;
   const url = new URL(request.url);
 
@@ -351,7 +405,7 @@ export async function handleSiteRequest(
   const pointer = await store.getPointer(host.hostname);
   if (!pointer) {
     return platformResponse(
-      notFoundPage(),
+      host.custom ? domainNotConnectedPage() : notFoundPage(),
       404,
       cacheControlFor("", "platform"),
     );
@@ -366,6 +420,31 @@ export async function handleSiteRequest(
       404,
       cacheControlFor("", "platform"),
     );
+  }
+
+  if (pointer.planLapsed) {
+    return platformResponse(domainPausedPage(), 503, "no-store", {
+      "Retry-After": "3600",
+    });
+  }
+
+  if (path === "/_gs/health") {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...SECURITY_HEADERS,
+      },
+    });
+  }
+
+  const primary = canonicalTarget(pointer, host);
+  if (
+    primary &&
+    (request.method === "GET" || request.method === "HEAD")
+  ) {
+    return permanentRedirect(`https://${primary}${url.pathname}${url.search}`);
   }
 
   if (pointer.pause) {

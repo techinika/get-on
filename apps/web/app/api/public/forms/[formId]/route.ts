@@ -59,20 +59,36 @@ export async function POST(
   const admin = createAdminClient();
   const config = readPublishConfig();
   const parsedHost =
-    parseHost(host, config.rootDomain) ?? null;
-  const hostName =
-    parsedHost?.ok === true
-      ? parsedHost.name
-      : parseHost(host, config.localRootDomain)?.ok === true
-        ? (parseHost(host, config.localRootDomain) as { ok: true; name: string }).name
-        : null;
-  if (!hostName) return json(404);
+    parseHost(host, config.rootDomain) ??
+    parseHost(host, config.localRootDomain);
+  if (!parsedHost.ok) return json(404);
 
-  const { data: project } = await admin
+  let projectQuery = admin
     .from("projects")
-    .select("id, name, subdomain, status, suspended_at, review_state, team_id")
-    .eq("subdomain", hostName)
-    .maybeSingle();
+    .select("id, name, subdomain, status, suspended_at, review_state, team_id");
+
+  if (parsedHost.custom) {
+    const { data: address } = await admin
+      .from("domain_hostnames")
+      .select("project_id, domain_id, status")
+      .eq("hostname", parsedHost.hostname)
+      .eq("status", "live")
+      .maybeSingle();
+    if (!address?.project_id) return json(404);
+    const { data: domain } = await admin
+      .from("domains")
+      .select("status")
+      .eq("id", address.domain_id)
+      .maybeSingle();
+    if (!domain || !["live", "attention"].includes(String(domain.status))) {
+      return json(404);
+    }
+    projectQuery = projectQuery.eq("id", address.project_id);
+  } else {
+    projectQuery = projectQuery.eq("subdomain", parsedHost.name);
+  }
+
+  const { data: project } = await projectQuery.maybeSingle();
 
   if (
     !project ||
