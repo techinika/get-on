@@ -1,19 +1,36 @@
+import { redirect } from "next/navigation";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
+import { TemplateGallery } from "@/components/templates/template-gallery";
+import { createClient } from "@/lib/supabase/server";
+import { getCurrentTeam } from "@/lib/team";
+import { templatesForPlan } from "@/lib/templates/catalog";
 
-export default function TemplatesPage() {
+export default async function TemplatesPage() {
+  const current = await getCurrentTeam();
+  if (!current) redirect("/login");
+
+  const supabase = await createClient();
+  const { data: projects } = await supabase
+    .from("projects")
+    .select("id, name")
+    .eq("team_id", current.team.teamId)
+    .order("created_at", { ascending: true });
+
+  const templates = templatesForPlan(current.team.planId);
+
   return (
-    <AppPage width="default">
+    <AppPage width="wide">
       <PageHeader
         breadcrumbs={[{ label: "Templates" }]}
         title="Templates"
-        description="Ready-made designs for your website. Pick one and make it yours."
+        description="Ready-made designs for your website. Pick one, then make it yours. You can change everything later."
       />
-      <div className="rounded-card border border-border bg-surface p-6 text-center">
-        <p className="text-base text-text-muted">
-          Templates are available. The gallery is being prepared with system templates.
-        </p>
-      </div>
+      <TemplateGallery
+        items={templates}
+        mode="dashboard"
+        projects={projects ?? []}
+      />
     </AppPage>
   );
 }

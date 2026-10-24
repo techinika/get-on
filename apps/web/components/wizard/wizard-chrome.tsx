@@ -2,15 +2,14 @@
 
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { LogoMark, Wordmark } from "@/components/logo";
+import { Wordmark } from "@/components/logo";
 import { TOTAL_STEPS } from "./types";
 
 export function WizardTopBar({ onExit }: { onExit: () => void }) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
       <span className="inline-flex items-center gap-2">
-        <LogoMark />
-        <Wordmark />
+        <Wordmark className="h-7 w-auto" />
       </span>
       <Button type="button" variant="ghost" size="md" onClick={onExit}>
         <X size={18} strokeWidth={1.75} aria-hidden />

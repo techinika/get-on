@@ -80,15 +80,20 @@ async function captureWizardSteps(page, width, scheme) {
   await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByRole("button", { name: "Continue" }).click(); // step 3 skippable
-  await page.getByRole("radio", { name: /Start blank/ }).click();
-  await page.getByRole("button", { name: "Continue" }).click(); // step 4
-  await page.getByRole("button", { name: "Skip this step" }).click(); // step 5
+  await page.getByRole("radio", { name: /Pick a template/ }).click();
+  await page.getByLabel("Choose a design").selectOption("restaurant");
+  await shot(page, `wizard-step4-${width}-${scheme}`);
+  await page.getByRole("button", { name: "Continue" }).click(); // step 5
+  await page.getByRole("button", { name: "Skip this step" }).click(); // step 6
   await shot(page, `wizard-step6-${width}-${scheme}`);
 }
 
 async function capturePublic(contextFactory) {
   const routes = [
     ["landing", "/"],
+    ["templates", "/templates"],
+    ["template-starter", "/templates/starter"],
+    ["template-restaurant", "/templates/restaurant"],
     ["request-demo", "/request-demo"],
     ["report", "/report"],
     ["terms", "/terms"],
@@ -180,9 +185,11 @@ async function captureAuthenticated(contextFactory) {
   await page.getByRole("button", { name: "Continue" }).click();
 
   await page.getByRole("button", { name: "Continue" }).click(); // step 3 skippable
-  await page.getByRole("radio", { name: /Start blank/ }).click();
-  await page.getByRole("button", { name: "Continue" }).click(); // step 4
-  await page.getByRole("button", { name: "Skip this step" }).click(); // step 5
+  await page.getByRole("radio", { name: /Pick a template/ }).click();
+  await page.getByLabel("Choose a design").selectOption("restaurant");
+  await shot(page, "wizard-step4-360-light");
+  await page.getByRole("button", { name: "Continue" }).click(); // step 5
+  await page.getByRole("button", { name: "Skip this step" }).click(); // step 6
   await shot(page, "wizard-step6-360-light");
 
   await page.getByRole("button", { name: "Create my website" }).click();
@@ -208,8 +215,14 @@ async function captureAuthenticated(contextFactory) {
   await page.goto(`${BASE}${projectPath}/images`, { waitUntil: "networkidle" });
   await shot(page, "pictures-360-light");
 
+  await page.goto(`${BASE}${projectPath}/templates`, { waitUntil: "networkidle" });
+  await shot(page, "project-templates-360-light");
+
   await page.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
   await shot(page, "dashboard-360-light");
+
+  await page.goto(`${BASE}/dashboard/templates`, { waitUntil: "networkidle" });
+  await shot(page, "templates-360-light");
 
   await page.goto(`${BASE}/dashboard/plan`, { waitUntil: "networkidle" });
   await shot(page, "plan-360-light");
@@ -245,6 +258,9 @@ async function captureAuthenticated(contextFactory) {
       await p2.goto(`${BASE}/dashboard/account`, { waitUntil: "networkidle" });
       await shot(p2, `account-${width}-${scheme}`);
 
+      await p2.goto(`${BASE}/dashboard/templates`, { waitUntil: "networkidle" });
+      await shot(p2, `templates-${width}-${scheme}`);
+
       // Project pages via the website card.
       await p2.goto(`${BASE}/dashboard`, { waitUntil: "networkidle" });
       const open = p2.getByRole("link", { name: businessName }).first();
@@ -269,6 +285,8 @@ async function captureAuthenticated(contextFactory) {
         await shot(p2, `pages-list-${width}-${scheme}`);
         await p2.goto(`${BASE}${url}/images`, { waitUntil: "networkidle" });
         await shot(p2, `pictures-${width}-${scheme}`);
+        await p2.goto(`${BASE}${url}/templates`, { waitUntil: "networkidle" });
+        await shot(p2, `project-templates-${width}-${scheme}`);
       }
       await captureWizardSteps(p2, width, scheme);
       await ctx2.close();

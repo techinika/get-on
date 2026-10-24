@@ -195,7 +195,7 @@ export function ShellSidebar({
       ]
     : [];
   const projectTailEntries: NavEntry[] = [
-    { key: "settings", label: "Settings", icon: Settings, soon: true },
+    { key: "settings", label: "Settings", icon: Settings, href: `${base}/settings` },
   ];
 
   // Prefetch the project routes when the sidebar mounts, so the first click

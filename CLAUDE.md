@@ -58,7 +58,7 @@ The site design system is prepared for a future "dark-mode" plugin:
 - A database needs every migration applied before the app works. `supabase db push` does it, or paste the files into the Supabase SQL editor in order.
 
 ## Known gaps
-- The visual editor is a placeholder: the blocks and renderer packages exist, but there is no canvas, inspector, version history UI or public site route yet.
+- The page editor shows a live preview of blocks; continue using Pages and Templates to update content and design.
 - Signed-in screenshots and the dashboard need a database with every migration applied and email confirmation switched off (or confirmed accounts).
 
 ## Templates (added)
@@ -68,3 +68,9 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Sample content is never copied as real business facts; sample claims warn before publishing.
 - Plan limits adapted, not bypassed. Restore points for 30 days on replace operations.
 - AI hooks only (no AI calls).
+
+
+## See also
+- docs/settings.md
+- docs/ui-spec-settings.md
+

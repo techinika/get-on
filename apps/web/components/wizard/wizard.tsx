@@ -9,7 +9,7 @@ import { StepBusinessName } from "./step-business-name";
 import { StepBusinessType } from "./step-business-type";
 import { StepContact } from "./step-contact";
 import { StepReview } from "./step-review";
-import { StepStart } from "./step-start";
+import { StepStart, type TemplateChoice } from "./step-start";
 import {
   DEFAULT_STATE,
   STEP_META,
@@ -77,6 +77,8 @@ function restoredState(): WizardState | null {
         typeof parsed.includeContactForm === "boolean"
           ? parsed.includeContactForm
           : DEFAULT_STATE.includeContactForm,
+      templateSlug:
+        typeof parsed.templateSlug === "string" ? parsed.templateSlug : null,
       addressStatus: DEFAULT_STATE.addressStatus,
     };
   } catch {
@@ -84,9 +86,19 @@ function restoredState(): WizardState | null {
   }
 }
 
-export function Wizard() {
+export function Wizard({
+  templates,
+  initialTemplateSlug,
+}: {
+  templates: TemplateChoice[];
+  initialTemplateSlug: string | null;
+}) {
   const router = useRouter();
-  const [state, setState] = React.useState<WizardState>(DEFAULT_STATE);
+  const [state, setState] = React.useState<WizardState>(() => ({
+    ...DEFAULT_STATE,
+    startChoice: initialTemplateSlug ? "template" : DEFAULT_STATE.startChoice,
+    templateSlug: initialTemplateSlug,
+  }));
   const [hydrated, setHydrated] = React.useState(false);
   const [checkNonce, setCheckNonce] = React.useState(0);
   const [checkedKey, setCheckedKey] = React.useState<string | null>(null);
@@ -104,10 +116,16 @@ export function Wizard() {
   // reading it during render would break SSR hydration). Passing the identical
   // DEFAULT_STATE reference is a no-op bail-out.
   React.useEffect(() => {
+    const restored = restoredState();
+    const next = restored ?? DEFAULT_STATE;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from sessionStorage
-    setState(restoredState() ?? DEFAULT_STATE);
+    setState(
+      initialTemplateSlug
+        ? { ...next, startChoice: "template", templateSlug: initialTemplateSlug }
+        : next,
+    );
     setHydrated(true);
-  }, []);
+  }, [initialTemplateSlug]);
 
   React.useEffect(() => {
     if (!hydrated) return;
@@ -228,6 +246,9 @@ export function Wizard() {
           about: state.about,
           businessType: state.businessType,
           startChoice: state.startChoice,
+          ...(state.startChoice === "template" && state.templateSlug
+            ? { templateSlug: state.templateSlug }
+            : {}),
           contact: {
             phone: state.contact.phone.trim(),
             email: state.contact.email.trim(),
@@ -340,7 +361,19 @@ export function Wizard() {
               <StepStart
                 value={state.startChoice}
                 onChange={(startChoice: StartChoice) =>
-                  setState((prev) => ({ ...prev, startChoice }))
+                  setState((prev) => ({
+                    ...prev,
+                    startChoice,
+                    templateSlug:
+                      startChoice === "template"
+                        ? prev.templateSlug ?? templates[0]?.slug ?? null
+                        : prev.templateSlug,
+                  }))
+                }
+                templates={templates}
+                templateSlug={state.templateSlug}
+                onTemplateChange={(templateSlug) =>
+                  setState((prev) => ({ ...prev, templateSlug }))
                 }
               />
             ) : null}

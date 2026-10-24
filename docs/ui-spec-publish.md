@@ -1,3 +1,7 @@
+# See also
+See also `docs/ui-spec-settings.md` for the Settings area.
+- docs/ui-spec-settings.md
+
 # Get-On UI Specification v1 - Publishing
 
 This document covers publishing a website to `https://{name}.get-on.tech`, the published site itself, the publishing dashboard UI and the safety and moderation screens. It extends `docs/ui-spec.md` (app scaffolding, auth, landing, dashboard, wizard, project area), `docs/ui-spec-app.md` (the dashboard app refresh) and `docs/ui-spec-editor.md` (the editor, site look, images library, version history and preview).
@@ -181,3 +185,7 @@ When a publish is stopped for review the dialog shows the "Under review" InfoBox
   - "Remove a report" (ghost md) on each report row: marks the report as handled.
 - Every action writes a row in `admin_audit_log` with the admin email, the action, the project id, the reason and the time. The audit log is visible on the site details page and in a dedicated "History" tab, newest first. Nothing in the console can change a website without a log entry.
 - The console never shows the rules a site broke to the owner, and never shows the admin notes to anyone but the admins.
+# See also
+- docs/ui-spec-settings.md
+
+See also `docs/ui-spec-settings.md` for the Settings area.

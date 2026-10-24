@@ -27,6 +27,7 @@
     "@get-on/publisher": "workspace:*",
     "@get-on/renderer": "workspace:*",
     "@get-on/site-server": "workspace:*",
+    "@get-on/templates": "workspace:*",
     "@supabase/ssr": "^0.7.0",
     "@supabase/supabase-js": "^2.57.4",
     "@tiptap/extension-link": "^2.10.3",

@@ -88,9 +88,94 @@ function text(value: string | null | undefined): string | undefined {
   return clean ? clean : undefined;
 }
 
+const SCALES = new Set(["compact", "comfortable", "large"]);
+const DENSITIES = new Set(["compact", "comfortable", "airy"]);
+const BUTTON_SHAPES = new Set(["square", "soft", "round", "pill"]);
+const BUTTON_STYLES = new Set(["solid", "outline", "soft"]);
+const BUTTON_SIZES = new Set(["normal", "large"]);
+const CARD_STYLES = new Set(["flat", "outlined", "shadow"]);
+const COLOR_KEYS = ["primary", "accent", "background", "text", "soft"] as const;
+
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+}
+
+function colour(value: unknown): string | null {
+  return typeof value === "string" && /^#[0-9a-f]{3,8}$/i.test(value) ? value : null;
+}
+
+function fontChoice(value: unknown, fallback: { id: string; weight: number }) {
+  const font = record(value);
+  return {
+    id: typeof font.id === "string" && font.id.trim() ? font.id.trim().slice(0, 80) : fallback.id,
+    weight: typeof font.weight === "number" && font.weight >= 100 && font.weight <= 900
+      ? Math.round(font.weight / 100) * 100
+      : fallback.weight,
+  };
+}
+
 export function parseTheme(value: unknown): Theme {
-  const theme =
-    value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+  const theme = record(value);
+
+  const colors = record(theme.colors);
+  const hasColors = COLOR_KEYS.every((key) => colour(colors[key]) !== null);
+  if (theme.version === 2 || hasColors) {
+    const fonts = record(theme.fonts);
+    const buttons = record(theme.buttons);
+    const cards = record(theme.cards);
+    return {
+      version: 2,
+      colors: hasColors
+        ? {
+            primary: colour(colors.primary)!,
+            accent: colour(colors.accent)!,
+            background: colour(colors.background)!,
+            text: colour(colors.text)!,
+            soft: colour(colors.soft)!,
+          }
+        : {
+            primary: "#0B6B4F",
+            accent: "#F5A524",
+            background: "#FFFBF5",
+            text: "#1F1A17",
+            soft: "#E8F5EF",
+          },
+      presetId: typeof theme.presetId === "string" ? theme.presetId : null,
+      fonts: {
+        heading: fontChoice(fonts.heading, { id: "Bricolage Grotesque", weight: 700 }),
+        body: fontChoice(fonts.body, { id: "Figtree", weight: 400 }),
+        scale: SCALES.has(String(fonts.scale))
+          ? (fonts.scale as NonNullable<Theme["fonts"]>["scale"])
+          : "comfortable",
+      },
+      buttons: {
+        shape: BUTTON_SHAPES.has(String(buttons.shape))
+          ? (buttons.shape as NonNullable<Theme["buttons"]>["shape"])
+          : "soft",
+        style: BUTTON_STYLES.has(String(buttons.style))
+          ? (buttons.style as NonNullable<Theme["buttons"]>["style"])
+          : "solid",
+        size: BUTTON_SIZES.has(String(buttons.size))
+          ? (buttons.size as NonNullable<Theme["buttons"]>["size"])
+          : "normal",
+        uppercase: buttons.uppercase === true,
+        shadow: buttons.shadow === true,
+      },
+      cards: {
+        style: CARD_STYLES.has(String(cards.style))
+          ? (cards.style as NonNullable<Theme["cards"]>["style"])
+          : "outlined",
+      },
+      corners: CORNERS.has(String(theme.corners))
+        ? (theme.corners as Theme["corners"])
+        : "soft",
+      density: DENSITIES.has(String(theme.density))
+        ? (theme.density as Theme["density"])
+        : "comfortable",
+      colorMode: "light",
+    };
+  }
+
   return {
     palette: PALETTES.has(String(theme.palette))
       ? (theme.palette as Theme["palette"])

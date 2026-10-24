@@ -1,4 +1,6 @@
-import type { Block, Theme } from "@get-on/blocks";
+import type { Theme } from "@get-on/blocks";
+
+export type Block = Record<string, any>;
 
 export type Category =
   | "starter"
@@ -31,30 +33,12 @@ export type Notice = { level: "info" | "warn"; text: string };
 export type SampleProfile = {
   businessName: string;
   tagline: string;
+  description: string;
   phone: string;
   email: string;
   address: string;
-  hours: Record<string, string>;
   hoursNote: string;
   social: { network: string; url: string }[];
-  logoAssetKey?: string;
-};
-
-export type HeaderConfig = {
-  logoMode: "name" | "logo";
-  menuSource: "pages" | "sections";
-  cta?: { label: string; link: any } | null;
-  sticky: boolean;
-  border: boolean;
-  announcement?: string;
-};
-
-export type FooterConfig = {
-  layout: "simple" | "columns" | "centered";
-  showSocial: boolean;
-  showContact: boolean;
-  showHours: boolean;
-  background: "plain" | "soft" | "dark";
 };
 
 export type TemplatePage = {
@@ -65,18 +49,8 @@ export type TemplatePage = {
   showInMenu: boolean;
   menuLabel?: string;
   priority: number;
-  dropLinkFallback: "home" | "none";
-  seo: { title: string; description: string; noindex?: boolean };
-  blocks: Block[];
-  blockMeta?: Record<string, { requires?: ("contact")[]; fallback?: Block; includeIf?: "contactForm" | "pictures" }>;
-};
-
-export type SinglePage = {
-  title: string;
-  include: { page: string; blocks: string[] }[];
-  anchors: Record<string, { anchor: string; menuLabel?: string }>;
-  pageAnchors: Record<string, string>;
   seo: { title: string; description: string };
+  blocks: Block[];
 };
 
 export type Composition = {
@@ -84,10 +58,7 @@ export type Composition = {
   label: string;
   businessTypes?: BusinessType[];
   theme: Theme;
-  header: HeaderConfig;
-  footer: FooterConfig;
   pages: TemplatePage[];
-  singlePage: SinglePage;
 };
 
 export type AiHints = {
@@ -96,7 +67,6 @@ export type AiHints = {
   tone: string[];
   doNot: string[];
   pagePurposes: Record<string, string>;
-  blockPurposes: Record<string, string>;
 };
 
 export type TemplateAssetDef = {
@@ -107,22 +77,41 @@ export type TemplateAssetDef = {
   kind: "art" | "photo" | "logo" | "avatar";
 };
 
+export type TemplateMeta = {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  category: Category;
+  tags: string[];
+  businessTypes: BusinessType[];
+  author: string;
+  license: "platform" | "user";
+  planMin: PlanId;
+  featured: boolean;
+  notices: Notice[];
+};
+
 export type TemplatePackage = {
   packageVersion: 1;
-  meta: {
-    name: string;
-    tagline: string;
-    description: string;
-    category: Category;
-    tags: string[];
-    businessTypes: BusinessType[];
-    language: "en";
-    author: string;
-    license: "platform" | "user";
-    notices: Notice[];
-  };
+  meta: TemplateMeta;
   sampleProfile: SampleProfile;
   aiHints: AiHints;
   assets: TemplateAssetDef[];
   compositions: Composition[];
+};
+
+export type TemplateCatalogItem = {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  category: Category;
+  tags: string[];
+  businessTypes: BusinessType[];
+  planMin: PlanId;
+  featured: boolean;
+  pageCount: number;
+  colors: { primary: string; accent: string; background: string; text: string; soft: string };
+  preview: { eyebrow: string; heading: string; subheading: string; items: string[] };
 };

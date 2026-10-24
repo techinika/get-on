@@ -6,6 +6,12 @@ import { cn } from "@/lib/utils";
 import { useRadioGroup } from "./use-radio-group";
 import type { StartChoice } from "./types";
 
+export type TemplateChoice = {
+  slug: string;
+  name: string;
+  tagline: string;
+};
+
 const START_OPTIONS: ReadonlyArray<{
   value: StartChoice;
   label: string;
@@ -25,7 +31,7 @@ const START_OPTIONS: ReadonlyArray<{
     label: "Pick a template",
     description: "Start from a ready-made design.",
     Icon: LayoutTemplate,
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     value: "blank",
@@ -41,9 +47,15 @@ const START_VALUES: readonly StartChoice[] = ["ai", "template", "blank"];
 export function StepStart({
   value,
   onChange,
+  templates,
+  templateSlug,
+  onTemplateChange,
 }: {
   value: StartChoice;
   onChange: (value: StartChoice) => void;
+  templates: TemplateChoice[];
+  templateSlug: string | null;
+  onTemplateChange: (slug: string) => void;
 }) {
   const { getOptionProps } = useRadioGroup(START_VALUES, value, onChange);
 
@@ -88,7 +100,30 @@ export function StepStart({
         })}
       </div>
 
-      {value !== "blank" ? (
+      {value === "template" ? (
+        <div className="mt-4 rounded-info border border-border bg-surface p-4">
+          <label htmlFor="wizard-template" className="text-sm font-semibold text-text">
+            Choose a design
+          </label>
+          <p className="mt-0.5 text-sm text-text-muted">
+            We will add friendly pages you can edit straight away.
+          </p>
+          <select
+            id="wizard-template"
+            value={templateSlug ?? templates[0]?.slug ?? ""}
+            onChange={(event) => onTemplateChange(event.target.value)}
+            className="mt-3 min-h-11 w-full rounded-input border-[1.5px] border-border-strong bg-surface px-3 text-base text-text focus:border-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {templates.map((item) => (
+              <option key={item.slug} value={item.slug}>
+                {item.name} — {item.tagline}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      {value === "ai" ? (
         <div className="mt-4 flex items-start gap-3 rounded-info bg-info-soft px-4 py-3.5">
           <Info size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-info-text" />
           <p className="text-sm text-info-text">

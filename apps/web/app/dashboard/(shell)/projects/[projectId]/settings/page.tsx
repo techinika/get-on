@@ -1,13 +1,11 @@
-import { Info } from "lucide-react";
+import { getShellData } from "@/lib/dashboard";
+import { redirect } from "next/navigation";
 
-export default function SettingsPlaceholderPage() {
-  return (
-    <div>
-      <h1 className="text-h1">Settings</h1>
-      <div className="mt-4 flex gap-3 rounded-info bg-info-soft px-4 py-3.5 text-sm text-info-text">
-        <Info size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0" />
-        <p>Settings are coming soon. For now you can update your details when the editor arrives.</p>
-      </div>
-    </div>
-  );
+type Params = { params: Promise<{ projectId: string }> };
+
+export default async function SettingsIndex({ params }: Params) {
+  const { projectId } = await params;
+  const data = await getShellData();
+  if (!data) redirect("/login");
+  redirect(`/dashboard/projects/${projectId}/settings/business`);
 }

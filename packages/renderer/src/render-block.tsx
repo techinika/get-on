@@ -341,6 +341,26 @@ export function RenderBlock({ block, ctx = {} }: { block: unknown; ctx?: RenderC
       );
     }
 
+    case 'quote': {
+      const align = (b.props as any).align ?? 'left';
+      const big = b.props.style === 'big';
+      return (
+        <section className={`${sClass} gs-quote ${big ? 'gs-quote-big' : 'gs-quote-plain'}`} style={sStyle} id={sec.anchor || undefined} data-block-id={rawId}>
+          <div className={innerClass(sec, align)}>
+            <blockquote className="gs-quote-text">
+              <p>{b.props.text}</p>
+              {b.props.author ? (
+                <footer className="gs-quote-author">
+                  <cite>{b.props.author}</cite>
+                  {b.props.role ? <span> · {b.props.role}</span> : null}
+                </footer>
+              ) : null}
+            </blockquote>
+          </div>
+        </section>
+      );
+    }
+
     case 'button': {
       const href = linkToHref(b.props.link, { getPageHref: ctx.getPageHref });
       if (!href || !b.props.label) return null;
@@ -384,7 +404,6 @@ export function RenderBlock({ block, ctx = {} }: { block: unknown; ctx?: RenderC
     case 'stats':
     case 'logos':
     case 'steps':
-    case 'quote':
     case 'link-list':
     case 'downloads':
       return <section className={sClass} style={sStyle} id={sec.anchor || undefined} data-block-id={rawId}><div className={innerClass(sec, (b.props as any).align ?? 'left')}><div className="gs-placeholder">{b.type}</div></div></section>;
