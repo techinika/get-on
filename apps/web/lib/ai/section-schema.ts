@@ -33,6 +33,12 @@ export const sectionDraftSchema = z.object({
 export type SectionDraft = z.infer<typeof sectionDraftSchema>;
 export type SectionBlock = z.infer<typeof blockSchema> & { id: string };
 
+export const pageDraftSchema = z.object({
+  blocks: sectionDraftSchema.shape.blocks.max(6),
+});
+
+export type PageDraft = z.infer<typeof pageDraftSchema>;
+
 export const sectionJsonSchema = {
   type: "object",
   additionalProperties: false,
@@ -66,6 +72,16 @@ export const sectionJsonSchema = {
           },
         },
       },
+    },
+  },
+};
+
+export const pageJsonSchema = {
+  ...sectionJsonSchema,
+  properties: {
+    blocks: {
+      ...sectionJsonSchema.properties.blocks,
+      maxItems: 6,
     },
   },
 };

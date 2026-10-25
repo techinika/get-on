@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { blocksFromDraft, sectionDraftSchema, sectionJsonSchema } from "@/lib/ai/section-schema";
+import {
+  blocksFromDraft,
+  pageDraftSchema,
+  pageJsonSchema,
+  sectionDraftSchema,
+  sectionJsonSchema,
+} from "@/lib/ai/section-schema";
 import { structuredTask } from "@/lib/ai/tasks";
 
 const hero = {
@@ -62,5 +68,13 @@ describe("AI section generation", () => {
     const task = structuredTask("section.generate");
     expect(task?.requirement.needsJson).toBe(true);
     expect(task?.validate({ blocks: [hero] }).ok).toBe(true);
+  });
+
+  it("allows up to six sections for a full page", () => {
+    expect(pageJsonSchema.properties.blocks.maxItems).toBe(6);
+    const blocks = Array.from({ length: 6 }, () => hero);
+    expect(pageDraftSchema.safeParse({ blocks }).success).toBe(true);
+    const task = structuredTask("page.generate");
+    expect(task?.validate({ blocks }).ok).toBe(true);
   });
 });

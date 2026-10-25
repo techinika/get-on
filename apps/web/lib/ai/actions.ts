@@ -26,6 +26,16 @@ export type AiSectionActionResult =
   | RunTextTaskResult
   | { ok: false; code: "AUTH" | "FORBIDDEN"; message: string };
 
+export type AiPageActionInput = {
+  projectId?: string | null;
+  brief: string;
+  existingText?: string;
+};
+
+export type AiPageActionResult =
+  | RunTextTaskResult
+  | { ok: false; code: "AUTH" | "FORBIDDEN"; message: string };
+
 export type AiImageActionInput = {
   projectId: string;
   prompt: string;
@@ -145,5 +155,43 @@ export async function generateImageWithAi(
     userId: current.user.id,
     projectId: input.projectId,
     prompt: input.prompt,
+  });
+}
+
+export async function generatePageWithAi(
+  input: AiPageActionInput,
+): Promise<AiPageActionResult> {
+  const current = await getCurrentTeam();
+  if (!current) {
+    return { ok: false, code: "AUTH", message: "Please sign in again." };
+  }
+  if (!["owner", "admin", "editor"].includes(current.team.role)) {
+    return {
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Only editors, admins and the owner can use AI here.",
+    };
+  }
+  if (input.brief.trim().length === 0) {
+    return {
+      ok: false,
+      code: "AI_TOO_LONG",
+      message: "Please describe the page you want first.",
+    };
+  }
+  if (input.brief.length > 20000 || (input.existingText?.length ?? 0) > 20000) {
+    return {
+      ok: false,
+      code: "AI_TOO_LONG",
+      message: "That is too long for AI to work with. Try a shorter description.",
+    };
+  }
+
+  return runTask("page.generate", {
+    teamId: current.team.teamId,
+    userId: current.user.id,
+    projectId: input.projectId ?? null,
+    userInput: input.brief,
+    existingText: input.existingText,
   });
 }
