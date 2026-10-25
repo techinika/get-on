@@ -87,7 +87,7 @@ The site design system is prepared for a future "dark-mode" plugin:
 ## Website settings core rules
 1. Heavy changes never run at the same time on one website (publish, apply template, import, restore, transfer and delete). Read-only jobs do not block.
 2. Nothing overwrites without a safety copy. Restore, import (replace/add), template apply, deletion create a safety backup first.
-3. Nothing auto-publishes except explicit publish actions. Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
+3. Nothing auto-publishes except explicit publish actions and the safe domain auto-publish (only when there are no unfinished changes). Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
 4. Backups and export files never contain secrets (no keys/tokens/emails/payment data). Contact messages included only when explicitly switched on.
 5. Imported files are untrusted: validate structure/size, defend against zip tricks, re-encode pictures, verify PDFs, validate blocks, never execute/trust paths/ids.
 6. Transfers move the website only; receiver must accept; limits checked on acceptance.
