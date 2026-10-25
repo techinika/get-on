@@ -117,7 +117,10 @@ class FakeSupabase {
     return new FakeTable(this, table);
   }
 
-  async rpc(name: string, args: Row): Promise<{ data: unknown; error: null }> {
+  async rpc(
+    name: string,
+    args: Row,
+  ): Promise<{ data: unknown; error: { message: string } | null }> {
     const domains = this.rows.domains!;
     const hosts = this.rows.domain_hostnames!;
     if (name === "start_domain") {
@@ -158,6 +161,12 @@ class FakeSupabase {
       return { data: null, error: null };
     }
     if (name === "add_hostname") {
+      const pending = hosts.filter(
+        (row) => row.status !== "live" && row.status !== "removed",
+      ).length;
+      if (pending >= Number(args.p_max_pending)) {
+        return { data: null, error: { message: "HOSTNAME_LIMIT" } };
+      }
       const domain = domains.find((row) => row.id === args.p_domain_id)!;
       const id = `host-${hosts.length + 1}`;
       const label = String(args.p_label);
@@ -326,7 +335,7 @@ const domainsConfig = readDomainsConfig({
   ROOT_DOMAIN: "get-on.tech",
 } as unknown as NodeJS.ProcessEnv);
 
-function setup() {
+function setup(config = domainsConfig) {
   const db = new FakeSupabase();
   db.rows.projects!.push({
     id: "project-1",
@@ -349,7 +358,7 @@ function setup() {
     supabase: db as unknown as SupabaseClient,
     provider,
     resolver,
-    config: domainsConfig,
+    config,
     pointers: pointers.store,
     publishConfig,
     healthCheck: async () => true,
@@ -400,6 +409,40 @@ describe("domain service", () => {
         mode: "switch_now",
       }),
     ).rejects.toMatchObject({ code: "DOMAIN_REVIEW_PENDING" });
+  });
+
+  it("stops adding hostnames when the provider pending cap is reached", async () => {
+    const { service, db, resolver } = setup({ ...domainsConfig, maxPendingHostnames: 1 });
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    db.rows.domain_hostnames!.push({
+      id: "host-existing",
+      domain_id: started.id,
+      project_id: "project-1",
+      hostname: "shop.rosebakery.com",
+      label: "shop",
+      role: "extra",
+      status: "pending",
+    });
+
+    await expect(
+      service.addAddress({
+        domainId: started.id,
+        label: "www",
+        role: "main",
+        mode: "switch_now",
+      }),
+    ).rejects.toMatchObject({ code: "HOSTNAME_LIMIT" });
   });
 
   it("creates the provider hostname and marks the address live after DNS and health", async () => {

@@ -16,6 +16,7 @@ type Mode =
   | "health"
   | "plan"
   | "migrate-pointers"
+  | "cleanup"
   | "all";
 
 const LIMIT = 50;
@@ -126,6 +127,32 @@ async function enforcePlans(): Promise<number> {
   return changed;
 }
 
+async function retryReleasedHostnames(): Promise<number> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("released_hostnames")
+    .select("provider_id, hostname")
+    .lte("delete_after", nowIso())
+    .limit(LIMIT);
+  if (!data || data.length === 0) return 0;
+
+  const provider = createHostnameProvider(readDomainsConfig());
+  let deleted = 0;
+  for (const row of data) {
+    try {
+      await provider.deleteHostname(String(row.provider_id));
+      await admin
+        .from("released_hostnames")
+        .delete()
+        .eq("provider_id", String(row.provider_id));
+      deleted += 1;
+    } catch (error) {
+      console.error(`[domains] cleanup ${row.hostname} failed`, error);
+    }
+  }
+  return deleted;
+}
+
 async function migratePointers(): Promise<number> {
   const config = readPublishConfig();
   const store = createPublishStore(config);
@@ -183,7 +210,7 @@ async function migratePointers(): Promise<number> {
 
 async function main() {
   const mode = (process.argv[2] ?? "all") as Mode;
-  if (!["verify", "poll", "health", "plan", "migrate-pointers", "all"].includes(mode)) {
+  if (!["verify", "poll", "health", "plan", "migrate-pointers", "cleanup", "all"].includes(mode)) {
     console.error(`Unknown domain job: ${mode}`);
     process.exit(1);
   }
@@ -199,6 +226,9 @@ async function main() {
   }
   if (mode === "plan" || mode === "all") {
     console.log(`[domains] enforced ${await enforcePlans()} team plan(s)`);
+  }
+  if (mode === "cleanup" || mode === "all") {
+    console.log(`[domains] cleaned up ${await retryReleasedHostnames()} hostname(s)`);
   }
   if (mode === "migrate-pointers") {
     console.log(`[domains] migrated ${await migratePointers()} pointer(s)`);

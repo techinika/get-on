@@ -311,6 +311,7 @@ export class DomainService {
       p_label: label,
       p_role: input.role,
       p_mode: input.mode,
+      p_max_pending: this.config.maxPendingHostnames,
     });
 
     try {
@@ -646,7 +647,7 @@ export class DomainService {
     if (!projectId) return;
     const { data: project } = await this.supabase
       .from("projects")
-      .select("subdomain, redirect_free_address")
+      .select("subdomain, redirect_free_address, primary_host")
       .eq("id", projectId)
       .maybeSingle();
     if (!project) return;
@@ -657,7 +658,7 @@ export class DomainService {
       .eq("project_id", projectId)
       .eq("status", "live");
 
-    let replacement: string | null = null;
+    const candidates: string[] = [];
     for (const row of others ?? []) {
       const { data: main } = await this.supabase
         .from("domain_hostnames")
@@ -666,11 +667,13 @@ export class DomainService {
         .eq("role", "main")
         .eq("status", "live")
         .maybeSingle();
-      if (main?.hostname) {
-        replacement = String(main.hostname);
-        break;
-      }
+      if (main?.hostname) candidates.push(String(main.hostname));
     }
+
+    const current =
+      typeof project.primary_host === "string" ? project.primary_host : null;
+    const replacement =
+      current && candidates.includes(current) ? current : candidates[0] ?? null;
 
     const freeHost = siteHostname(this.publishConfig, String(project.subdomain));
     const pointer = await this.pointers.getPointer(freeHost);

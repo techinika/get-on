@@ -31,6 +31,7 @@
     "job:domains-health": "pnpm --filter web job:domains-health",
     "job:domains-verify": "pnpm --filter web job:domains-verify",
     "job:domains-plan": "pnpm --filter web job:domains-plan",
+    "job:domains-cleanup": "pnpm --filter web job:domains-cleanup",
     "job:migrate-pointers": "pnpm --filter web job:migrate-pointers"
   },
   "devDependencies": {

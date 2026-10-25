@@ -569,11 +569,12 @@ create or replace function public.add_hostname(
   p_domain_id uuid,
   p_label text,
   p_role text,
-  p_mode text
+  p_mode text,
+  p_max_pending integer default 200
 )
 returns uuid
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 declare
@@ -598,6 +599,13 @@ begin
     raise exception 'DOMAIN_BLOCKED';
   end if;
   if p_role not in ('main','extra') or p_mode not in ('switch_now','prepare_first') then
+    raise exception 'HOSTNAME_LIMIT';
+  end if;
+
+  if (
+    select count(*) from public.domain_hostnames
+    where status not in ('live','removed')
+  ) >= greatest(coalesce(p_max_pending, 200), 1) then
     raise exception 'HOSTNAME_LIMIT';
   end if;
 
@@ -889,7 +897,7 @@ $$;
 
 revoke all on function public.start_domain(uuid,text,text) from public;
 revoke all on function public.mark_domain_verified(uuid) from public;
-revoke all on function public.add_hostname(uuid,text,text,text) from public;
+revoke all on function public.add_hostname(uuid,text,text,text,integer) from public;
 revoke all on function public.set_main_hostname(uuid) from public;
 revoke all on function public.detach_domain(uuid) from public;
 revoke all on function public.reassign_domain(uuid,uuid) from public;
@@ -900,7 +908,7 @@ revoke all on function public.restore_domain_plan(uuid) from public;
 
 grant execute on function public.start_domain(uuid,text,text) to authenticated, service_role;
 grant execute on function public.mark_domain_verified(uuid) to authenticated, service_role;
-grant execute on function public.add_hostname(uuid,text,text,text) to authenticated, service_role;
+grant execute on function public.add_hostname(uuid,text,text,text,integer) to authenticated, service_role;
 grant execute on function public.set_main_hostname(uuid) to authenticated, service_role;
 grant execute on function public.detach_domain(uuid) to authenticated, service_role;
 grant execute on function public.reassign_domain(uuid,uuid) to authenticated, service_role;

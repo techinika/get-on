@@ -86,7 +86,8 @@ export default async function AdminOperationsPage() {
       <InfoBox variant="info" className="mt-5">
         Job runs: <code className="font-mono text-xs">pnpm job:domains-poll</code> checks hostnames,{" "}
         <code className="font-mono text-xs">pnpm job:domains-health</code> checks live addresses, and{" "}
-        <code className="font-mono text-xs">pnpm job:domains-plan</code> pauses or restores domains after a plan change.
+        <code className="font-mono text-xs">pnpm job:domains-plan</code> pauses or restores domains after a plan change, and{" "}
+        <code className="font-mono text-xs">pnpm job:domains-cleanup</code> removes provider hostnames after the 7-day grace period.
       </InfoBox>
     </AppPage>
   );

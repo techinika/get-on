@@ -32,6 +32,7 @@
     "job:domains-health": "tsx scripts/jobs/domains.ts health",
     "job:domains-verify": "tsx scripts/jobs/domains.ts verify",
     "job:domains-plan": "tsx scripts/jobs/domains.ts plan",
+    "job:domains-cleanup": "tsx scripts/jobs/domains.ts cleanup",
     "job:migrate-pointers": "tsx scripts/jobs/domains.ts migrate-pointers"
   },
   "dependencies": {
