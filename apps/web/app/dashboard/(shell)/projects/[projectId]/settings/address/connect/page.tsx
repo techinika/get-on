@@ -23,6 +23,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
   let domain: Domain | null = null;
   let hosts: DomainHostname[] = [];
   let caa: CaaCheck | null = null;
+  let autoPublish: "published" | "failed" | null = null;
 
   if (current) {
     const supabase = await createClient();
@@ -62,6 +63,22 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         mainHost?.hostname ?? domain.registrable,
         domain.registrable,
       ).catch(() => null);
+
+      const { data: event } = await supabase
+        .from("domain_events")
+        .select("event, created_at")
+        .eq("domain_id", domain.id)
+        .in("event", ["auto_published", "auto_publish_failed"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (
+        event &&
+        (!mainHost?.liveAt || String(event.created_at) >= mainHost.liveAt)
+      ) {
+        autoPublish =
+          event.event === "auto_published" ? "published" : "failed";
+      }
     }
   }
 
@@ -78,6 +95,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         initialDomain={domain}
         initialHosts={hosts}
         caa={caa}
+        autoPublish={autoPublish}
         freeUrl={freeUrl}
         published={published}
       />

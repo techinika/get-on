@@ -126,6 +126,7 @@ export function ConnectWizard({
   initialDomain,
   initialHosts,
   caa,
+  autoPublish,
   freeUrl,
   published,
 }: {
@@ -133,6 +134,7 @@ export function ConnectWizard({
   initialDomain: Domain | null;
   initialHosts: DomainHostname[];
   caa: CaaCheck | null;
+  autoPublish: "published" | "failed" | null;
   freeUrl: string;
   published: boolean;
 }) {
@@ -515,6 +517,16 @@ export function ConnectWizard({
                 <CheckCircle2 className="h-9 w-9" aria-hidden />
               </span>
               <p className="mt-4 text-[15px] text-text-muted">It may take a minute to show everywhere.</p>
+              {autoPublish === "published" ? (
+                <p className="mt-2 text-[15px] font-semibold text-success-text">
+                  We updated your website for you.
+                </p>
+              ) : null}
+              {autoPublish === "failed" ? (
+                <p className="mt-2 text-[15px] text-text-muted">
+                  We could not update your website automatically. Publish when you are ready.
+                </p>
+              ) : null}
               <div className="mt-4 flex justify-center">
                 <CopyValue value={`https://${liveHost.hostname}`} label="website address" />
               </div>
