@@ -230,7 +230,7 @@ export function AddressManager({
                       <Badge variant="primary">{domain.role === "primary" ? "Main domain" : "Also redirects"}</Badge>
                     </div>
                     <p className="mt-1 text-[13px] text-text-muted">{statusLine(domain, hosts)}</p>
-                    {domain.status === "plan_lapsed" || domain.status === "paused" ? (
+                    {domain.status === "plan_lapsed" ? (
                       <div className="mt-2">
                         <InfoBox variant="warning">
                           Your domain is paused because your plan no longer includes it.{" "}
@@ -238,10 +238,29 @@ export function AddressManager({
                         </InfoBox>
                       </div>
                     ) : null}
+                    {domain.status === "paused" ? (
+                      <div className="mt-2">
+                        <InfoBox variant="warning">
+                          Our team paused this domain. Contact support if you need help.
+                        </InfoBox>
+                      </div>
+                    ) : null}
                   </div>
                 </div>
-                {canManage ? (
-                  <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2">
+                  {hosts.some((host) => host.status === "live") ? (
+                    <a
+                      href={`https://${hosts.find((host) => host.status === "live")!.hostname}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <Button type="button" size="sm" variant="secondary">
+                        Open website
+                      </Button>
+                    </a>
+                  ) : null}
+                  {canManage ? (
+                    <>
                     {needsSetup ? (
                       <Link href={`${connectHref}?domain=${domain.id}`}>
                         <Button type="button" size="sm">Continue setup</Button>
@@ -265,8 +284,9 @@ export function AddressManager({
                     <Button type="button" size="sm" variant="ghost" onClick={() => setRemoveId(domain.id)}>
                       Remove
                     </Button>
-                  </div>
-                ) : null}
+                    </>
+                  ) : null}
+                </div>
               </div>
 
               {hosts.length > 0 ? (
