@@ -13,7 +13,7 @@ import {
   reserveCredits,
   usageToNeurons,
   type AiErrorCode,
-  type AiResult,
+  type AiMessage,
   type AiTaskId,
   type AiUsage,
   type SkillBlock,
@@ -32,7 +32,7 @@ import {
   loadPlatformUsage,
   loadSkills,
 } from "./settings";
-import { textTask, type TextTaskConfig } from "./tasks";
+import { structuredTask, textTask, type TaskConfig } from "./tasks";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -53,6 +53,7 @@ export type RunTextTaskSuccess = {
   credits: number;
   flags: AiFlags;
   status: "succeeded" | "partial";
+  data?: unknown;
 };
 
 export type RunTextTaskFailure = {
@@ -265,15 +266,43 @@ async function moderateText(
   return { safe: result.safe, categories: result.categories };
 }
 
+function parseJsonValue(value: string): unknown {
+  const trimmed = value.trim();
+  const match = trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  return JSON.parse(match?.[1] ?? trimmed);
+}
+
+function sanitiseDeep(value: unknown): unknown {
+  if (typeof value === "string") return sanitiseText(value, 20000);
+  if (Array.isArray(value)) return value.map(sanitiseDeep);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [
+        key,
+        sanitiseDeep(entry),
+      ]),
+    );
+  }
+  return value;
+}
+
+function addUsage(a: AiUsage, b: AiUsage): AiUsage {
+  return {
+    inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0) || undefined,
+    outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0) || undefined,
+    images: (a.images ?? 0) + (b.images ?? 0) || undefined,
+    neurons: (a.neurons ?? 0) + (b.neurons ?? 0) || undefined,
+  };
+}
+
 export async function runTextTask(
   input: RunTextTaskInput,
 ): Promise<RunTextTaskResult> {
-  const task: TextTaskConfig | null = textTask(input.taskId);
-  return runTextTaskWithConfig(task, input);
+  return runTextTaskWithConfig(textTask(input.taskId), input);
 }
 
 async function runTextTaskWithConfig(
-  task: TextTaskConfig | null,
+  task: TaskConfig | null,
   input: RunTextTaskInput,
 ): Promise<RunTextTaskResult> {
   const config = aiConfig();
@@ -468,16 +497,79 @@ async function runTextTaskWithConfig(
       started_at: new Date(startedAt).toISOString(),
     });
 
-    let providerResult: AiResult<string>;
+    let outputText: string;
+    let outputData: unknown;
+    let providerUsage: AiUsage;
     try {
-      providerResult = await provider.generateText({
-        modelId: model.modelId,
-        messages: composed.messages,
-        maxTokens: maxOutputTokens,
-        temperature: task.temperature,
-        timeoutMs: AI_TASKS[task.taskId].timeoutMs,
-        metadata,
-      });
+      if (task.kind === "text") {
+        const providerResult = await provider.generateText({
+          modelId: model.modelId,
+          messages: composed.messages,
+          maxTokens: maxOutputTokens,
+          temperature: task.temperature,
+          timeoutMs: AI_TASKS[task.taskId].timeoutMs,
+          metadata,
+        });
+        outputText = sanitiseText(providerResult.value, task.maxChars);
+        outputData = undefined;
+        providerUsage = providerResult.usage;
+      } else {
+        const callStructured = async (messages: AiMessage[]) => {
+          if (model.supportsJson) {
+            const result = await provider.generateStructured({
+              modelId: model.modelId,
+              messages,
+              maxTokens: maxOutputTokens,
+              temperature: task.temperature,
+              timeoutMs: AI_TASKS[task.taskId].timeoutMs,
+              metadata,
+              jsonSchema: task.jsonSchema,
+              schemaName: task.schemaName,
+            });
+            return { value: result.value, usage: result.usage };
+          }
+          const result = await provider.generateText({
+            modelId: model.modelId,
+            messages,
+            maxTokens: maxOutputTokens,
+            temperature: task.temperature,
+            timeoutMs: AI_TASKS[task.taskId].timeoutMs,
+            metadata,
+          });
+          return { value: parseJsonValue(result.value), usage: result.usage };
+        };
+
+        let first: { value: unknown; usage: AiUsage };
+        try {
+          first = await callStructured(composed.messages);
+        } catch (error) {
+          if (!(isAiError(error) && error.code === "AI_BAD_RESULT")) {
+            throw error;
+          }
+          first = { value: null, usage: {} };
+        }
+
+        providerUsage = first.usage;
+        let validation = task.validate(sanitiseDeep(first.value));
+        if (!validation.ok) {
+          const repair = await callStructured([
+            ...composed.messages,
+            {
+              role: "user",
+              content: `The previous answer did not fit the required format. Fix these problems and return only the corrected JSON: ${validation.issues.join("; ")}`,
+            },
+          ]);
+          providerUsage = addUsage(providerUsage, repair.usage);
+          validation = task.validate(sanitiseDeep(repair.value));
+          if (!validation.ok) {
+            throw new AiError("AI_BAD_RESULT", {
+              details: { reason: "repair_failed" },
+            });
+          }
+        }
+        outputData = validation.data;
+        outputText = JSON.stringify(outputData);
+      }
     } catch (error) {
       const mapped = isAiError(error) ? error : new AiError("AI_PROVIDER_ERROR", { cause: error });
       await releaseRequest(admin, requestId);
@@ -490,8 +582,7 @@ async function runTextTaskWithConfig(
       return failure(mapped, requestId);
     }
 
-    const text = sanitiseText(providerResult.value, task.maxChars);
-    const flags = scanOutput(text);
+    const flags = scanOutput(outputText);
     if (flags.empty || flags.injection) {
       const mapped = new AiError("AI_BAD_RESULT");
       await releaseRequest(admin, requestId);
@@ -510,7 +601,7 @@ async function runTextTaskWithConfig(
         const outputModeration = await moderateText(
           provider,
           guard?.modelId,
-          text,
+          outputText,
           AI_TASKS.moderate.timeoutMs,
           metadata,
         );
@@ -542,8 +633,8 @@ async function runTextTaskWithConfig(
     }
 
     const usage: AiUsage = {
-      inputTokens: providerResult.usage.inputTokens ?? inputTokens,
-      outputTokens: providerResult.usage.outputTokens ?? estimateTokens(text),
+      inputTokens: providerUsage.inputTokens ?? inputTokens,
+      outputTokens: providerUsage.outputTokens ?? estimateTokens(outputText),
     };
     const neurons = usageToNeurons(usage, model);
     const credits =
@@ -598,7 +689,7 @@ async function runTextTaskWithConfig(
         skills: composed.manifest.skills,
         promptVersion: composed.manifest.task,
       },
-      { text },
+      task.kind === "text" ? { text: outputText } : { data: outputData },
       settings.payloadRetentionDays,
     );
     await recordUsage(admin, input.teamId, charged, neurons);
@@ -606,7 +697,8 @@ async function runTextTaskWithConfig(
     return {
       ok: true,
       requestId,
-      text,
+      text: outputText,
+      data: outputData,
       credits: charged,
       flags,
       status,
@@ -631,5 +723,8 @@ export async function runTask(
   taskId: AiTaskId,
   input: Omit<RunTextTaskInput, "taskId">,
 ): Promise<RunTextTaskResult> {
-  return runTextTaskWithConfig(textTask(taskId), { ...input, taskId });
+  return runTextTaskWithConfig(textTask(taskId) ?? structuredTask(taskId), {
+    ...input,
+    taskId,
+  });
 }

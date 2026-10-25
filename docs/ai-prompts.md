@@ -70,7 +70,7 @@ Changing this text requires a new `PLATFORM_RULES_VERSION` and a new evaluation 
 
 - Use `response_format: { type: "json_schema", json_schema: { name, schema, strict: true } }` only for models with `supports_json`.
 - Validate with Zod after parsing.
-- Repair once with the validation issues and the original output.
+- Repair once with the validation issues.
 - If repair fails, release the reservation and return `AI_BAD_RESULT`.
 - If the provider reports “JSON Mode couldn't be met”, treat it as a recoverable bad result.
 

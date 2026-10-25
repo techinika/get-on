@@ -90,7 +90,7 @@ The pipeline never writes to a page or publishes. The caller applies the result.
 - `profile.write`
 - `design.suggest`
 
-`tips.fix` is deterministic and does not call a model. Structured tasks (`site.generate`, `template.fill`, `template.generate`, `page.generate`, `section.generate`, `alt.describe`, `image.generate`, `repair`) still need their task runners and schemas.
+`section.generate` is the first structured task. It uses strict JSON mode, Zod validation and one repair call. The other structured tasks (`site.generate`, `template.fill`, `template.generate`, `page.generate`, `alt.describe`, `image.generate`, `repair`) still need their task runners and schemas. `tips.fix` is deterministic and does not call a model.
 
 ## Credits
 
