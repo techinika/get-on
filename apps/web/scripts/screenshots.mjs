@@ -265,6 +265,9 @@ async function captureAuthenticated(contextFactory) {
   await page.goto(`${BASE}/dashboard/team`, { waitUntil: "networkidle" });
   await shot(page, "team-360-light");
 
+  await page.goto(`${BASE}/dashboard/domains`, { waitUntil: "networkidle" });
+  await shot(page, "domains-360-light");
+
   await page.goto(`${BASE}/dashboard/account`, { waitUntil: "networkidle" });
   await shot(page, "account-360-light");
 
@@ -289,6 +292,9 @@ async function captureAuthenticated(contextFactory) {
 
       await p2.goto(`${BASE}/dashboard/team`, { waitUntil: "networkidle" });
       await shot(p2, `team-${width}-${scheme}`);
+
+      await p2.goto(`${BASE}/dashboard/domains`, { waitUntil: "networkidle" });
+      await shot(p2, `domains-${width}-${scheme}`);
 
       await p2.goto(`${BASE}/dashboard/account`, { waitUntil: "networkidle" });
       await shot(p2, `account-${width}-${scheme}`);
@@ -323,6 +329,11 @@ async function captureAuthenticated(contextFactory) {
         await p2.goto(`${BASE}${url}/templates`, { waitUntil: "networkidle" });
         await shot(p2, `project-templates-${width}-${scheme}`);
         await captureProjectSettings(p2, url, width, scheme);
+        await p2.goto(`${BASE}${url}/settings/address/connect`, {
+          waitUntil: "domcontentloaded",
+        });
+        await p2.waitForTimeout(600);
+        await shot(p2, `connect-domain-${width}-${scheme}`);
       }
       await captureWizardSteps(p2, width, scheme);
       await ctx2.close();
@@ -369,6 +380,15 @@ async function captureAdmin(contextFactory) {
       await shot(page, `admin-${width}-${scheme}`);
       await page.goto(`${BASE}/admin/sites`, { waitUntil: "networkidle" });
       await shot(page, `admin-sites-${width}-${scheme}`);
+
+      await page.goto(`${BASE}/admin/domains`, { waitUntil: "networkidle" });
+      await shot(page, `admin-domains-${width}-${scheme}`);
+      const firstDomain = page.locator('a[href^="/admin/domains/"]').first();
+      if (await firstDomain.count()) {
+        await firstDomain.click();
+        await page.waitForLoadState("networkidle");
+        await shot(page, `admin-domain-${width}-${scheme}`);
+      }
 
       const firstSite = page.locator('a[href^="/admin/sites/"]').first();
       if (await firstSite.count()) {
