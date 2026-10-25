@@ -33,7 +33,11 @@
     "job:domains-verify": "tsx scripts/jobs/domains.ts verify",
     "job:domains-plan": "tsx scripts/jobs/domains.ts plan",
     "job:domains-cleanup": "tsx scripts/jobs/domains.ts cleanup",
-    "job:migrate-pointers": "tsx scripts/jobs/domains.ts migrate-pointers"
+    "job:migrate-pointers": "tsx scripts/jobs/domains.ts migrate-pointers",
+    "job:ai": "tsx scripts/jobs/ai.ts",
+    "job:ai-monthly": "tsx scripts/jobs/ai.ts monthly",
+    "job:ai-expire": "tsx scripts/jobs/ai.ts expire",
+    "job:ai-payloads": "tsx scripts/jobs/ai.ts payloads"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

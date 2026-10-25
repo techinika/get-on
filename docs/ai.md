@@ -1,6 +1,6 @@
 # AI generation
 
-Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema and a first text pipeline exist. The AI UI, admin console, jobs, evaluation runner and the remaining generation tasks are still to be built.
+Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, a first text pipeline and the credit/payload jobs exist. The AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
 
 ## Invariants
 
@@ -119,6 +119,8 @@ RLS:
 - `ai_settings`, `ai_models`, skill packs, reservations and payloads are server-only.
 
 The AI migration follows `20261026000400_domain_ops.sql`. Both migrations still need applying to the target Supabase project.
+
+Jobs: `pnpm job:ai` grants monthly credits, expires old buckets and purges payloads. See `docs/credits.md`.
 
 ## Safety and review
 

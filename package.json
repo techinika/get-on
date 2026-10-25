@@ -32,7 +32,11 @@
     "job:domains-verify": "pnpm --filter web job:domains-verify",
     "job:domains-plan": "pnpm --filter web job:domains-plan",
     "job:domains-cleanup": "pnpm --filter web job:domains-cleanup",
-    "job:migrate-pointers": "pnpm --filter web job:migrate-pointers"
+    "job:migrate-pointers": "pnpm --filter web job:migrate-pointers",
+    "job:ai": "pnpm --filter web job:ai",
+    "job:ai-monthly": "pnpm --filter web job:ai-monthly",
+    "job:ai-expire": "pnpm --filter web job:ai-expire",
+    "job:ai-payloads": "pnpm --filter web job:ai-payloads"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

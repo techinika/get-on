@@ -102,10 +102,17 @@ Free also gets the separate one-time 25-credit grant. It does not refill.
 
 `profiles.free_ai_grant_at` claims the one-time grant before `grant_credits` runs. The source key is `free:{userId}`. If the grant fails, the claim is reset.
 
+## Jobs
+
+Run the AI jobs with `pnpm job:ai` (or `pnpm job:ai-monthly`, `pnpm job:ai-expire`, `pnpm job:ai-payloads`).
+
+- `monthly` grants each paid team its plan credits once per UTC month, expiring at the end of the following month. The source key is `monthly:YYYY-MM`, so a retry cannot double-grant.
+- `expire` calls `expire_credits()` for expired buckets.
+- `payloads` deletes stored payloads after 30 days.
+- `all` runs the three in order.
+
 ## Still to build
 
-- Monthly grant job.
-- Expiry job.
 - Referral and purchase hooks.
 - Credit calibration against real usage.
 - AI credits page and admin credit tools.
