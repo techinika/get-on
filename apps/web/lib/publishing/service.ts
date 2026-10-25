@@ -2,8 +2,8 @@ import { buildSite } from "@get-on/publisher";
 import { createClient } from "@/lib/supabase/server";
 import { invalidateQuickFind } from "@/lib/project-activity";
 import {
+  primaryAddress,
   readPublishConfig,
-  siteAddress,
   siteHostname,
 } from "./config";
 import {
@@ -31,6 +31,8 @@ export type PublishContext = {
   project: { id: string; name: string; subdomain: string };
   /** The admin console publishes without the normal per-project rate limit. */
   bypassRateLimit?: boolean;
+  /** Rebuild even when there are no draft changes (used after a domain goes live). */
+  force?: boolean;
 };
 
 export class PublishError extends Error {
@@ -57,6 +59,8 @@ type LoadedSite = {
     content_revision: number;
     review_state: string;
     suspended_reason: string | null;
+    primary_host: string | null;
+    redirect_free_address: boolean;
   };
   settings: SourceSettings | null;
   pages: SourcePage[];
@@ -75,6 +79,9 @@ function asProject(row: Record<string, unknown>): LoadedSite["project"] {
     content_revision: Number(row.content_revision ?? 0),
     review_state: String(row.review_state ?? "none"),
     suspended_reason: (row.suspended_reason as string | null) ?? null,
+    primary_host:
+      typeof row.primary_host === "string" ? row.primary_host : null,
+    redirect_free_address: row.redirect_free_address !== false,
   };
 }
 
@@ -85,7 +92,7 @@ async function loadSite(
   const { data: row, error } = await supabase
     .from("projects")
     .select(
-      "id, name, subdomain, settings, content_revision, review_state, suspended_reason",
+      "id, name, subdomain, settings, content_revision, review_state, suspended_reason, primary_host, redirect_free_address",
     )
     .eq("id", projectId)
     .maybeSingle();
@@ -199,20 +206,22 @@ export async function publishProject(
     if (rateOk !== true) throw new PublishError("PUBLISH_RATE_LIMITED");
   }
 
-  const { data: hasChanges, error: changesError } = await ctx.supabase.rpc(
-    "project_has_unpublished_changes",
-    { p_project_id: project.id },
-  );
-  if (changesError) throw new PublishError("UNKNOWN");
-  if (hasChanges !== true) {
-    return {
-      publishId: "",
-      status: "no_changes",
-      url: siteAddress(config, project.subdomain),
-      warnings: [],
-      pagesCount: pages.filter((page) => !page.is_hidden).length,
-      sizeBytes: 0,
-    };
+  if (!ctx.force) {
+    const { data: hasChanges, error: changesError } = await ctx.supabase.rpc(
+      "project_has_unpublished_changes",
+      { p_project_id: project.id },
+    );
+    if (changesError) throw new PublishError("UNKNOWN");
+    if (hasChanges !== true) {
+      return {
+        publishId: "",
+        status: "no_changes",
+        url: primaryAddress(config, project.subdomain, project.primary_host),
+        warnings: [],
+        pagesCount: pages.filter((page) => !page.is_hidden).length,
+        sizeBytes: 0,
+      };
+    }
   }
 
   const { data: publishRow, error: insertError } = await ctx.supabase
@@ -247,6 +256,7 @@ export async function publishProject(
       publishId,
       rootDomain:
         config.kind === "local" ? config.localRootDomain : config.rootDomain,
+      primaryHost: project.primary_host,
       activePlugins,
       builtAt,
     });
@@ -280,6 +290,9 @@ export async function publishProject(
       plan: ctx.team.planId,
       pause: pauseFromSettings(settings?.maintenance),
       redirects: redirectsFromRows(redirects),
+      primaryHost: project.primary_host ?? null,
+      freeHost: hostname,
+      redirectToPrimary: project.redirect_free_address,
     });
 
     const now = new Date().toISOString();
@@ -305,7 +318,7 @@ export async function publishProject(
     return {
       publishId,
       status: "live",
-      url: siteAddress(config, project.subdomain),
+      url: primaryAddress(config, project.subdomain, project.primary_host),
       warnings: result.warnings,
       pagesCount,
       sizeBytes: result.totalBytes,
@@ -386,7 +399,7 @@ export async function restorePublish(
   if (target.status === "live") {
     return {
       publishId: String(target.id),
-      url: siteAddress(config, loaded.project.subdomain),
+      url: primaryAddress(config, loaded.project.subdomain, loaded.project.primary_host),
     };
   }
   if (!["offline", "superseded"].includes(String(target.status))) {
@@ -428,6 +441,6 @@ export async function restorePublish(
 
   return {
     publishId: String(target.id),
-    url: siteAddress(config, loaded.project.subdomain),
+    url: primaryAddress(config, loaded.project.subdomain, loaded.project.primary_host),
   };
 }

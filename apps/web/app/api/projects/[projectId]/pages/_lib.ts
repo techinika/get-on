@@ -8,7 +8,7 @@ export const PAGE_COLUMNS =
 export type ProjectContext = {
   supabase: Awaited<ReturnType<typeof createClient>>;
   current: { user: { id: string; email?: string }; team: CurrentTeam };
-  project: { id: string; name: string; subdomain: string };
+  project: { id: string; name: string; subdomain: string; primary_host: string | null };
 };
 
 /** Verify the current user can access this project. */
@@ -25,7 +25,7 @@ export async function requireProject(projectId: string): Promise<
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("projects")
-    .select("id, name, subdomain")
+    .select("id, name, subdomain, primary_host")
     .eq("id", projectId)
     .eq("team_id", current.team.teamId)
     .maybeSingle();
@@ -36,7 +36,18 @@ export async function requireProject(projectId: string): Promise<
       response: NextResponse.json({ error: "PROJECT_NOT_FOUND" }, { status: 404 }),
     };
   }
-  return { ok: true, ctx: { supabase, current, project } };
+  return {
+    ok: true,
+    ctx: {
+      supabase,
+      current,
+      project: {
+        ...project,
+        primary_host:
+          typeof project.primary_host === "string" ? project.primary_host : null,
+      },
+    },
+  };
 }
 
 /** True when the team's plan still allows another page on this project. */

@@ -33,6 +33,8 @@ export type ShellProject = {
   hasUnpublishedChanges?: boolean;
   /** The public address of the website, when publishing is configured. */
   siteUrl?: string | null;
+  /** The live main domain, when one is connected. */
+  primaryHost?: string | null;
 };
 
 export type ShellUsage = {

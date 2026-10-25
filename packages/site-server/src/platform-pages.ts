@@ -71,6 +71,12 @@ const SHIELD_ALERT_ICON =
 const CLOCK_ICON =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>';
 
+const PLUG_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22v-5"/><path d="M9 8V2"/><path d="M15 8V2"/><path d="M18 8H6a2 2 0 0 0-2 2v3a8 8 0 0 0 16 0v-3a2 2 0 0 0-2-2Z"/></svg>';
+
+const PAUSE_ICON =
+  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></svg>';
+
 /** The address is unknown, reserved, or has never been published. */
 export function notFoundPage(): string {
   return shell({
@@ -102,6 +108,39 @@ export function notPublishedPage(): string {
     icon: COMPASS_ICON,
     title: "This website is not live yet",
     text: "The owner has not published it, or has taken it offline for now.",
+    actionLabel: "Go to Get-On",
+    actionHref: "https://get-on.tech",
+  });
+}
+
+/** The owner has not connected this address to a website yet. */
+export function domainNotConnectedPage(): string {
+  return shell({
+    icon: PLUG_ICON,
+    title: "This domain is not connected to a website yet",
+    text: "If you own this domain, log in to Get-On and choose a website for it.",
+    actionLabel: "Go to Get-On",
+    actionHref: "https://get-on.tech",
+  });
+}
+
+/** The website behind this address is paused because its plan lapsed. */
+export function domainPausedPage(): string {
+  return shell({
+    icon: PAUSE_ICON,
+    title: "This website is taking a break",
+    text: "The owner needs to renew their plan to bring it back.",
+    actionLabel: "Go to Get-On",
+    actionHref: "https://get-on.tech",
+  });
+}
+
+/** Our team paused this address while we look into a problem. */
+export function domainSupportPausedPage(): string {
+  return shell({
+    icon: PAUSE_ICON,
+    title: "This website is taking a break",
+    text: "Check back soon, or contact the business if you need help.",
     actionLabel: "Go to Get-On",
     actionHref: "https://get-on.tech",
   });

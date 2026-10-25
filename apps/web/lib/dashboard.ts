@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 import { initialsFrom } from "@/lib/viewer";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import type {
   ShellProject,
   ShellRole,
@@ -84,7 +84,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   const [{ data: projects }, { count: memberCount }] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, subdomain, status, content_revision, created_at, updated_at, deleted_at")
+      .select("id, name, subdomain, primary_host, status, content_revision, created_at, updated_at, deleted_at")
       .eq("team_id", currentTeam.id)
       .order("created_at", { ascending: false }),
     supabase
@@ -176,7 +176,13 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       unreadMessages: unreadByProject.get(project.id) ?? 0,
       homepageId: homepageByProject.get(project.id) ?? null,
       hasUnpublishedChanges,
-      siteUrl: siteAddress(publishConfig, project.subdomain),
+      primaryHost:
+        typeof project.primary_host === "string" ? project.primary_host : null,
+      siteUrl: primaryAddress(
+        publishConfig,
+        project.subdomain,
+        project.primary_host,
+      ),
     };
   });
 

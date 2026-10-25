@@ -37,6 +37,8 @@ export type WebsiteSummary = {
   status: "draft" | "published";
   updatedAt: string | null;
   unreadMessages?: number;
+  siteUrl?: string | null;
+  primaryHost?: string | null;
 };
 
 export type WebsitesContentProps = {
@@ -320,7 +322,9 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
           <h2 className="truncate text-card-title text-text">{website.name}</h2>
           <p className="mt-1 flex items-center gap-1.5 text-sm text-text-muted">
             <Globe size={14} strokeWidth={1.75} aria-hidden className="shrink-0" />
-            <span className="truncate">{website.subdomain}.get-on.tech</span>
+            <span className="truncate">
+              {website.primaryHost ?? `${website.subdomain}.get-on.tech`}
+            </span>
           </p>
           <div className="mt-3 flex items-center justify-between gap-2">
             {(website.unreadMessages ?? 0) > 0 ? (

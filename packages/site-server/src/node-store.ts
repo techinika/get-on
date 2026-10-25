@@ -26,6 +26,15 @@ export function pointerPath(rootDir: string, hostname: string): string {
   return path.join(rootDir, "pointers", `${hostname}.json`);
 }
 
+/** The v2 host mapping and the full site pointer, kept in separate files. */
+export function hostPointerPath(rootDir: string, hostname: string): string {
+  return path.join(rootDir, "pointers", "hosts", `${hostname}.json`);
+}
+
+export function sitePointerPath(rootDir: string, siteId: string): string {
+  return path.join(rootDir, "pointers", "sites", `${siteId}.json`);
+}
+
 export function sharedPath(rootDir: string, filePath: string): string {
   return path.join(rootDir, "_shared", filePath);
 }
@@ -64,6 +73,38 @@ export function createNodeStore(rootDir: string): SiteStore {
         }
         return parsed;
       } catch {
+        // Fall through to the v2 host mapping.
+      }
+
+      try {
+        const raw = await readFile(hostPointerPath(rootDir, hostname), "utf8");
+        const mapping = JSON.parse(raw) as {
+          v?: number;
+          siteId?: string;
+          planLapsed?: boolean;
+        supportPaused?: boolean;
+        };
+        if (mapping.v !== 2 || typeof mapping.siteId !== "string") return null;
+        const siteRaw = await readFile(
+          sitePointerPath(rootDir, mapping.siteId),
+          "utf8",
+        );
+        const pointer = JSON.parse(siteRaw) as SitePointer;
+        if (
+          !pointer ||
+          typeof pointer !== "object" ||
+          pointer.siteId !== mapping.siteId ||
+          !pointer.publishId
+        ) {
+          return null;
+        }
+        if (mapping.supportPaused === true) {
+          return { ...pointer, supportPaused: true };
+        }
+        return mapping.planLapsed === true
+          ? { ...pointer, planLapsed: true }
+          : pointer;
+      } catch {
         return null;
       }
     },
@@ -86,7 +127,7 @@ export function createNodeStore(rootDir: string): SiteStore {
   };
 }
 
-/** Writes the live pointer for a host name. */
+/** Writes the live pointer for the free address, plus the v2 mapping. */
 export async function writeNodePointer(
   rootDir: string,
   hostname: string,
@@ -95,6 +136,42 @@ export async function writeNodePointer(
   const file = pointerPath(rootDir, hostname);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(file, `${JSON.stringify(pointer, null, 2)}\n`, "utf8");
+  await writeNodeSitePointer(rootDir, pointer);
+  await writeNodeHostPointer(rootDir, hostname, pointer.siteId);
+}
+
+export async function writeNodeSitePointer(
+  rootDir: string,
+  pointer: SitePointer,
+): Promise<void> {
+  const file = sitePointerPath(rootDir, pointer.siteId);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(file, `${JSON.stringify(pointer, null, 2)}\n`, "utf8");
+}
+
+/** Points a custom address at a website without copying the full pointer. */
+export async function writeNodeHostPointer(
+  rootDir: string,
+  hostname: string,
+  siteId: string,
+  options?: { planLapsed?: boolean; supportPaused?: boolean },
+): Promise<void> {
+  const file = hostPointerPath(rootDir, hostname);
+  await mkdir(path.dirname(file), { recursive: true });
+  await writeFile(
+    file,
+    `${JSON.stringify(
+      {
+        v: 2,
+        siteId,
+        ...(options?.planLapsed ? { planLapsed: true } : {}),
+        ...(options?.supportPaused ? { supportPaused: true } : {}),
+      },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 }
 
 /** Lists the files of one published version. */

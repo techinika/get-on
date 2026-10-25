@@ -87,6 +87,7 @@ export type BuildInputArgs = {
   planId: string;
   publishId: string;
   rootDomain?: string;
+  primaryHost?: string | null;
   /** The plugin ids that are switched on for the website. */
   activePlugins?: string[];
   builtAt?: Date;
@@ -363,6 +364,7 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     publishId: args.publishId,
     subdomain: args.project.subdomain,
     rootDomain: args.rootDomain,
+    primaryHost: args.primaryHost ?? null,
     settings: siteSettings,
     pages: args.pages.map((page) => toPublishPage(page, allowIndexing)),
     forms: { enabled: contactEnabled },

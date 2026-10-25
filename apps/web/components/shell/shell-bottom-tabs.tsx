@@ -8,6 +8,7 @@ import {
   CreditCard,
   Ellipsis,
   FileText,
+  Globe,
   HelpCircle,
   Image as ImageIcon,
   LayoutDashboard,
@@ -221,6 +222,16 @@ export function ShellBottomTabs({
                 >
                   <BarChart3 size={22} strokeWidth={1.75} aria-hidden className="text-text-muted" />
                   <span className="flex-1">Visitors</span>
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href={project ? `${base}/settings/address` : "/dashboard/domains"}
+                  onClick={() => setMoreOpen(false)}
+                  className="flex min-h-14 items-center gap-3 border-b border-border px-5 text-base font-semibold text-text"
+                >
+                  <Globe size={22} strokeWidth={1.75} aria-hidden className="text-text-muted" />
+                  <span className="flex-1">{project ? "Address" : "Domains"}</span>
                 </Link>
               </li>
               <li>

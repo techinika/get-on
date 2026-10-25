@@ -10,6 +10,7 @@ export type Plan = {
   storageMb: number | null;
   aiCreditsMonthly: number;
   customDomainAllowed: boolean;
+  customDomainsPerSite: number;
   watermarked: boolean;
   backupAutoFrequency: "weekly" | "daily";
   backupAutoKeep: number;
@@ -30,6 +31,7 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     storageMb: 100,
     aiCreditsMonthly: 0,
     customDomainAllowed: false,
+    customDomainsPerSite: 0,
     watermarked: true,
     backupAutoFrequency: "weekly",
     backupAutoKeep: 1,
@@ -47,7 +49,8 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     maxMembers: 3,
     storageMb: 500,
     aiCreditsMonthly: 50,
-    customDomainAllowed: false,
+    customDomainAllowed: true,
+    customDomainsPerSite: 1,
     watermarked: false,
     backupAutoFrequency: "daily",
     backupAutoKeep: 7,
@@ -66,6 +69,7 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     storageMb: 2048,
     aiCreditsMonthly: 200,
     customDomainAllowed: true,
+    customDomainsPerSite: 3,
     watermarked: false,
     backupAutoFrequency: "daily",
     backupAutoKeep: 14,
@@ -84,6 +88,7 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     storageMb: 10240,
     aiCreditsMonthly: 1000,
     customDomainAllowed: true,
+    customDomainsPerSite: 10,
     watermarked: false,
     backupAutoFrequency: "daily",
     backupAutoKeep: 30,

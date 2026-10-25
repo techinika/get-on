@@ -57,6 +57,15 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Plans and reserved web addresses are inserted by a migration, not only by `supabase/seed.sql`.
 - A database needs every migration applied before the app works. `supabase db push` does it, or paste the files into the Supabase SQL editor in order.
 
+## Custom domains
+- Customers keep their DNS. They add one TXT proof record at `_geton-verify.{domain}` and one CNAME per address to `CF_SAAS_CNAME_TARGET`. We never host or edit DNS.
+- No provider hostname is created before TXT verification. Cloudflare for SaaS is behind `HostnameProvider`; the fake provider is the development default.
+- `switch_now` uses HTTP DCV; `prepare_first` uses TXT DCV so HTTPS can be ready before the CNAME moves.
+- One main address per website; other addresses, alias domains and the free address (when enabled) 301 GET/HEAD to it. POST is never redirected. HSTS on customer hosts omits `includeSubDomains` and `preload`.
+- KV pointer v2 uses `host:{hostname}` and `site:{siteId}`. Host mappings may carry `planLapsed` so one address pauses without pausing the free address. Keep the old reader for one release and run `pnpm job:migrate-pointers`.
+- Domains are Basic and above. Limits come from `plans.custom_domains_per_site`; Free is 0.
+- See `docs/domains.md`, `docs/domains-spike.md` and `docs/ui-spec-domains.md`.
+
 ## Known gaps
 - The page editor shows a live preview of blocks; continue using Pages and Templates to update content and design.
 - Signed-in screenshots and the dashboard need a database with every migration applied and email confirmation switched off (or confirmed accounts).
@@ -78,7 +87,7 @@ The site design system is prepared for a future "dark-mode" plugin:
 ## Website settings core rules
 1. Heavy changes never run at the same time on one website (publish, apply template, import, restore, transfer and delete). Read-only jobs do not block.
 2. Nothing overwrites without a safety copy. Restore, import (replace/add), template apply, deletion create a safety backup first.
-3. Nothing auto-publishes except explicit publish actions. Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
+3. Nothing auto-publishes except explicit publish actions and the safe domain auto-publish (only when there are no unfinished changes). Restore/import/transfer change the draft only; live changes only on publish except redirects, pause mode and unpublish.
 4. Backups and export files never contain secrets (no keys/tokens/emails/payment data). Contact messages included only when explicitly switched on.
 5. Imported files are untrusted: validate structure/size, defend against zip tricks, re-encode pictures, verify PDFs, validate blocks, never execute/trust paths/ids.
 6. Transfers move the website only; receiver must accept; limits checked on acceptance.

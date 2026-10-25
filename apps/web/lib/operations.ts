@@ -8,7 +8,8 @@ export type OperationKind =
   | "export"
   | "backup"
   | "transfer"
-  | "delete";
+  | "delete"
+  | "domain";
 
 export async function beginProjectOperation(params: {
   projectId: string;

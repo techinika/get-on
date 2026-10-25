@@ -12,6 +12,8 @@ export const dynamic = "force-dynamic";
 
 const GO_TO: QuickFindItem[] = [
   { id: "go-websites", title: "Websites", href: "/dashboard", icon: "link" },
+  { id: "go-domains", title: "Domains", href: "/dashboard/domains", icon: "link" },
+  { id: "go-connect-domain", title: "Connect a domain", href: "/dashboard/domains", icon: "link" },
   { id: "go-team", title: "Team", href: "/dashboard/team", icon: "link" },
   { id: "go-plan", title: "Plan and billing", href: "/dashboard/plan", icon: "link" },
   { id: "go-account", title: "Account", href: "/dashboard/account", icon: "link" },
@@ -65,6 +67,20 @@ export async function GET(request: Request) {
       ]);
 
       projectItems = [
+        {
+          id: "project-address",
+          title: "Address",
+          detail: "Your web address and domains",
+          href: `/dashboard/projects/${projectId}/settings/address`,
+          icon: "link",
+        },
+        {
+          id: "project-check-domain",
+          title: "Check my domain",
+          detail: "Check the connection records",
+          href: `/dashboard/projects/${projectId}/settings/address`,
+          icon: "link",
+        },
         {
           id: "project-plugins",
           title: "Plugins",

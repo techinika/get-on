@@ -10,13 +10,14 @@ insert into public.plans (
   storage_mb,
   monthly_emails,
   custom_domain_allowed,
+  custom_domains_per_site,
   watermark_required
 )
 values
-  ('free', 'Free', 0, 1, 1, 1, 1, 0, 100, 100, false, true),
-  ('basic', 'Basic', 7.99, 3, 10, 3, 5, 50, 500, 500, false, false),
-  ('pro', 'Pro', 13.99, 10, 50, 10, 15, 200, 2048, 2000, true, false),
-  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1000, 10240, 10000, true, false)
+  ('free', 'Free', 0, 1, 1, 1, 1, 0, 100, 100, false, 0, true),
+  ('basic', 'Basic', 7.99, 3, 10, 3, 5, 50, 500, 500, true, 1, false),
+  ('pro', 'Pro', 13.99, 10, 50, 10, 15, 200, 2048, 2000, true, 3, false),
+  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1000, 10240, 10000, true, 10, false)
 on conflict (id) do update
 set
   name = excluded.name,
@@ -29,6 +30,7 @@ set
   storage_mb = excluded.storage_mb,
   monthly_emails = excluded.monthly_emails,
   custom_domain_allowed = excluded.custom_domain_allowed,
+  custom_domains_per_site = excluded.custom_domains_per_site,
   watermark_required = excluded.watermark_required;
 
 insert into public.reserved_subdomains (name)

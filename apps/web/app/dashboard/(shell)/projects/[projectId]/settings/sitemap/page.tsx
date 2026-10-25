@@ -14,8 +14,17 @@ export default async function SettingsPage({ params }: Params) {
     bing: "",
     includeImages: true,
   };
+  let connectedHost: string | null = null;
   if (current) {
     const supabase = await createClient();
+    const { data: project } = await supabase
+      .from("projects")
+      .select("primary_host")
+      .eq("id", projectId)
+      .eq("team_id", current.team.teamId)
+      .maybeSingle();
+    connectedHost =
+      typeof project?.primary_host === "string" ? project.primary_host : null;
     const { data } = await supabase
       .from("project_settings")
       .select("verification, sitemap_include_images")
@@ -40,7 +49,11 @@ export default async function SettingsPage({ params }: Params) {
         description="Help search engines find all your pages, and connect Google's tools."
         timing="publish"
       />
-      <SitemapForm projectId={projectId} initial={initial} />
+      <SitemapForm
+        projectId={projectId}
+        initial={initial}
+        connectedHost={connectedHost}
+      />
     </div>
   );
 }

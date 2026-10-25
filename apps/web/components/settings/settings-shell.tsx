@@ -19,6 +19,10 @@ export function SettingsShell({ children }: { children: React.ReactNode }) {
   const projectId = getProjectId(pathname);
   const base = projectId ? `/dashboard/projects/${projectId}/settings` : "/dashboard";
 
+  if (pathname.endsWith("/settings/address/connect")) {
+    return <AppPage width="narrow">{children}</AppPage>;
+  }
+
   return (
     <AppPage width="wide">
       <PageHeader

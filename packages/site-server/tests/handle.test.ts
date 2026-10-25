@@ -78,15 +78,23 @@ describe("parseHost", () => {
     expect(result.ok && result.name).toBe("rosebakery");
   });
 
-  it("rejects the apex, nested labels, other domains and IP hosts", () => {
+  it("rejects the apex, nested platform labels and IP hosts", () => {
     expect(parseHost("get-on.tech")).toEqual({ ok: false, reason: "apex" });
     expect(parseHost("a.b.get-on.tech")).toEqual({
       ok: false,
       reason: "invalid",
     });
-    expect(parseHost("example.com")).toEqual({ ok: false, reason: "invalid" });
     expect(parseHost("127.0.0.1")).toEqual({ ok: false, reason: "invalid" });
     expect(parseHost("")).toEqual({ ok: false, reason: "invalid" });
+  });
+
+  it("accepts a customer host on another domain", () => {
+    expect(parseHost("WWW.Example.COM:443")).toEqual({
+      ok: true,
+      name: "www.example.com",
+      hostname: "www.example.com",
+      custom: true,
+    });
   });
 
   it("rejects reserved names", () => {
@@ -424,5 +432,115 @@ describe("platform pages", () => {
       expect(html).toContain("Made with");
       expect(html).toContain("Get-On");
     }
+  });
+});
+
+describe("custom domains", () => {
+  it("serves a connected custom host with the customer HSTS header", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        primaryHost: "www.example.com",
+        freeHost: "rose.get-on.tech",
+        redirectToPrimary: true,
+      },
+      files: { "index.html": file("<h1>Rose Bakery</h1>") },
+    });
+
+    const response = await handleSiteRequest(
+      request("https://www.example.com/"),
+      store,
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Strict-Transport-Security")).toBe(
+      "max-age=31536000",
+    );
+  });
+
+  it("redirects another custom address to the main address", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        primaryHost: "www.example.com",
+      },
+    });
+
+    const response = await handleSiteRequest(
+      request("https://example.com/menu?from=old"),
+      store,
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("Location")).toBe(
+      "https://www.example.com/menu?from=old",
+    );
+  });
+
+  it("sends the free address to the main address when the owner allows it", async () => {
+    const store = memoryStore({
+      pointer: {
+        ...livePointer,
+        primaryHost: "www.example.com",
+        freeHost: "rose.get-on.tech",
+        redirectToPrimary: true,
+      },
+    });
+
+    const response = await handleSiteRequest(
+      request("https://rose.get-on.tech/"),
+      store,
+    );
+
+    expect(response.status).toBe(301);
+    expect(response.headers.get("Location")).toBe("https://www.example.com/");
+  });
+
+  it("answers the health check without redirecting", async () => {
+    const store = memoryStore({
+      pointer: { ...livePointer, primaryHost: "www.example.com" },
+    });
+
+    const response = await handleSiteRequest(
+      request("https://example.com/_gs/health"),
+      store,
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe("ok");
+  });
+
+  it("shows the not-connected page for an unknown custom host", async () => {
+    const response = await handleSiteRequest(
+      request("https://unknown.example.com/"),
+      memoryStore({}),
+    );
+
+    expect(response.status).toBe(404);
+    expect(await response.text()).toContain("not connected to a website");
+  });
+
+  it("shows the support pause message before the plan message", async () => {
+    const response = await handleSiteRequest(
+      request("https://www.example.com/"),
+      memoryStore({
+        pointer: { ...livePointer, planLapsed: true, supportPaused: true },
+      }),
+    );
+
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(body).toContain("Check back soon");
+    expect(body).not.toContain("renew their plan");
+  });
+
+  it("pauses a website when its plan lapsed", async () => {
+    const response = await handleSiteRequest(
+      request("https://www.example.com/"),
+      memoryStore({ pointer: { ...livePointer, planLapsed: true } }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("3600");
   });
 });

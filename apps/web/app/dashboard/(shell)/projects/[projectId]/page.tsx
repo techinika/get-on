@@ -12,7 +12,7 @@ import { Checklist } from "@/components/project/checklist";
 import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
 import { planLimits } from "@/lib/team";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
 
 type Params = { params: Promise<{ projectId: string }> };
@@ -22,6 +22,7 @@ type ProjectRow = {
   name: string;
   subdomain: string;
   status: string;
+  primary_host: string | null;
   settings: unknown;
   review_state: string | null;
   suspended_at: string | null;
@@ -42,7 +43,7 @@ export default async function OverviewPage({ params }: Params) {
   const supabase = await createClient();
   const { data: row } = await supabase
     .from("projects")
-    .select("id, name, subdomain, status, settings, review_state, suspended_at")
+    .select("id, name, subdomain, status, primary_host, settings, review_state, suspended_at")
     .eq("id", projectId)
     .eq("team_id", data.currentTeam.id)
     .maybeSingle();
@@ -95,7 +96,11 @@ export default async function OverviewPage({ params }: Params) {
   );
 
   const used = pageRows.length;
-  const address = siteAddress(readPublishConfig(), project.subdomain);
+  const address = primaryAddress(
+    readPublishConfig(),
+    project.subdomain,
+    project.primary_host,
+  );
   const hasLiveVersion = Boolean(livePublish);
   const siteState = siteStateOf({
     published: project.status === "published",
@@ -167,6 +172,7 @@ export default async function OverviewPage({ params }: Params) {
             subdomain={project.subdomain}
             detailsDone={detailsDone}
             customDomainAllowed={plan.customDomainAllowed}
+            customDomainLive={Boolean(project.primary_host)}
             homepageId={homepage?.id ?? null}
             contactEnabled={contactEnabled}
             hasContactForm={hasContactForm}

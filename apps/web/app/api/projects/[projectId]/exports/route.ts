@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProject } from "../pages/_lib";
-import { siteAddress } from "@/lib/publishing/config";
-import { readPublishConfig } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -35,7 +34,11 @@ export async function GET(_request: Request, { params }: Params) {
   const content = {
     profile: {
       name: ctx.project.name,
-      address: siteAddress(readPublishConfig(), ctx.project.subdomain),
+      address: primaryAddress(
+        readPublishConfig(),
+        ctx.project.subdomain,
+        ctx.project.primary_host,
+      ),
     },
     look: settings?.theme ?? {},
     pages: pages ?? [],
@@ -66,7 +69,11 @@ export async function GET(_request: Request, { params }: Params) {
         themeVersion: 1,
         source: {
           name: ctx.project.name,
-          address: siteAddress(readPublishConfig(), ctx.project.subdomain),
+          address: primaryAddress(
+        readPublishConfig(),
+        ctx.project.subdomain,
+        ctx.project.primary_host,
+      ),
         },
         options: { pictures: false, files: false, messages: false },
         counts: { pages: content.pages.length, redirects: content.redirects.length },

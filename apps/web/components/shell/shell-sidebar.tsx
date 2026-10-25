@@ -168,6 +168,7 @@ export function ShellSidebar({
   const teamEntries: NavEntry[] = [
     { key: "websites", label: "Websites", icon: LayoutGrid, href: "/dashboard" },
     { key: "templates", label: "Templates", icon: LayoutTemplate, href: "/dashboard/templates" },
+    { key: "domains", label: "Domains", icon: Globe, href: "/dashboard/domains" },
   ];
   const teamGroupEntries: NavEntry[] = [
     { key: "members", label: "Members", icon: Users, href: "/dashboard/team" },
@@ -488,6 +489,19 @@ export function ShellSidebar({
                 <Shield size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
                 <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
                   Admin
+                </span>
+              </Link>
+              <Link
+                href="/admin/domains"
+                title={collapsed ? "Admin domains" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <Globe size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Domains
                 </span>
               </Link>
             </div>
