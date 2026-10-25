@@ -56,7 +56,7 @@ Transition data and exhaustive tests live in `apps/web/lib/domains/state.ts`.
 4. Add the Worker route for custom-hostname traffic and more specific Worker: None routes for dashboard/platform hosts. Confirm the exact patterns on the deployed zone.
 5. Create `CF_API_TOKEN_DOMAINS` with custom hostnames read/write and the setup-read scopes.
 6. Set `CF_SAAS_ZONE_ID`, `CF_SAAS_CNAME_TARGET`, `CF_SAAS_HOSTNAMES_INCLUDED`, `DOMAINS_MAX_PENDING_HOSTNAMES`, `DOMAINS_PROVIDER_RPS`, `DOH_ENDPOINTS`, `RDAP_BOOTSTRAP_URL`, `DOMAINS_PROVIDER`.
-7. Run `pnpm job:migrate-pointers` once, then schedule the domain jobs, including `pnpm job:domains-cleanup` for provider hostnames whose 7-day grace period has passed.
+7. Run `pnpm job:migrate-pointers` once, then schedule the domain jobs, including `pnpm job:domains-cleanup` to expire unfinished setups and delete provider hostnames whose 7-day grace period has passed.
 
 ## Serving
 

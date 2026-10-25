@@ -127,6 +127,11 @@ async function enforcePlans(): Promise<number> {
   return changed;
 }
 
+async function expireDrafts(): Promise<number> {
+  const { service: domains } = service();
+  return domains.expireUnverifiedDomains();
+}
+
 async function retryReleasedHostnames(): Promise<number> {
   const admin = createAdminClient();
   const { data } = await admin
@@ -228,6 +233,7 @@ async function main() {
     console.log(`[domains] enforced ${await enforcePlans()} team plan(s)`);
   }
   if (mode === "cleanup" || mode === "all") {
+    console.log(`[domains] expired ${await expireDrafts()} unfinished domain(s)`);
     console.log(`[domains] cleaned up ${await retryReleasedHostnames()} hostname(s)`);
   }
   if (mode === "migrate-pointers") {

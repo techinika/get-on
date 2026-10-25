@@ -16,7 +16,13 @@ function iso(offsetMs = 0): string {
 }
 
 class FakeTable {
-  private filters: { column: string; value: unknown; negate: boolean }[] = [];
+  private filters: {
+    column: string;
+    value: unknown;
+    negate: boolean;
+    list?: boolean;
+    lessThan?: boolean;
+  }[] = [];
   private mode: "select" | "update" | "insert" = "select";
   private values: Row = {};
 
@@ -38,6 +44,16 @@ class FakeTable {
 
   neq(column: string, value: unknown) {
     this.filters.push({ column, value, negate: true });
+    return this;
+  }
+
+  in(column: string, values: unknown[]) {
+    this.filters.push({ column, value: values, negate: false, list: true });
+    return this;
+  }
+
+  lt(column: string, value: unknown) {
+    this.filters.push({ column, value, negate: false, lessThan: true });
     return this;
   }
 
@@ -82,6 +98,13 @@ class FakeTable {
 
   private matches(row: Row): boolean {
     return this.filters.every((filter) => {
+      if (filter.list) {
+        const equal = (filter.value as unknown[]).includes(row[filter.column]);
+        return filter.negate ? !equal : equal;
+      }
+      if (filter.lessThan) {
+        return String(row[filter.column] ?? "") < String(filter.value);
+      }
       const equal = row[filter.column] === filter.value;
       return filter.negate ? !equal : equal;
     });
@@ -839,6 +862,24 @@ describe("domain service", () => {
     expect(pointers.site.pointer?.primaryHost).toBeNull();
     expect(pointers.site.pointer?.redirectToPrimary).toBe(false);
     expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+  });
+
+  it("expires unfinished domain setups after their verification window", async () => {
+    const { service, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    expect(started.status).toBe("draft");
+    db.rows.domains![0]!.verification_expires_at = iso(-60_000);
+
+    expect(await service.expireUnverifiedDomains()).toBe(1);
+
+    expect(db.rows.domains?.[0]?.status).toBe("removed");
+    expect(db.rows.domains?.[0]?.removed_at).toBe(iso());
+    expect(db.rows.domain_events).toContainEqual(
+      expect.objectContaining({ event: "verification_expired" }),
+    );
   });
 
   it("simulates and restores a plan lapse", async () => {

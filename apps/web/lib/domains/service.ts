@@ -786,6 +786,27 @@ export class DomainService {
     }
   }
 
+  async expireUnverifiedDomains(): Promise<number> {
+    const { data } = await this.supabase
+      .from("domains")
+      .select("id")
+      .in("status", ["draft", "awaiting_txt"])
+      .lt("verification_expires_at", this.now().toISOString())
+      .limit(50);
+
+    let expired = 0;
+    for (const row of data ?? []) {
+      const domainId = String(row.id);
+      await this.updateDomain(domainId, {
+        status: "removed",
+        removed_at: this.now().toISOString(),
+      });
+      await this.event(domainId, "verification_expired", "Domain setup expired");
+      expired += 1;
+    }
+    return expired;
+  }
+
   async simulatePlanLapse(domainId: string): Promise<void> {
     const domain = await this.loadDomain(domainId);
     if (domain.status === "plan_lapsed") return;
