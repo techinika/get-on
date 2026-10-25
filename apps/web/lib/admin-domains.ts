@@ -106,3 +106,93 @@ export function domainMatches(row: AdminDomainRow, query: string): boolean {
     ...row.hostnames.map((host) => host.hostname),
   ].some((value) => value.toLowerCase().includes(q));
 }
+
+export type DomainJobRun = {
+  id: string;
+  job: string;
+  status: "ok" | "error";
+  startedAt: string;
+  finishedAt: string;
+  durationMs: number;
+  count: number;
+  error: string | null;
+  createdAt: string;
+};
+
+export type DomainProviderHealth = {
+  provider: string;
+  totalRequests: number;
+  totalFailures: number;
+  consecutiveFailures: number;
+  circuitOpenUntil: string | null;
+  lastFailureAt: string | null;
+  lastSuccessAt: string | null;
+  checkedAt: string;
+  circuitOpen: boolean;
+};
+
+export async function loadDomainOps(admin: AdminClient): Promise<{
+  runs: DomainJobRun[];
+  health: DomainProviderHealth | null;
+}> {
+  const [{ data: runRows }, { data: healthRow }] = await Promise.all([
+    admin
+      .from("domain_job_runs")
+      .select(
+        "id, job, status, started_at, finished_at, duration_ms, count, error, created_at",
+      )
+      .order("started_at", { ascending: false })
+      .limit(200),
+    admin
+      .from("domain_provider_health")
+      .select(
+        "provider, total_requests, total_failures, consecutive_failures, circuit_open_until, last_failure_at, last_success_at, checked_at",
+      )
+      .eq("id", "default")
+      .maybeSingle(),
+  ]);
+
+  const seen = new Set<string>();
+  const runs: DomainJobRun[] = [];
+  for (const row of runRows ?? []) {
+    const job = String(row.job);
+    if (seen.has(job)) continue;
+    seen.add(job);
+    runs.push({
+      id: String(row.id),
+      job,
+      status: row.status === "error" ? "error" : "ok",
+      startedAt: String(row.started_at),
+      finishedAt: String(row.finished_at),
+      durationMs: Number(row.duration_ms ?? 0),
+      count: Number(row.count ?? 0),
+      error: row.error ? String(row.error) : null,
+      createdAt: String(row.created_at),
+    });
+  }
+
+  return {
+    runs,
+    health: healthRow
+      ? {
+          provider: String(healthRow.provider),
+          totalRequests: Number(healthRow.total_requests ?? 0),
+          totalFailures: Number(healthRow.total_failures ?? 0),
+          consecutiveFailures: Number(healthRow.consecutive_failures ?? 0),
+          circuitOpenUntil: healthRow.circuit_open_until
+            ? String(healthRow.circuit_open_until)
+            : null,
+          lastFailureAt: healthRow.last_failure_at
+            ? String(healthRow.last_failure_at)
+            : null,
+          lastSuccessAt: healthRow.last_success_at
+            ? String(healthRow.last_success_at)
+            : null,
+          checkedAt: String(healthRow.checked_at),
+          circuitOpen:
+            healthRow.circuit_open_until != null &&
+            new Date(healthRow.circuit_open_until).getTime() > Date.now(),
+        }
+      : null,
+  };
+}

@@ -290,6 +290,7 @@ describe("domains config", () => {
     const config = readDomainsConfig(env({}));
     expect(config.provider).toBe("fake");
     expect(config.includedHostnames).toBe(100);
+    expect(config.maximumHostnames).toBe(50_000);
     expect(config.dohEndpoints).toHaveLength(2);
   });
 
@@ -301,6 +302,7 @@ describe("domains config", () => {
         CF_API_TOKEN_DOMAINS: "token",
         CF_SAAS_CNAME_TARGET: "customers.example.com",
         CF_SAAS_HOSTNAMES_INCLUDED: "50",
+        CF_SAAS_MAX_HOSTNAMES: "40000",
         DOMAINS_MAX_PENDING_HOSTNAMES: "10",
         DOMAINS_PROVIDER_RPS: "2",
         DOH_ENDPOINTS: "https://one/dns-query, https://two/resolve",
@@ -309,6 +311,7 @@ describe("domains config", () => {
     expect(config.provider).toBe("cloudflare");
     expect(config.cnameTarget).toBe("customers.example.com");
     expect(config.includedHostnames).toBe(50);
+    expect(config.maximumHostnames).toBe(40_000);
     expect(config.maxPendingHostnames).toBe(10);
     expect(config.dohEndpoints).toEqual(["https://one/dns-query", "https://two/resolve"]);
   });

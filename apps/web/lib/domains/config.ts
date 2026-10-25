@@ -6,6 +6,7 @@ export type DomainsConfig = {
   zoneId: string;
   apiToken: string;
   includedHostnames: number;
+  maximumHostnames: number;
   maxPendingHostnames: number;
   providerRps: number;
   dohEndpoints: string[];
@@ -40,6 +41,7 @@ export function readDomainsConfig(
     zoneId: trimmed(env.CF_SAAS_ZONE_ID),
     apiToken: trimmed(env.CF_API_TOKEN_DOMAINS),
     includedHostnames: positiveInt(env.CF_SAAS_HOSTNAMES_INCLUDED, 100),
+    maximumHostnames: positiveInt(env.CF_SAAS_MAX_HOSTNAMES, 50_000),
     maxPendingHostnames: positiveInt(env.DOMAINS_MAX_PENDING_HOSTNAMES, 200),
     providerRps: positiveInt(env.DOMAINS_PROVIDER_RPS, 3),
     dohEndpoints:

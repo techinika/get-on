@@ -1030,6 +1030,115 @@ export class DomainService {
     await this.event(domainId, "blocked", reason.slice(0, 200));
   }
 
+  async removeAddress(hostnameId: string): Promise<void> {
+    const host = await this.loadHostname(hostnameId);
+    if (host.status === "removed") return;
+    const domain = await this.loadDomain(host.domainId);
+
+    if (host.role === "main") {
+      const { data } = await this.supabase
+        .from("domain_hostnames")
+        .select(HOSTNAME_COLUMNS)
+        .eq("domain_id", host.domainId)
+        .neq("status", "removed");
+      const replacement = (data ?? [])
+        .map(asHostname)
+        .find(
+          (item) =>
+            item.id !== host.id &&
+            item.status === "live" &&
+            item.role === "extra",
+        );
+      if (replacement) await this.setMainAddress(replacement.id);
+    }
+
+    if (host.providerId) {
+      try {
+        await this.provider.deleteHostname(host.providerId);
+      } catch {
+        await this.supabase.from("released_hostnames").insert({
+          provider_id: host.providerId,
+          hostname: host.hostname,
+          delete_after: new Date(
+            this.now().getTime() + 7 * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          reason: "address_removed",
+        });
+      }
+    }
+    await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+    await this.updateHostname(host.id, {
+      status: "removed",
+      removed_at: this.now().toISOString(),
+    });
+    await this.refreshPrimaryAddress(host.projectId ?? domain.projectId);
+    await this.refreshDomainStatus(domain.id, this.now());
+    await this.event(domain.id, "hostname_removed", "Address removed", host.id);
+  }
+
+  async adminReassignHostname(
+    hostnameId: string,
+    projectId: string,
+    adminId: string,
+  ): Promise<void> {
+    const host = await this.loadHostname(hostnameId);
+    if (host.status === "removed") throw new DomainError("HOSTNAME_TAKEN");
+    const source = await this.loadDomain(host.domainId);
+    const sourceProjectId = host.projectId ?? source.projectId;
+    let sourceReplacement: DomainHostname | null = null;
+    if (host.role === "main") {
+      const { data } = await this.supabase
+        .from("domain_hostnames")
+        .select(HOSTNAME_COLUMNS)
+        .eq("domain_id", host.domainId)
+        .neq("status", "removed");
+      sourceReplacement =
+        (data ?? [])
+          .map(asHostname)
+          .find(
+            (item) =>
+              item.id !== host.id &&
+              item.status === "live" &&
+              item.role === "extra",
+          ) ?? null;
+    }
+
+    const targetDomainId = await this.rpc<string>("admin_reassign_hostname", {
+      p_hostname_id: hostnameId,
+      p_project_id: projectId,
+      p_admin_id: adminId,
+    });
+    const project = await this.loadProject(projectId);
+
+    if (host.status === "live") {
+      await this.pointers.writeHostPointer(host.hostname, project.id);
+      if (host.role === "main") {
+        await this.linkSitePointer(
+          { ...host, projectId: project.id, domainId: targetDomainId },
+          project,
+        );
+      }
+    } else {
+      await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+    }
+
+    if (sourceReplacement) {
+      await this.setMainAddress(sourceReplacement.id);
+    }
+    if (sourceProjectId && sourceProjectId !== projectId) {
+      await this.refreshPrimaryAddress(sourceProjectId);
+    }
+    const { data: sourceRow } = await this.supabase
+      .from("domains")
+      .select("status")
+      .eq("id", source.id)
+      .maybeSingle();
+    if (sourceRow?.status !== "removed") {
+      await this.refreshDomainStatus(source.id, this.now());
+    }
+    await this.refreshDomainStatus(targetDomainId, this.now());
+  }
+
   async deleteProviderHostname(hostnameId: string): Promise<void> {
     const host = await this.loadHostname(hostnameId);
     if (host.status === "removed") return;

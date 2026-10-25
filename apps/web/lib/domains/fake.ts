@@ -2,6 +2,7 @@ import { ProviderError } from "./errors";
 import type { HostnameProvider } from "./provider";
 import type {
   HostnameMode,
+  ProviderHealth,
   ProviderHostname,
   ProviderPage,
   ProviderSetup,
@@ -117,6 +118,17 @@ export class FakeHostnameProvider implements HostnameProvider {
       hostnames: all.slice((current - 1) * perPage, current * perPage),
       page: current,
       totalPages,
+    };
+  }
+
+  health(): ProviderHealth {
+    return {
+      totalRequests: 0,
+      totalFailures: 0,
+      consecutiveFailures: 0,
+      circuitOpenUntil: null,
+      lastFailureAt: null,
+      lastSuccessAt: null,
     };
   }
 

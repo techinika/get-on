@@ -109,6 +109,21 @@ export async function addAddressAction(
   }
 }
 
+export async function removeAddressAction(
+  projectId: string,
+  hostnameId: string,
+): Promise<AddressResult<null>> {
+  const ctx = await context(projectId);
+  if ("error" in ctx) return { ok: false, error: ctx.error ?? "Please try again." };
+  try {
+    await service(ctx.supabase).removeAddress(hostnameId);
+    invalidate(projectId);
+    return { ok: true, data: null };
+  } catch (error) {
+    return { ok: false, error: messageFor(error) };
+  }
+}
+
 export async function refreshAddressAction(
   projectId: string,
   hostnameId: string,

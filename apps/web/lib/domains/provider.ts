@@ -1,6 +1,7 @@
 import type {
   HostnameMode,
   ProviderHostname,
+  ProviderHealth,
   ProviderPage,
   ProviderSetup,
   ProviderUsage,
@@ -20,4 +21,5 @@ export type HostnameProvider = {
   deleteHostname(id: string): Promise<void>;
   listHostnames(page: number): Promise<ProviderPage>;
   usage(): Promise<ProviderUsage>;
+  health(): ProviderHealth;
 };

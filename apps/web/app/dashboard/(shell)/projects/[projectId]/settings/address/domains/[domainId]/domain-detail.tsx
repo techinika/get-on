@@ -9,6 +9,7 @@ import {
   Globe2,
   Lock,
   Pause,
+  Plus,
   Share2,
   Trash2,
 } from "lucide-react";
@@ -26,7 +27,7 @@ import {
   relativeName,
   verificationRecord,
 } from "@/lib/domains/records";
-import type { Domain, DomainHostname } from "@/lib/domains/types";
+import type { DnsRecord, Domain, DomainHostname } from "@/lib/domains/types";
 import type { CaaCheck, HostnameDnsCheck } from "@/lib/domains/diagnostics";
 import { CaaNotice } from "../../caa-notice";
 import { DnsChecks } from "../../dns-checks";
@@ -34,10 +35,12 @@ import { RecordCard } from "../../record-card";
 import { DomainStatusBadge, HostnameStatusBadge } from "../../address-status";
 import type { DomainEventRow } from "./page";
 import {
+  addAddressAction,
   checkDomainAction,
   detachDomainAction,
   reassignDomainAction,
   refreshAddressAction,
+  removeAddressAction,
   removeDomainAction,
   saveAddressOptionsAction,
   saveAutoPublishAction,
@@ -151,6 +154,11 @@ export function DomainDetail({
   const [savingRedirect, setSavingRedirect] = useState(false);
   const [autoPublish, setAutoPublish] = useState(initialAutoPublish);
   const [savingAutoPublish, setSavingAutoPublish] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+  const [addChoice, setAddChoice] = useState<"other" | "custom">("other");
+  const [addLabel, setAddLabel] = useState("");
+  const [addMode, setAddMode] = useState<"prepare_first" | "switch_now">("prepare_first");
+  const [removeHost, setRemoveHost] = useState<DomainHostname | null>(null);
 
   const addressHref = `/dashboard/projects/${projectId}/settings/address`;
   const connectHref = `${addressHref}/connect?domain=${domain.id}`;
@@ -159,6 +167,33 @@ export function DomainDetail({
   const txt = verificationRecord(domain.registrable, domain.verificationValue);
   const expiryDays = daysUntil(domain.registrar.expiresAt);
   const basePath = `${addressHref}/domains/${domain.id}`;
+  const mainLabel = hosts.find((host) => host.role === "main")?.label ?? hosts[0]?.label;
+  const otherForm = mainLabel === "www" ? "@" : mainLabel === "@" ? "www" : null;
+  const otherHostname =
+    otherForm === "@" ? domain.registrable : otherForm ? `www.${domain.registrable}` : "";
+  const hasMainAddress = hosts.some((host) => host.role === "main");
+  const canAddAddress =
+    canManage &&
+    ["verified", "connecting", "live", "attention", "stalled"].includes(domain.status) &&
+    hosts.length < 2 &&
+    (!hasMainAddress || mainLabel === "www" || mainLabel === "@");
+
+  function prepareRecords(host: DomainHostname): DnsRecord[] {
+    return [host.ownershipTxt, host.validationTxt].filter(
+      (record, index, all): record is DnsRecord =>
+        record != null &&
+        all.findIndex(
+          (item) => item?.name === record.name && item?.value === record.value,
+        ) === index,
+    );
+  }
+
+  function cnameReady(host: DomainHostname): boolean {
+    return (
+      host.mode !== "prepare_first" ||
+      ["ready_to_switch", "active", "live", "moved"].includes(host.status)
+    );
+  }
 
   async function checkDomain() {
     setBusy("domain");
@@ -197,6 +232,53 @@ export function DomainDetail({
     }
     setPendingMain(null);
     toast("Main address changed. Publish to update your sitemap and links.");
+    router.refresh();
+  }
+
+  async function addAddress() {
+    const label =
+      addChoice === "other" ? otherForm : addLabel.trim().toLowerCase();
+    if (!label) {
+      setError("Enter the name you want to use.");
+      return;
+    }
+    setBusy("add");
+    setError(null);
+    const result = await addAddressAction(
+      projectId,
+      domain.id,
+      label,
+      hosts.some((host) => host.role === "main") ? "extra" : "main",
+      addMode,
+    );
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setAddOpen(false);
+    setAddLabel("");
+    setAddChoice(otherForm ? "other" : "custom");
+    toast(
+      addMode === "prepare_first"
+        ? "Address added. Add the prepare records below."
+        : "Address added",
+    );
+    router.refresh();
+  }
+
+  async function removeAddress() {
+    if (!removeHost) return;
+    setBusy("remove-address");
+    setError(null);
+    const result = await removeAddressAction(projectId, removeHost.id);
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    toast(`${removeHost.hostname} was removed.`);
+    setRemoveHost(null);
     router.refresh();
   }
 
@@ -370,18 +452,38 @@ export function DomainDetail({
                   <div className="mt-4 grid gap-3">
                     {hosts.map((host) => {
                       const record = { type: "CNAME" as const, name: relativeName(host.hostname, domain.registrable), value: host.cnameTarget };
+                      const prepare = prepareRecords(host);
                       return (
-                        <RecordCard
-                          key={host.id}
-                          type="CNAME"
-                          title={`Connect ${host.hostname}`}
-                          name={record.name}
-                          fullName={recordFullName(record, domain.registrable)}
-                          value={record.value}
-                          status={recordStatus(host)}
-                          onCheck={() => void checkHost(host.id)}
-                          checking={busy === `host-${host.id}`}
-                        />
+                        <div key={host.id} className="grid gap-3">
+                          {prepare.map((item) => (
+                            <RecordCard
+                              key={`${host.id}-${item.name}`}
+                              type="TXT"
+                              title={`Prepare ${host.hostname}`}
+                              name={item.name}
+                              fullName={recordFullName(item, domain.registrable)}
+                              value={item.value}
+                              status="optional"
+                            />
+                          ))}
+                          {cnameReady(host) ? (
+                            <RecordCard
+                              type="CNAME"
+                              title={`Connect ${host.hostname}`}
+                              name={record.name}
+                              fullName={recordFullName(record, domain.registrable)}
+                              value={record.value}
+                              status={recordStatus(host)}
+                              onCheck={() => void checkHost(host.id)}
+                              checking={busy === `host-${host.id}`}
+                            />
+                          ) : (
+                            <InfoBox variant="info">
+                              Wait until we say it is ready, then add the connection
+                              record for {host.hostname}.
+                            </InfoBox>
+                          )}
+                        </div>
                       );
                     })}
                     {caa?.blocking ? (
@@ -424,6 +526,15 @@ export function DomainDetail({
                   </div>
                 ) : null}
 
+                {hosts.some(
+                  (host) => host.status !== "live" && host.mode === "prepare_first",
+                ) ? (
+                  <InfoBox variant="info" className="mt-4">
+                    We are preparing another address. Add its TXT records under Your
+                    records below. We will tell you when it is ready to switch.
+                  </InfoBox>
+                ) : null}
+
                 {domain.status === "plan_lapsed" ? (
                   <Link href="/dashboard/plan"><Button type="button" size="sm" className="mt-4">See plans</Button></Link>
                 ) : null}
@@ -449,18 +560,40 @@ export function DomainDetail({
               />
               {hosts.map((host) => {
                 const record = { type: "CNAME" as const, name: relativeName(host.hostname, domain.registrable), value: host.cnameTarget };
+                const prepare = prepareRecords(host);
                 return (
-                  <RecordCard
-                    key={host.id}
-                    type="CNAME"
-                    title={`Connect ${host.hostname}`}
-                    name={record.name}
-                    fullName={recordFullName(record, domain.registrable)}
-                    value={record.value}
-                    status={recordStatus(host)}
-                    onCheck={() => void checkHost(host.id)}
-                    checking={busy === `host-${host.id}`}
-                  />
+                  <div key={host.id} className="grid gap-3">
+                    {host.status !== "live"
+                      ? prepare.map((item) => (
+                          <RecordCard
+                            key={`${host.id}-${item.name}`}
+                            type="TXT"
+                            title={`Prepare ${host.hostname}`}
+                            name={item.name}
+                            fullName={recordFullName(item, domain.registrable)}
+                            value={item.value}
+                            status="optional"
+                          />
+                        ))
+                      : null}
+                    {cnameReady(host) ? (
+                      <RecordCard
+                        type="CNAME"
+                        title={`Connect ${host.hostname}`}
+                        name={record.name}
+                        fullName={recordFullName(record, domain.registrable)}
+                        value={record.value}
+                        status={recordStatus(host)}
+                        onCheck={() => void checkHost(host.id)}
+                        checking={busy === `host-${host.id}`}
+                      />
+                    ) : (
+                      <InfoBox variant="info">
+                        Wait until we say it is ready, then add the connection
+                        record for {host.hostname}.
+                      </InfoBox>
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -470,7 +603,22 @@ export function DomainDetail({
           </AppCard>
 
           <AppCard className="p-5">
-            <h2 className="text-[17px] font-semibold text-text">Addresses</h2>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-[17px] font-semibold text-text">Addresses</h2>
+              {canAddAddress ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="secondary"
+                  onClick={() => {
+                    setAddChoice(otherForm ? "other" : "custom");
+                    setAddOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4" aria-hidden /> Add an address
+                </Button>
+              ) : null}
+            </div>
             {hosts.length === 0 ? (
               <p className="mt-2 text-sm text-text-muted">No addresses yet.</p>
             ) : (
@@ -483,6 +631,9 @@ export function DomainDetail({
                       <Badge variant={host.role === "main" ? "primary" : "neutral"}>
                         {host.role === "main" ? "Main address" : "Also redirects"}
                       </Badge>
+                      {host.mode === "prepare_first" && host.status !== "live" ? (
+                        <Badge variant="draft">Preparing</Badge>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-1">
                       {host.status === "live" ? (
@@ -493,6 +644,17 @@ export function DomainDetail({
                       {canManage && host.role !== "main" && host.status === "live" ? (
                         <Button type="button" size="sm" variant="ghost" onClick={() => setPendingMain(host)}>
                           Make main address
+                        </Button>
+                      ) : null}
+                      {canManage ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="ghost"
+                          className="text-danger-text"
+                          onClick={() => setRemoveHost(host)}
+                        >
+                          Remove
                         </Button>
                       ) : null}
                     </div>
@@ -675,6 +837,142 @@ export function DomainDetail({
           )}
         </AppCard>
       ) : null}
+
+      <Dialog
+        open={addOpen}
+        onClose={() => setAddOpen(false)}
+        title="Add another address?"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setAddOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={addAddress}
+              loading={busy === "add"}
+              loadingLabel="Adding..."
+              disabled={addChoice === "custom" && !addLabel.trim()}
+            >
+              Add address
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          {hosts.some((host) => host.role === "main")
+            ? "Visitors who use another address are sent to your main address."
+            : "Choose the main address people will use for your website."}
+        </p>
+        <div className="mt-4 grid gap-2" role="radiogroup" aria-label="Address">
+          {otherForm ? (
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-card border border-border p-3">
+              <input
+                type="radio"
+                name="add-address"
+                checked={addChoice === "other"}
+                onChange={() => setAddChoice("other")}
+                className="h-[20px] w-[20px] accent-primary"
+              />
+              <code className="break-all font-mono text-[15px] font-semibold text-text">
+                {otherHostname}
+              </code>
+            </label>
+          ) : null}
+          <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-card border border-border p-3">
+            <input
+              type="radio"
+              name="add-address"
+              checked={addChoice === "custom"}
+              onChange={() => setAddChoice("custom")}
+              className="h-[20px] w-[20px] accent-primary"
+            />
+            <span className="text-sm font-semibold text-text">A different name</span>
+          </label>
+        </div>
+        {addChoice === "custom" ? (
+          <div className="mt-3 flex items-center gap-1">
+            <Input
+              value={addLabel}
+              onChange={(event) => setAddLabel(event.target.value)}
+              aria-label="Name"
+              placeholder="shop"
+              className="max-w-[180px]"
+            />
+            <span className="text-sm text-text-muted">.{domain.registrable}</span>
+          </div>
+        ) : null}
+        <p className="mt-5 text-sm font-semibold text-text">How do you want to switch?</p>
+        <div className="mt-2 grid gap-2" role="radiogroup" aria-label="Switch method">
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-card border border-border p-3">
+            <input
+              type="radio"
+              name="add-mode"
+              checked={addMode === "prepare_first"}
+              onChange={() => setAddMode("prepare_first")}
+              className="mt-1 h-[20px] w-[20px] accent-primary"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Prepare first (recommended)</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Keeps any existing website online while we prepare the secure connection.
+              </span>
+            </span>
+          </label>
+          <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-card border border-border p-3">
+            <input
+              type="radio"
+              name="add-mode"
+              checked={addMode === "switch_now"}
+              onChange={() => setAddMode("switch_now")}
+              className="mt-1 h-[20px] w-[20px] accent-primary"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Switch now</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Visitors may see an error for a few minutes while we connect it.
+              </span>
+            </span>
+          </label>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={removeHost !== null}
+        onClose={() => setRemoveHost(null)}
+        title={`Remove ${removeHost?.hostname ?? "this address"}?`}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setRemoveHost(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={removeAddress}
+              loading={busy === "remove-address"}
+              loadingLabel="Removing..."
+            >
+              Remove address
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          This address stops opening your website. Your domain and other addresses stay
+          connected.
+        </p>
+        {removeHost?.role === "main" ? (
+          <InfoBox variant="warning" className="mt-4">
+            {hosts.some((host) => host.id !== removeHost.id && host.status === "live")
+              ? "Another live address will become your main address."
+              : "Your website will use its free address until you add a new main address."}
+          </InfoBox>
+        ) : null}
+        <p className="mt-4 text-sm text-text-muted">
+          You can delete the connection record for this address at your DNS provider.
+        </p>
+      </Dialog>
 
       <Dialog
         open={pendingMain !== null}

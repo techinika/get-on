@@ -23,7 +23,7 @@ import {
   relativeName,
   verificationRecord,
 } from "@/lib/domains/records";
-import type { Domain, DomainHostname } from "@/lib/domains/types";
+import type { DnsRecord, Domain, DomainHostname, HostnameMode } from "@/lib/domains/types";
 import type { CaaCheck, HostnameDnsCheck } from "@/lib/domains/diagnostics";
 import { CaaNotice } from "../caa-notice";
 import { DnsChecks } from "../dns-checks";
@@ -151,6 +151,7 @@ export function ConnectWizard({
   const [choice, setChoice] = useState<Choice>("www");
   const [customLabel, setCustomLabel] = useState("");
   const [alsoConnect, setAlsoConnect] = useState(true);
+  const [mode, setMode] = useState<HostnameMode>("prepare_first");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -161,6 +162,23 @@ export function ConnectWizard({
   const verified = Boolean(domain?.verifiedAt);
   const liveHost = hosts.find((host) => host.role === "main" && host.status === "live")
     ?? hosts.find((host) => host.status === "live");
+
+  function prepareRecords(host: DomainHostname): DnsRecord[] {
+    return [host.ownershipTxt, host.validationTxt].filter(
+      (record, index, all): record is DnsRecord =>
+        record != null &&
+        all.findIndex(
+          (item) => item?.name === record.name && item?.value === record.value,
+        ) === index,
+    );
+  }
+
+  function cnameReady(host: DomainHostname): boolean {
+    return (
+      host.mode !== "prepare_first" ||
+      ["ready_to_switch", "active", "live", "moved"].includes(host.status)
+    );
+  }
 
   useEffect(() => {
     headingRef.current?.focus();
@@ -216,7 +234,7 @@ export function ConnectWizard({
     }
     setBusy("address");
     setError(null);
-    const main = await addAddressAction(projectId, domain.id, label, "main", "switch_now");
+    const main = await addAddressAction(projectId, domain.id, label, "main", mode);
     if (!main.ok) {
       setBusy(null);
       setError(main.error);
@@ -225,7 +243,7 @@ export function ConnectWizard({
     const added = [main.data];
     if (alsoConnect && choice !== "custom") {
       const other = choice === "www" ? "@" : "www";
-      const extra = await addAddressAction(projectId, domain.id, other, "extra", "switch_now");
+      const extra = await addAddressAction(projectId, domain.id, other, "extra", mode);
       if (!extra.ok) {
         setBusy(null);
         setError(extra.error);
@@ -460,6 +478,39 @@ export function ConnectWizard({
                 </span>
               </label>
             ) : null}
+            <p className="mt-5 text-sm font-semibold text-text">How do you want to switch?</p>
+            <div className="mt-2 grid gap-2" role="radiogroup" aria-label="Switch method">
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-card border border-border p-3">
+                <input
+                  type="radio"
+                  name="switch-mode"
+                  checked={mode === "prepare_first"}
+                  onChange={() => setMode("prepare_first")}
+                  className="mt-1 h-[20px] w-[20px] accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-text">Prepare first (recommended)</span>
+                  <span className="mt-0.5 block text-sm text-text-muted">
+                    Keeps any existing website online while we prepare the secure connection.
+                  </span>
+                </span>
+              </label>
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-card border border-border p-3">
+                <input
+                  type="radio"
+                  name="switch-mode"
+                  checked={mode === "switch_now"}
+                  onChange={() => setMode("switch_now")}
+                  className="mt-1 h-[20px] w-[20px] accent-primary"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-text">Switch now</span>
+                  <span className="mt-0.5 block text-sm text-text-muted">
+                    Visitors may see an error for a few minutes while we connect it.
+                  </span>
+                </span>
+              </label>
+            </div>
             <p className="mt-3 text-sm text-text-muted">You can change this later.</p>
           </div>
         ) : null}
@@ -597,16 +648,35 @@ export function ConnectWizard({
                           {host.role === "main" ? "Main address" : "Also redirects"}
                         </Badge>
                       </div>
-                      <RecordCard
-                        type="CNAME"
-                        title={`Connect ${host.hostname}`}
-                        name={record.name}
-                        fullName={recordFullName(record, domain.registrable)}
-                        value={record.value}
-                        status={status}
-                        onCheck={() => void checkHost(host.id)}
-                        checking={busy === `host-${host.id}`}
-                      />
+                      {prepareRecords(host).map((item) => (
+                        <div key={`${host.id}-${item.name}`} className="mb-3">
+                          <RecordCard
+                            type="TXT"
+                            title={`Prepare ${host.hostname}`}
+                            name={item.name}
+                            fullName={recordFullName(item, domain.registrable)}
+                            value={item.value}
+                            status="optional"
+                          />
+                        </div>
+                      ))}
+                      {cnameReady(host) ? (
+                        <RecordCard
+                          type="CNAME"
+                          title={`Connect ${host.hostname}`}
+                          name={record.name}
+                          fullName={recordFullName(record, domain.registrable)}
+                          value={record.value}
+                          status={status}
+                          onCheck={() => void checkHost(host.id)}
+                          checking={busy === `host-${host.id}`}
+                        />
+                      ) : (
+                        <InfoBox variant="info">
+                          Wait until we say it is ready, then add the connection
+                          record for {host.hostname}.
+                        </InfoBox>
+                      )}
                       {record.name === "@" ? (
                         <InfoBox variant="info" className="mt-3">
                           Some providers call this an ALIAS or ANAME record. If your provider does not allow it, connect www instead and forward {domain.registrable} to www in your provider&apos;s forwarding settings.

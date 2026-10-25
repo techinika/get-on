@@ -32,6 +32,25 @@ export default async function AdminDomainPage({ params }: Props) {
   const { domain, hostnames } = row;
   const txt = verificationRecord(domain.registrable, domain.verificationValue);
 
+  const [{ data: projectRows }, { data: teamRows }] = await Promise.all([
+    admin
+      .from("projects")
+      .select("id, name, team_id")
+      .is("deleted_at", null)
+      .neq("team_id", domain.teamId)
+      .order("name", { ascending: true })
+      .limit(500),
+    admin.from("teams").select("id, name"),
+  ]);
+  const teamNames = new Map(
+    (teamRows ?? []).map((team) => [String(team.id), String(team.name)]),
+  );
+  const targets = (projectRows ?? []).map((project) => ({
+    id: String(project.id),
+    name: String(project.name),
+    teamName: teamNames.get(String(project.team_id)) ?? "Team",
+  }));
+
   return (
     <AppPage width="default">
       <PageHeader
@@ -72,6 +91,7 @@ export default async function AdminDomainPage({ params }: Props) {
           hostname: host.hostname,
           providerId: host.providerId,
         }))}
+        targets={targets}
       />
 
       <div className="mt-5 grid gap-5">

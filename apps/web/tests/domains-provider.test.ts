@@ -157,6 +157,63 @@ describe("cloudflare hostname provider", () => {
     );
   });
 
+  it("tracks provider health for operations", async () => {
+    let fail = true;
+    const fetch = vi.fn(async () => {
+      if (fail) {
+        return new Response(JSON.stringify({ success: false }), { status: 503 });
+      }
+      return new Response(
+        JSON.stringify({
+          success: true,
+          result: { id: "cf-1", hostname: "example.com", status: "active" },
+        }),
+        { status: 200 },
+      );
+    });
+    const provider = new CloudflareHostnameProvider(cloudflareConfig, {
+      fetch: fetch as typeof globalThis.fetch,
+      sleep: async () => {},
+      retries: 0,
+    });
+
+    await expect(provider.getHostname("cf-1")).rejects.toBeInstanceOf(ProviderError);
+    expect(provider.health()).toMatchObject({
+      totalRequests: 1,
+      totalFailures: 1,
+      consecutiveFailures: 1,
+    });
+    expect(provider.health().lastFailureAt).not.toBeNull();
+
+    fail = false;
+    await provider.getHostname("cf-1");
+    expect(provider.health()).toMatchObject({
+      totalRequests: 2,
+      totalFailures: 1,
+      consecutiveFailures: 0,
+    });
+    expect(provider.health().lastSuccessAt).not.toBeNull();
+  });
+
+  it("opens the circuit after five consecutive failures", async () => {
+    const fetch = vi.fn(async () =>
+      new Response(JSON.stringify({ success: false }), { status: 503 }),
+    );
+    const provider = new CloudflareHostnameProvider(cloudflareConfig, {
+      fetch: fetch as typeof globalThis.fetch,
+      sleep: async () => {},
+      retries: 0,
+    });
+    for (let index = 0; index < 5; index += 1) {
+      await expect(provider.getHostname("cf-1")).rejects.toBeInstanceOf(ProviderError);
+    }
+    expect(provider.health().consecutiveFailures).toBe(5);
+    expect(provider.health().circuitOpenUntil).not.toBeNull();
+    await expect(provider.getHostname("cf-1")).rejects.toMatchObject({
+      code: "PROVIDER_UNAVAILABLE",
+    });
+  });
+
   it("checks the fallback origin", async () => {
     const fetch = vi.fn(async () =>
       new Response(

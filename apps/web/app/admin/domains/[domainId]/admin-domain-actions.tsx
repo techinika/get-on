@@ -10,6 +10,7 @@ import {
   approveDomainAction,
   deleteProviderHostnameAction,
   pauseDomainAction,
+  reassignHostnameAction,
   recheckDomainAction,
   rejectDomainAction,
   resumeDomainAction,
@@ -24,12 +25,14 @@ export function AdminDomainActions({
   status,
   canSimulate,
   hostnames,
+  targets,
 }: {
   domainId: string;
   reviewState: string;
   status: string;
   canSimulate: boolean;
   hostnames: { id: string; hostname: string; providerId: string | null }[];
+  targets: { id: string; name: string; teamName: string }[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -42,7 +45,14 @@ export function AdminDomainActions({
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [planOpen, setPlanOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
+  const [reassignOpen, setReassignOpen] = useState(false);
+  const [reassignHostId, setReassignHostId] = useState("");
+  const [reassignProjectId, setReassignProjectId] = useState("");
+  const [reassignNote, setReassignNote] = useState("");
+  const [reassignConfirm, setReassignConfirm] = useState("");
   const deleteHost = hostnames.find((host) => host.id === deleteHostId) ?? null;
+  const reassignHost =
+    hostnames.find((host) => host.id === reassignHostId) ?? null;
 
   async function run(key: string, work: () => Promise<{ ok: boolean; error?: string }>, message: string) {
     setBusy(key);
@@ -116,6 +126,14 @@ export function AdminDomainActions({
             {status === "plan_lapsed" ? "Restore plan" : "Simulate plan lapse"}
           </Button>
         ) : null}
+        <Button
+          type="button"
+          variant="secondary"
+          disabled={targets.length === 0}
+          onClick={() => setReassignOpen(true)}
+        >
+          Reassign hostname
+        </Button>
         {hostnames.some((host) => host.providerId) ? (
           <Button type="button" variant="danger-outline" onClick={() => setDeleteOpen(true)}>
             Delete provider hostname
@@ -292,6 +310,133 @@ export function AdminDomainActions({
           id="delete-confirm"
           value={deleteConfirm}
           onChange={(event) => setDeleteConfirm(event.target.value)}
+          className="mt-2"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Dialog>
+
+
+      <Dialog
+        open={reassignOpen}
+        onClose={() => {
+          setReassignOpen(false);
+          setReassignHostId("");
+          setReassignProjectId("");
+          setReassignNote("");
+          setReassignConfirm("");
+        }}
+        title="Reassign a hostname to another team?"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setReassignOpen(false);
+                setReassignHostId("");
+                setReassignProjectId("");
+                setReassignNote("");
+                setReassignConfirm("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={
+                !reassignHost ||
+                !reassignProjectId ||
+                reassignNote.trim().length < 3 ||
+                reassignConfirm.trim() !== reassignHost.hostname
+              }
+              loading={busy === "reassign"}
+              loadingLabel="Moving..."
+              onClick={() =>
+                void run(
+                  "reassign",
+                  async () => {
+                    if (!reassignHost) {
+                      return { ok: false, error: "Choose an address." };
+                    }
+                    const result = await reassignHostnameAction(
+                      reassignHost.id,
+                      reassignProjectId,
+                      reassignNote,
+                    );
+                    if (result.ok) {
+                      setReassignOpen(false);
+                      setReassignHostId("");
+                      setReassignProjectId("");
+                      setReassignNote("");
+                      setReassignConfirm("");
+                    }
+                    return result;
+                  },
+                  "Hostname reassigned",
+                )
+              }
+            >
+              Reassign hostname
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          The address moves to a website in another team. The new team must have room
+          for another domain, and the old website stops serving this address.
+        </p>
+        <label htmlFor="reassign-host" className="mt-4 block text-sm font-semibold text-text">
+          Address
+        </label>
+        <select
+          id="reassign-host"
+          value={reassignHostId}
+          onChange={(event) => {
+            setReassignHostId(event.target.value);
+            setReassignConfirm("");
+          }}
+          className="mt-2 h-11 w-full rounded-card border border-border bg-surface px-3 text-[15px] text-text"
+        >
+          <option value="">Choose an address</option>
+          {hostnames.map((host) => (
+            <option key={host.id} value={host.id}>{host.hostname}</option>
+          ))}
+        </select>
+        <label htmlFor="reassign-project" className="mt-4 block text-sm font-semibold text-text">
+          Website
+        </label>
+        <select
+          id="reassign-project"
+          value={reassignProjectId}
+          onChange={(event) => setReassignProjectId(event.target.value)}
+          className="mt-2 h-11 w-full rounded-card border border-border bg-surface px-3 text-[15px] text-text"
+        >
+          <option value="">Choose a website</option>
+          {targets.map((target) => (
+            <option key={target.id} value={target.id}>
+              {target.teamName} · {target.name}
+            </option>
+          ))}
+        </select>
+        <label htmlFor="reassign-note" className="mt-4 block text-sm font-semibold text-text">
+          Reason
+        </label>
+        <Input
+          id="reassign-note"
+          value={reassignNote}
+          onChange={(event) => setReassignNote(event.target.value)}
+          className="mt-2"
+          maxLength={200}
+        />
+        <label htmlFor="reassign-confirm" className="mt-4 block text-sm font-semibold text-text">
+          Type {reassignHost?.hostname ?? "the address"} to confirm
+        </label>
+        <Input
+          id="reassign-confirm"
+          value={reassignConfirm}
+          onChange={(event) => setReassignConfirm(event.target.value)}
           className="mt-2"
           autoComplete="off"
           spellCheck={false}

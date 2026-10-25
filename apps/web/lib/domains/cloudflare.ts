@@ -5,6 +5,7 @@ import type { CreateHostnameInput, HostnameProvider } from "./provider";
 import type {
   DnsRecord,
   HostnameMode,
+  ProviderHealth,
   ProviderHostname,
   ProviderPage,
   ProviderSetup,
@@ -60,8 +61,6 @@ export type CloudflareOptions = {
   retries?: number;
   maximumHostnames?: number;
 };
-
-const MAXIMUM_HOSTNAMES = 50000;
 
 function sslSettings(mode: HostnameMode) {
   return {
@@ -142,6 +141,10 @@ export class CloudflareHostnameProvider implements HostnameProvider {
   private nextSlot = 0;
   private failures = 0;
   private openUntil = 0;
+  private requests = 0;
+  private totalFailures = 0;
+  private lastFailureAt = 0;
+  private lastSuccessAt = 0;
 
   constructor(config: DomainsConfig, options: CloudflareOptions = {}) {
     const required = requireCloudflareDomainsConfig(config);
@@ -149,7 +152,8 @@ export class CloudflareHostnameProvider implements HostnameProvider {
     this.apiToken = required.apiToken;
     this.cnameTarget = required.cnameTarget;
     this.includedHostnames = config.includedHostnames;
-    this.maximumHostnames = options.maximumHostnames ?? MAXIMUM_HOSTNAMES;
+    this.maximumHostnames =
+      options.maximumHostnames ?? config.maximumHostnames;
     this.providerRps = config.providerRps;
     this.fetchImpl = options.fetch ?? fetch;
     this.sleep =
@@ -241,6 +245,26 @@ export class CloudflareHostnameProvider implements HostnameProvider {
     };
   }
 
+  health(): ProviderHealth {
+    return {
+      totalRequests: this.requests,
+      totalFailures: this.totalFailures,
+      consecutiveFailures: this.failures,
+      circuitOpenUntil:
+        this.openUntil > Date.now()
+          ? new Date(this.openUntil).toISOString()
+          : null,
+      lastFailureAt:
+        this.lastFailureAt > 0
+          ? new Date(this.lastFailureAt).toISOString()
+          : null,
+      lastSuccessAt:
+        this.lastSuccessAt > 0
+          ? new Date(this.lastSuccessAt).toISOString()
+          : null,
+    };
+  }
+
   async usage(): Promise<ProviderUsage> {
     let total = 0;
     let pending = 0;
@@ -293,6 +317,7 @@ export class CloudflareHostnameProvider implements HostnameProvider {
       throw new ProviderError("PROVIDER_UNAVAILABLE");
     }
 
+    this.requests += 1;
     let lastError: ProviderError | null = null;
     for (let attempt = 0; attempt <= this.retries; attempt += 1) {
       await this.takeSlot();
@@ -311,6 +336,8 @@ export class CloudflareHostnameProvider implements HostnameProvider {
         );
 
         if (response.status === 404 && options.notFound) {
+          this.failures = 0;
+          this.lastSuccessAt = Date.now();
           return {
             result: null,
             info: { page: 1, totalPages: 1, total: 0 },
@@ -323,6 +350,7 @@ export class CloudflareHostnameProvider implements HostnameProvider {
 
         if (response.ok && payload?.success !== false) {
           this.failures = 0;
+          this.lastSuccessAt = Date.now();
           return {
             result: payload?.result ?? null,
             info: {
@@ -386,6 +414,8 @@ export class CloudflareHostnameProvider implements HostnameProvider {
 
   private recordFailure(): void {
     this.failures += 1;
+    this.totalFailures += 1;
+    this.lastFailureAt = Date.now();
     if (this.failures >= 5) {
       this.openUntil = Date.now() + 60_000;
     }

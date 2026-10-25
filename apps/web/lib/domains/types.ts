@@ -128,6 +128,15 @@ export type ProviderUsage = {
   maximum: number;
 };
 
+export type ProviderHealth = {
+  totalRequests: number;
+  totalFailures: number;
+  consecutiveFailures: number;
+  circuitOpenUntil: string | null;
+  lastFailureAt: string | null;
+  lastSuccessAt: string | null;
+};
+
 export type ProviderPage = {
   hostnames: ProviderHostname[];
   page: number;

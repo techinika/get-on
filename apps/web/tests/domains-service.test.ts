@@ -827,6 +827,97 @@ describe("domain service", () => {
     expect(pointers.site.pointer?.redirectToPrimary).toBe(true);
   });
 
+  it("removes one address without removing the domain", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const main = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    const extra = await service.addAddress({
+      domainId: started.id,
+      label: "@",
+      role: "extra",
+      mode: "switch_now",
+    });
+    resolver.cname = [
+      { type: "CNAME", name: main.hostname, value: "customers.get-on.tech" },
+      { type: "CNAME", name: extra.hostname, value: "customers.get-on.tech" },
+    ];
+    provider.markDnsReady(main.hostname);
+    provider.markDnsReady(extra.hostname);
+    await service.refreshAddress(main.id);
+    await service.refreshAddress(extra.id);
+    expect(db.rows.projects?.[0]?.primary_host).toBe(main.hostname);
+
+    await service.removeAddress(extra.id);
+
+    const removed = db.rows.domain_hostnames?.find((row) => row.id === extra.id);
+    expect(removed?.status).toBe("removed");
+    expect(pointers.site.deleted).toContain(extra.hostname);
+    expect(db.rows.projects?.[0]?.primary_host).toBe(main.hostname);
+    expect(db.rows.domains?.[0]?.status).toBe("live");
+  });
+
+  it("promotes the extra address when the main one is removed", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const main = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    const extra = await service.addAddress({
+      domainId: started.id,
+      label: "@",
+      role: "extra",
+      mode: "switch_now",
+    });
+    resolver.cname = [
+      { type: "CNAME", name: main.hostname, value: "customers.get-on.tech" },
+      { type: "CNAME", name: extra.hostname, value: "customers.get-on.tech" },
+    ];
+    provider.markDnsReady(main.hostname);
+    provider.markDnsReady(extra.hostname);
+    await service.refreshAddress(main.id);
+    await service.refreshAddress(extra.id);
+
+    await service.removeAddress(main.id);
+
+    const removed = db.rows.domain_hostnames?.find((row) => row.id === main.id);
+    const promoted = db.rows.domain_hostnames?.find((row) => row.id === extra.id);
+    expect(removed?.status).toBe("removed");
+    expect(promoted?.role).toBe("main");
+    expect(db.rows.projects?.[0]?.primary_host).toBe(extra.hostname);
+    expect(pointers.site.pointer?.primaryHost).toBe(extra.hostname);
+    expect(db.rows.domains?.[0]?.status).toBe("live");
+  });
+
   it("pauses only the lapsed addresses and frees the free address", async () => {
     const { service, resolver, provider, pointers, db } = setup();
     const started = await service.startDomain({

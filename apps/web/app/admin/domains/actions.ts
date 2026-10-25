@@ -79,6 +79,52 @@ export async function retryHostnameAction(hostnameId: string): Promise<AdminDoma
   return { ok: true };
 }
 
+export async function reassignHostnameAction(
+  hostnameId: string,
+  projectId: string,
+  note: string,
+): Promise<AdminDomainResult> {
+  const adminUser = await requireAdmin();
+  const cleaned = note.trim();
+  if (cleaned.length < 3) {
+    return { ok: false, error: "Add a short reason first." };
+  }
+  const admin = createAdminClient();
+  const { data: host } = await admin
+    .from("domain_hostnames")
+    .select("id, domain_id, project_id, hostname, role")
+    .eq("id", hostnameId)
+    .maybeSingle();
+  if (!host) return { ok: false, error: "We could not find that address." };
+  const { data: project } = await admin
+    .from("projects")
+    .select("id, name, team_id")
+    .eq("id", projectId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!project) return { ok: false, error: "We could not find that website." };
+
+  try {
+    await new DomainService({ supabase: admin }).adminReassignHostname(
+      hostnameId,
+      projectId,
+      adminUser.id,
+    );
+  } catch (error) {
+    return { ok: false, error: asDomainError(error).message };
+  }
+  await audit("domain_reassign_hostname", host.project_id ?? null, cleaned, {
+    domainId: host.domain_id,
+    hostnameId,
+    hostname: host.hostname,
+    targetProjectId: projectId,
+    targetTeamId: project.team_id,
+  });
+  refresh(host.domain_id);
+  revalidatePath(`/admin/sites/${projectId}`);
+  return { ok: true };
+}
+
 export async function pauseDomainAction(
   domainId: string,
 ): Promise<AdminDomainResult> {
