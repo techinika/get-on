@@ -9,11 +9,12 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { InfoBox } from "@/components/app/info-box";
 import { Dialog } from "@/components/ui/dialog";
 import { Label, Textarea } from "@/components/ui/input";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { useToast } from "@/components/ui/toast";
-import { describeImageWithAi } from "@/lib/ai/actions";
+import { describeImageWithAi, generateImageWithAi } from "@/lib/ai/actions";
 import { processImageForUpload } from "@/lib/images/process";
 import { formatBytes, publicMediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -35,9 +36,16 @@ type PicturesContentProps = {
   teamName: string;
   projectName: string;
   items: MediaItem[];
+  imagesEnabled?: boolean;
 };
 
-export function PicturesContent({ projectId, teamName, projectName, items }: PicturesContentProps) {
+export function PicturesContent({
+  projectId,
+  teamName,
+  projectName,
+  items,
+  imagesEnabled = false,
+}: PicturesContentProps) {
   const { toast } = useToast();
   const [media, setMedia] = React.useState<MediaItem[]>(items);
   const [uploading, setUploading] = React.useState(false);
@@ -48,6 +56,10 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
   const [describing, setDescribing] = React.useState(false);
   const [description, setDescription] = React.useState("");
   const [savingDescription, setSavingDescription] = React.useState(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
+  const [aiPrompt, setAiPrompt] = React.useState("");
+  const [aiError, setAiError] = React.useState<string | null>(null);
+  const [creatingImage, setCreatingImage] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
@@ -140,6 +152,30 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
     toast("Description saved.", "success");
   }
 
+  async function createPicture() {
+    if (aiPrompt.trim().length === 0) return;
+    setCreatingImage(true);
+    setAiError(null);
+    try {
+      const result = await generateImageWithAi({
+        projectId,
+        prompt: aiPrompt,
+      });
+      if (!result.ok) {
+        setAiError(result.message);
+        return;
+      }
+      setMedia((prev) => [result.media, ...prev]);
+      setAiOpen(false);
+      setAiPrompt("");
+      toast("Picture added.", "success");
+    } catch {
+      setAiError("We could not create that picture. Please try again.");
+    } finally {
+      setCreatingImage(false);
+    }
+  }
+
   const target = deleteId ? media.find((item) => item.id === deleteId) ?? null : null;
   const describeTarget = describeId
     ? media.find((item) => item.id === describeId) ?? null
@@ -156,16 +192,31 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
         title="Pictures"
         description="Add and manage the pictures on your website."
         actions={
-          <Button
-            variant="primary"
-            size="md"
-            loading={uploading}
-            loadingLabel="Uploading..."
-            onClick={() => inputRef.current?.click()}
-          >
-            <Upload size={20} strokeWidth={1.75} aria-hidden />
-            Upload picture
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            {imagesEnabled ? (
+              <Button
+                variant="secondary"
+                size="md"
+                onClick={() => {
+                  setAiError(null);
+                  setAiOpen(true);
+                }}
+              >
+                <Sparkles size={20} strokeWidth={1.75} aria-hidden />
+                Create with AI
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              size="md"
+              loading={uploading}
+              loadingLabel="Uploading..."
+              onClick={() => inputRef.current?.click()}
+            >
+              <Upload size={20} strokeWidth={1.75} aria-hidden />
+              Upload picture
+            </Button>
+          </div>
         }
       />
 
@@ -289,6 +340,72 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={aiOpen}
+        onClose={() => {
+          if (creatingImage) return;
+          setAiOpen(false);
+          setAiPrompt("");
+          setAiError(null);
+        }}
+        title="Create a picture with AI"
+        width="form"
+        dismissible={!creatingImage}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              type="button"
+              onClick={() => {
+                setAiOpen(false);
+                setAiPrompt("");
+                setAiError(null);
+              }}
+              disabled={creatingImage}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              type="button"
+              onClick={() => void createPicture()}
+              loading={creatingImage}
+              loadingLabel="Creating..."
+              disabled={aiPrompt.trim().length === 0}
+            >
+              Create picture
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-text-muted">
+          Describe the picture you want. AI pictures are a starting point, so
+          check the result before you use it.
+        </p>
+        <div className="mt-4">
+          <Label htmlFor="ai-picture-prompt">What should the picture show?</Label>
+          <Textarea
+            id="ai-picture-prompt"
+            value={aiPrompt}
+            onChange={(event) => setAiPrompt(event.target.value)}
+            maxLength={2000}
+            placeholder="For example: A bright bakery counter with fresh bread, morning light."
+            disabled={creatingImage}
+            className="mt-1.5 min-h-[112px]"
+          />
+          <p className="mt-1.5 text-sm text-text-muted">
+            About 2 credits. You are only charged for what AI uses.
+          </p>
+        </div>
+        {aiError ? (
+          <InfoBox variant="danger" className="mt-3">
+            {aiError}
+          </InfoBox>
+        ) : null}
+      </Dialog>
 
       <Dialog
         open={describeTarget !== null}

@@ -61,6 +61,17 @@ export type RunImageTaskSuccess = {
   mediaId: string;
   path: string;
   url: string | null;
+  media: {
+    id: string;
+    path: string;
+    filename: string | null;
+    mime: string | null;
+    size_bytes: number | null;
+    width: number | null;
+    height: number | null;
+    alt: string | null;
+    created_at: string | null;
+  };
   credits: number;
   flags: AiFlags;
   status: "succeeded";
@@ -353,7 +364,7 @@ export async function runImageTask(
         ai_generated: true,
         ai_request_id: requestId,
       })
-      .select("id, path")
+      .select("id, path, filename, mime, size_bytes, width, height, alt, created_at")
       .single();
     if (insertError || !media) {
       await admin.storage.from(BUCKET).remove([storagePath]);
@@ -444,6 +455,17 @@ export async function runImageTask(
       mediaId: String(media.id),
       path: storagePath,
       url: signed?.signedUrl ?? null,
+      media: {
+        id: String(media.id),
+        path: String(media.path),
+        filename: media.filename ? String(media.filename) : null,
+        mime: media.mime ? String(media.mime) : null,
+        size_bytes: typeof media.size_bytes === "number" ? media.size_bytes : null,
+        width: typeof media.width === "number" ? media.width : null,
+        height: typeof media.height === "number" ? media.height : null,
+        alt: media.alt ? String(media.alt) : null,
+        created_at: media.created_at ? String(media.created_at) : null,
+      },
       credits: charged,
       flags,
       status: "succeeded",
