@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import {
   approveDomainAction,
+  deleteProviderHostnameAction,
   recheckDomainAction,
   rejectDomainAction,
   retryHostnameAction,
@@ -20,7 +21,7 @@ export function AdminDomainActions({
 }: {
   domainId: string;
   reviewState: string;
-  hostnames: { id: string; hostname: string }[];
+  hostnames: { id: string; hostname: string; providerId: string | null }[];
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -28,6 +29,10 @@ export function AdminDomainActions({
   const [error, setError] = useState<string | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteHostId, setDeleteHostId] = useState("");
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const deleteHost = hostnames.find((host) => host.id === deleteHostId) ?? null;
 
   async function run(key: string, work: () => Promise<{ ok: boolean; error?: string }>, message: string) {
     setBusy(key);
@@ -83,6 +88,11 @@ export function AdminDomainActions({
             Approve
           </Button>
         ) : null}
+        {hostnames.some((host) => host.providerId) ? (
+          <Button type="button" variant="danger-outline" onClick={() => setDeleteOpen(true)}>
+            Delete provider hostname
+          </Button>
+        ) : null}
         {reviewState !== "rejected" ? (
           <Button type="button" variant="danger-outline" onClick={() => setRejectOpen(true)}>
             Reject
@@ -90,6 +100,93 @@ export function AdminDomainActions({
         ) : null}
       </div>
       {error ? <p className="mt-2 text-sm text-danger-text" role="alert">{error}</p> : null}
+
+      <Dialog
+        open={deleteOpen}
+        onClose={() => {
+          setDeleteOpen(false);
+          setDeleteHostId("");
+          setDeleteConfirm("");
+        }}
+        title="Delete provider hostname?"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setDeleteOpen(false);
+                setDeleteHostId("");
+                setDeleteConfirm("");
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              disabled={!deleteHost || deleteConfirm.trim() !== deleteHost.hostname}
+              loading={busy === "delete-host"}
+              loadingLabel="Deleting..."
+              onClick={() =>
+                void run(
+                  "delete-host",
+                  async () => {
+                    if (!deleteHost) return { ok: false, error: "Choose an address." };
+                    const result = await deleteProviderHostnameAction(
+                      deleteHost.id,
+                      deleteConfirm,
+                    );
+                    if (result.ok) {
+                      setDeleteOpen(false);
+                      setDeleteHostId("");
+                      setDeleteConfirm("");
+                    }
+                    return result;
+                  },
+                  "Provider hostname deleted",
+                )
+              }
+            >
+              Delete hostname
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          This removes the hostname from the provider and stops serving it. The customer must add it again to reconnect.
+        </p>
+        <label htmlFor="delete-host" className="mt-4 block text-sm font-semibold text-text">
+          Address
+        </label>
+        <select
+          id="delete-host"
+          value={deleteHostId}
+          onChange={(event) => {
+            setDeleteHostId(event.target.value);
+            setDeleteConfirm("");
+          }}
+          className="mt-2 h-11 w-full rounded-card border border-border bg-surface px-3 text-[15px] text-text"
+        >
+          <option value="">Choose an address</option>
+          {hostnames
+            .filter((host) => host.providerId)
+            .map((host) => (
+              <option key={host.id} value={host.id}>{host.hostname}</option>
+            ))}
+        </select>
+        <label htmlFor="delete-confirm" className="mt-4 block text-sm font-semibold text-text">
+          Type {deleteHost?.hostname ?? "the address"} to confirm
+        </label>
+        <Input
+          id="delete-confirm"
+          value={deleteConfirm}
+          onChange={(event) => setDeleteConfirm(event.target.value)}
+          className="mt-2"
+          autoComplete="off"
+          spellCheck={false}
+        />
+      </Dialog>
 
       <Dialog
         open={rejectOpen}

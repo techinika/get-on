@@ -758,6 +758,46 @@ describe("domain service", () => {
     await expect(provider.getHostname(host.providerId!)).resolves.toBeNull();
   });
 
+  it("deletes a provider hostname from support and stops serving it", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.deleteProviderHostname(host.id);
+
+    expect(db.rows.domain_hostnames?.[0]?.status).toBe("removed");
+    expect(db.rows.domains?.[0]?.status).toBe("verified");
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+    expect(pointers.site.deleted).toContain(host.hostname);
+    expect(pointers.site.pointer?.primaryHost).toBeNull();
+    expect(await provider.getHostname(host.providerId!, host.mode)).toBeNull();
+  });
+
   it("lets a disconnected domain be used by a website again", async () => {
     const { service, resolver, provider } = setup();
     const started = await service.startDomain({

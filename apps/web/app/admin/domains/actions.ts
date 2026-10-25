@@ -79,6 +79,38 @@ export async function retryHostnameAction(hostnameId: string): Promise<AdminDoma
   return { ok: true };
 }
 
+export async function deleteProviderHostnameAction(
+  hostnameId: string,
+  confirmation: string,
+): Promise<AdminDomainResult> {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data: host } = await admin
+    .from("domain_hostnames")
+    .select("id, domain_id, project_id, hostname, provider_id")
+    .eq("id", hostnameId)
+    .maybeSingle();
+  if (!host) return { ok: false, error: "We could not find that address." };
+  if (!host.provider_id) return { ok: false, error: "This address has no provider hostname." };
+  if (confirmation.trim() !== host.hostname) {
+    return { ok: false, error: "Type the address exactly to confirm." };
+  }
+
+  try {
+    await new DomainService({ supabase: admin }).deleteProviderHostname(hostnameId);
+  } catch (error) {
+    return { ok: false, error: asDomainError(error).message };
+  }
+  await audit("domain_delete_provider_hostname", host.project_id ?? null, null, {
+    domainId: host.domain_id,
+    hostnameId,
+    hostname: host.hostname,
+    providerId: host.provider_id,
+  });
+  refresh(host.domain_id);
+  return { ok: true };
+}
+
 export async function approveDomainAction(domainId: string): Promise<AdminDomainResult> {
   await requireAdmin();
   const admin = createAdminClient();

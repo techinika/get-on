@@ -788,6 +788,38 @@ export class DomainService {
     await this.event(domainId, "blocked", reason.slice(0, 200));
   }
 
+  async deleteProviderHostname(hostnameId: string): Promise<void> {
+    const host = await this.loadHostname(hostnameId);
+    if (host.status === "removed") return;
+    if (!host.providerId) throw new DomainError("PROVIDER_ERROR");
+    const domain = await this.loadDomain(host.domainId);
+
+    try {
+      await this.provider.deleteHostname(host.providerId);
+    } catch {
+      await this.supabase.from("released_hostnames").upsert({
+        provider_id: host.providerId,
+        hostname: host.hostname,
+        delete_after: this.now().toISOString(),
+        reason: "support_delete",
+      });
+    }
+
+    await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+    await this.updateHostname(host.id, {
+      status: "removed",
+      removed_at: this.now().toISOString(),
+    });
+    await this.refreshPrimaryAddress(host.projectId ?? domain.projectId);
+    await this.refreshDomainStatus(domain.id, this.now());
+    await this.event(
+      domain.id,
+      "provider_hostname_deleted",
+      "Provider hostname deleted by support",
+      host.id,
+    );
+  }
+
   async removeDomain(domainId: string): Promise<void> {
     const domain = await this.loadDomain(domainId);
     const { data } = await this.supabase

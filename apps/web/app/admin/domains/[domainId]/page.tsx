@@ -62,7 +62,11 @@ export default async function AdminDomainPage({ params }: Props) {
       <AdminDomainActions
         domainId={domain.id}
         reviewState={domain.reviewState}
-        hostnames={hostnames.map((host) => ({ id: host.id, hostname: host.hostname }))}
+        hostnames={hostnames.map((host) => ({
+          id: host.id,
+          hostname: host.hostname,
+          providerId: host.providerId,
+        }))}
       />
 
       <div className="mt-5 grid gap-5">
