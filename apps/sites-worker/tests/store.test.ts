@@ -217,6 +217,23 @@ describe("v2 pointers", () => {
     });
   });
 
+  it("overlays a support pause from the host mapping", async () => {
+    const kv = fakeKv({
+      "host:www.example.com": {
+        v: 2,
+        siteId: "site-1",
+        supportPaused: true,
+      },
+      "site:site-1": { ...pointer, primaryHost: "www.example.com" },
+    });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      supportPaused: true,
+      primaryHost: "www.example.com",
+    });
+  });
+
   it("refuses a mapping that points at a missing site", async () => {
     const kv = fakeKv({ "host:www.example.com": { v: 2, siteId: "site-1" } });
     const store = createCloudflareStore({ kv, bucket: fakeBucket() });

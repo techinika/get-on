@@ -34,7 +34,7 @@ export type PublishStore = {
   writeHostPointer(
     hostname: string,
     siteId: string,
-    options?: { planLapsed?: boolean },
+    options?: { planLapsed?: boolean; supportPaused?: boolean },
   ): Promise<void>;
   /** Removes the mapping for an address that is no longer connected. */
   deleteHostPointer(hostname: string): Promise<void>;
@@ -195,11 +195,18 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       ) {
         return null;
       }
-      const mapping = value as unknown as { siteId: string; planLapsed?: boolean };
+      const mapping = value as unknown as {
+        siteId: string;
+        planLapsed?: boolean;
+        supportPaused?: boolean;
+      };
       const site = await read(`site:${mapping.siteId}`);
       if (!site || typeof site !== "object") return null;
       const pointer = site as SitePointer;
       if (pointer.siteId !== mapping.siteId || !pointer.publishId) return null;
+      if (mapping.supportPaused === true) {
+        return { ...pointer, supportPaused: true };
+      }
       return mapping.planLapsed === true
         ? { ...pointer, planLapsed: true }
         : pointer;
@@ -237,6 +244,7 @@ function cloudflareStore(config: PublishConfig): PublishStore {
           v: 2,
           siteId,
           ...(options?.planLapsed ? { planLapsed: true } : {}),
+          ...(options?.supportPaused ? { supportPaused: true } : {}),
         }),
       });
       await readCloudflareResponse(response, "POINTER_WRITE_FAILED");

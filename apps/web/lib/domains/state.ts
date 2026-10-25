@@ -5,10 +5,11 @@ const DOMAIN_NEXT: Record<DomainStatus, readonly DomainStatus[]> = {
   awaiting_txt: ["draft", "verified", "failed", "removing"],
   verified: ["connecting", "unassigned", "removing"],
   connecting: ["live", "attention", "stalled", "verified", "removing"],
-  live: ["attention", "plan_lapsed", "unassigned", "removing"],
-  attention: ["live", "connecting", "stalled", "plan_lapsed", "unassigned", "removing"],
-  stalled: ["live", "attention", "plan_lapsed", "unassigned", "removing"],
-  plan_lapsed: ["live", "connecting", "attention", "stalled", "verified", "unassigned", "removing"],
+  live: ["attention", "plan_lapsed", "paused", "unassigned", "removing"],
+  attention: ["live", "connecting", "stalled", "plan_lapsed", "paused", "unassigned", "removing"],
+  stalled: ["live", "attention", "plan_lapsed", "paused", "unassigned", "removing"],
+  plan_lapsed: ["live", "connecting", "attention", "stalled", "paused", "verified", "unassigned", "removing"],
+  paused: ["live", "connecting", "attention", "stalled", "plan_lapsed", "verified", "unassigned", "removing"],
   unassigned: ["verified", "connecting", "removing"],
   removing: ["removed", "failed"],
   removed: [],
@@ -88,7 +89,7 @@ export function domainStatusFromHostnames(
   if (current === "removing" || current === "removed" || current === "failed") {
     return current;
   }
-  if (current === "plan_lapsed") return current;
+  if (current === "plan_lapsed" || current === "paused") return current;
   if (hostnames.some((hostname) => hostname.role === "main" && hostname.status === "live")) {
     return "live";
   }

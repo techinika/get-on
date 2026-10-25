@@ -25,7 +25,7 @@ function isState(value: unknown): value is SiteState {
 
 function parseHostMapping(
   value: unknown,
-): { v: 2; siteId: string; planLapsed?: boolean } | null {
+): { v: 2; siteId: string; planLapsed?: boolean; supportPaused?: boolean } | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (record.v !== 2 || typeof record.siteId !== "string") return null;
@@ -34,6 +34,7 @@ function parseHostMapping(
     v: 2,
     siteId: record.siteId,
     ...(record.planLapsed === true ? { planLapsed: true } : {}),
+    ...(record.supportPaused === true ? { supportPaused: true } : {}),
   };
 }
 
@@ -56,6 +57,7 @@ function parsePointer(value: unknown): SitePointer | null {
   if (typeof record.freeHost === "string") pointer.freeHost = record.freeHost;
   if (record.redirectToPrimary === true) pointer.redirectToPrimary = true;
   if (record.planLapsed === true) pointer.planLapsed = true;
+  if (record.supportPaused === true) pointer.supportPaused = true;
   if (
     record.pause &&
     typeof record.pause === "object" &&
@@ -140,6 +142,9 @@ export function createCloudflareStore(
       });
       const pointer = parsePointer(site);
       if (pointer?.siteId !== mapping.siteId) return null;
+      if (mapping.supportPaused === true) {
+        return { ...pointer, supportPaused: true };
+      }
       return mapping.planLapsed === true
         ? { ...pointer, planLapsed: true }
         : pointer;

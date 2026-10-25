@@ -372,6 +372,7 @@ export class DomainService {
       domain.status === "removing" ||
       domain.status === "removed" ||
       domain.status === "plan_lapsed" ||
+      domain.status === "paused" ||
       domain.status === "unassigned"
     ) {
       return host;
@@ -488,6 +489,13 @@ export class DomainService {
     domainId: string,
     checkedAt: Date,
   ): Promise<void> {
+    const { data: current } = await this.supabase
+      .from("domains")
+      .select("status")
+      .eq("id", domainId)
+      .maybeSingle();
+    if (current?.status === "paused") return;
+
     const { data } = await this.supabase
       .from("domain_hostnames")
       .select("role, status, waiting_since")
@@ -807,9 +815,77 @@ export class DomainService {
     return expired;
   }
 
+  async pauseDomain(domainId: string): Promise<void> {
+    const domain = await this.loadDomain(domainId);
+    if (domain.status === "paused") return;
+    if (
+      ["draft", "awaiting_txt", "unassigned", "removing", "removed", "failed"].includes(
+        domain.status,
+      )
+    ) {
+      throw new DomainError("DOMAIN_NOT_CONNECTED");
+    }
+
+    await this.updateDomain(domainId, {
+      status: "paused",
+      pause_previous_status: domain.status,
+      status_reason: "support_pause",
+    });
+    if (domain.projectId) {
+      const { data: hosts } = await this.supabase
+        .from("domain_hostnames")
+        .select("hostname, status")
+        .eq("domain_id", domainId)
+        .eq("status", "live");
+      for (const host of hosts ?? []) {
+        await this.pointers.writeHostPointer(
+          String(host.hostname),
+          domain.projectId,
+          { supportPaused: true },
+        );
+      }
+      await this.refreshPrimaryAddress(domain.projectId);
+    }
+    await this.event(domainId, "support_paused", "Domain paused by support");
+  }
+
+  async resumeDomain(domainId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("domains")
+      .select("status, project_id, pause_previous_status")
+      .eq("id", domainId)
+      .maybeSingle();
+    if (!data) throw new DomainError("DOMAIN_NOT_CONNECTED");
+    if (data.status !== "paused") return;
+
+    const previous = String(data.pause_previous_status ?? "connecting");
+    await this.updateDomain(domainId, {
+      status: previous,
+      pause_previous_status: null,
+      status_reason: null,
+    });
+    if (data.project_id) {
+      const { data: hosts } = await this.supabase
+        .from("domain_hostnames")
+        .select("hostname, status")
+        .eq("domain_id", domainId)
+        .eq("status", "live");
+      for (const host of hosts ?? []) {
+        await this.pointers.writeHostPointer(
+          String(host.hostname),
+          String(data.project_id),
+          { planLapsed: previous === "plan_lapsed", supportPaused: false },
+        );
+      }
+      await this.refreshPrimaryAddress(String(data.project_id));
+    }
+    await this.event(domainId, "support_resumed", "Domain resumed by support");
+  }
+
   async simulatePlanLapse(domainId: string): Promise<void> {
     const domain = await this.loadDomain(domainId);
     if (domain.status === "plan_lapsed") return;
+    if (domain.status === "paused") throw new DomainError("DOMAIN_PAUSED");
     if (!domain.projectId) throw new DomainError("DOMAIN_NOT_CONNECTED");
 
     await this.updateDomain(domainId, {

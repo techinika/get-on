@@ -35,6 +35,7 @@ function statusLine(domain: Domain, hosts: DomainHostname[]): string {
   if (domain.status === "attention") return "Needs attention: the connection record changed.";
   if (domain.status === "stalled") return "Not connected yet. Check the connection record.";
   if (domain.status === "plan_lapsed") return "Paused because your plan no longer includes it.";
+  if (domain.status === "paused") return "Paused by our team. Contact support if you need help.";
   return "This domain is not used by a website.";
 }
 
@@ -229,7 +230,7 @@ export function AddressManager({
                       <Badge variant="primary">{domain.role === "primary" ? "Main domain" : "Also redirects"}</Badge>
                     </div>
                     <p className="mt-1 text-[13px] text-text-muted">{statusLine(domain, hosts)}</p>
-                    {domain.status === "plan_lapsed" ? (
+                    {domain.status === "plan_lapsed" || domain.status === "paused" ? (
                       <div className="mt-2">
                         <InfoBox variant="warning">
                           Your domain is paused because your plan no longer includes it.{" "}

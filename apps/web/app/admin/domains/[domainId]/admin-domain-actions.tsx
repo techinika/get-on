@@ -9,8 +9,10 @@ import { useToast } from "@/components/ui/toast";
 import {
   approveDomainAction,
   deleteProviderHostnameAction,
+  pauseDomainAction,
   recheckDomainAction,
   rejectDomainAction,
+  resumeDomainAction,
   restorePlanLapseAction,
   retryHostnameAction,
   simulatePlanLapseAction,
@@ -39,6 +41,7 @@ export function AdminDomainActions({
   const [deleteHostId, setDeleteHostId] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState("");
   const [planOpen, setPlanOpen] = useState(false);
+  const [pauseOpen, setPauseOpen] = useState(false);
   const deleteHost = hostnames.find((host) => host.id === deleteHostId) ?? null;
 
   async function run(key: string, work: () => Promise<{ ok: boolean; error?: string }>, message: string) {
@@ -95,7 +98,16 @@ export function AdminDomainActions({
             Approve
           </Button>
         ) : null}
-        {canSimulate ? (
+        {["draft", "awaiting_txt", "unassigned", "removing", "removed", "failed"].includes(status) ? null : (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setPauseOpen(true)}
+          >
+            {status === "paused" ? "Resume website" : "Pause website"}
+          </Button>
+        )}
+        {canSimulate && status !== "paused" ? (
           <Button
             type="button"
             variant="secondary"
@@ -116,6 +128,47 @@ export function AdminDomainActions({
         ) : null}
       </div>
       {error ? <p className="mt-2 text-sm text-danger-text" role="alert">{error}</p> : null}
+
+      <Dialog
+        open={pauseOpen}
+        onClose={() => setPauseOpen(false)}
+        title={status === "paused" ? "Resume this website?" : "Pause this website?"}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setPauseOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant={status === "paused" ? "primary" : "danger"}
+              loading={busy === "pause"}
+              loadingLabel="Saving..."
+              onClick={() =>
+                void run(
+                  "pause",
+                  async () => {
+                    const result =
+                      status === "paused"
+                        ? await resumeDomainAction(domainId)
+                        : await pauseDomainAction(domainId);
+                    if (result.ok) setPauseOpen(false);
+                    return result;
+                  },
+                  status === "paused" ? "Website resumed" : "Website paused",
+                )
+              }
+            >
+              {status === "paused" ? "Resume website" : "Pause website"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          {status === "paused"
+            ? "Visitors will see the website again as soon as the connection is ready."
+            : "Visitors will see a short pause message until you resume the website."}
+        </p>
+      </Dialog>
 
       <Dialog
         open={planOpen}
@@ -146,7 +199,7 @@ export function AdminDomainActions({
                 )
               }
             >
-              {status === "plan_lapsed" ? "Restore domain" : "Pause domain"}
+              {status === "plan_lapsed" ? "Restore domain" : "Simulate lapse"}
             </Button>
           </>
         }

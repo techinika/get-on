@@ -135,6 +135,17 @@ export function domainPausedPage(): string {
   });
 }
 
+/** Our team paused this address while we look into a problem. */
+export function domainSupportPausedPage(): string {
+  return shell({
+    icon: PAUSE_ICON,
+    title: "This website is taking a break",
+    text: "Check back soon, or contact the business if you need help.",
+    actionLabel: "Go to Get-On",
+    actionHref: "https://get-on.tech",
+  });
+}
+
 /** The website has been taken offline by Get-On. */
 export function suspendedPage(siteName?: string | null): string {
   const reportHref = siteName

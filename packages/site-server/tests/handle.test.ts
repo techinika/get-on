@@ -520,6 +520,20 @@ describe("custom domains", () => {
     expect(await response.text()).toContain("not connected to a website");
   });
 
+  it("shows the support pause message before the plan message", async () => {
+    const response = await handleSiteRequest(
+      request("https://www.example.com/"),
+      memoryStore({
+        pointer: { ...livePointer, planLapsed: true, supportPaused: true },
+      }),
+    );
+
+    const body = await response.text();
+    expect(response.status).toBe(503);
+    expect(body).toContain("Check back soon");
+    expect(body).not.toContain("renew their plan");
+  });
+
   it("pauses a website when its plan lapsed", async () => {
     const response = await handleSiteRequest(
       request("https://www.example.com/"),

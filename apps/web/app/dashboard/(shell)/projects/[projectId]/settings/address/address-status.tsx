@@ -13,6 +13,7 @@ const DOMAIN: Record<
   attention: { label: "Needs attention", variant: "draft" },
   stalled: { label: "Not connected yet", variant: "neutral" },
   plan_lapsed: { label: "Paused", variant: "accent" },
+  paused: { label: "Paused", variant: "accent" },
   unassigned: { label: "Not used by a website", variant: "neutral" },
   removing: { label: "Removing", variant: "neutral" },
   removed: { label: "Removed", variant: "danger" },

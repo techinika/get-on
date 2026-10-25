@@ -7,6 +7,7 @@ export const DOMAIN_STATUSES = [
   "attention",
   "stalled",
   "plan_lapsed",
+  "paused",
   "unassigned",
   "removing",
   "removed",

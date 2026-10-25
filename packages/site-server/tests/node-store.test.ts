@@ -55,4 +55,20 @@ describe("node store host pointers", () => {
       planLapsed: true,
     });
   });
+
+  it("pauses only the host mapping marked by support", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "get-on-store-"));
+    await writeNodePointer(rootDir, pointer.freeHost!, pointer);
+    await writeNodeHostPointer(rootDir, "www.example.com", pointer.siteId, {
+      supportPaused: true,
+    });
+
+    const store = createNodeStore(rootDir);
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      supportPaused: true,
+    });
+    await expect(store.getPointer("rose.localhost")).resolves.not.toMatchObject({
+      supportPaused: true,
+    });
+  });
 });

@@ -337,6 +337,7 @@ function memoryPointers(initial: SitePointer | null): {
     pointer: SitePointer | null;
     hosts: string[];
     planLapsed: Record<string, boolean>;
+    supportPaused: Record<string, boolean>;
     deleted: string[];
   };
 } {
@@ -344,6 +345,7 @@ function memoryPointers(initial: SitePointer | null): {
     pointer: initial,
     hosts: [] as string[],
     planLapsed: {} as Record<string, boolean>,
+    supportPaused: {} as Record<string, boolean>,
     deleted: [] as string[],
   };
   return {
@@ -358,6 +360,7 @@ function memoryPointers(initial: SitePointer | null): {
       async writeHostPointer(hostname, _siteId, options) {
         site.hosts.push(hostname);
         site.planLapsed[hostname] = options?.planLapsed === true;
+        site.supportPaused[hostname] = options?.supportPaused === true;
       },
       async deleteHostPointer(hostname) {
         site.deleted.push(hostname);
@@ -880,6 +883,49 @@ describe("domain service", () => {
     expect(db.rows.domain_events).toContainEqual(
       expect.objectContaining({ event: "verification_expired" }),
     );
+  });
+
+  it("pauses and resumes a live website from support", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.pauseDomain(started.id);
+
+    expect(db.rows.domains?.[0]?.status).toBe("paused");
+    expect(pointers.site.supportPaused[host.hostname]).toBe(true);
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+
+    await service.resumeDomain(started.id);
+
+    expect(db.rows.domains?.[0]?.status).toBe("live");
+    expect(pointers.site.supportPaused[host.hostname]).toBe(false);
+    expect(db.rows.projects?.[0]?.primary_host).toBe(host.hostname);
   });
 
   it("simulates and restores a plan lapse", async () => {

@@ -83,6 +83,7 @@ function statusTitle(domain: Domain, hosts: DomainHostname[]): string {
     case "stalled":
       return "Still waiting for your connection record";
     case "plan_lapsed":
+    case "paused":
       return "This domain is paused";
     default:
       return "Domain status";
@@ -315,7 +316,7 @@ export function DomainDetail({
           <AppCard className={`p-5 ${domain.status === "attention" ? "border-l-4 border-l-warning-text" : ""}`} aria-live="polite">
             <div className="flex items-start gap-3">
               <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-card bg-surface-muted text-text-muted">
-                {domain.status === "plan_lapsed" ? <Pause className="h-5 w-5" aria-hidden /> : <Globe2 className="h-5 w-5" aria-hidden />}
+                {domain.status === "plan_lapsed" || domain.status === "paused" ? <Pause className="h-5 w-5" aria-hidden /> : <Globe2 className="h-5 w-5" aria-hidden />}
               </span>
               <div className="min-w-0">
                 <h2 className="text-[17px] font-semibold text-text">{statusTitle(domain, hosts)}</h2>
@@ -332,6 +333,8 @@ export function DomainDetail({
                           ? liveHost ? `${liveHost.hostname} is connected.` : "This domain is connected."
                           : domain.status === "plan_lapsed"
                             ? "Your domain is paused because your plan no longer includes it."
+                            : domain.status === "paused"
+                              ? "Our team paused this domain. Contact support if you need help."
                             : domain.status === "attention" || domain.status === "stalled"
                               ? plainReason(domain)
                               : plainReason(domain)}

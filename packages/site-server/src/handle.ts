@@ -3,6 +3,7 @@ import { DEFAULT_ROOT_DOMAIN, parseHost } from "./host";
 import {
   domainNotConnectedPage,
   domainPausedPage,
+  domainSupportPausedPage,
   notFoundPage,
   notPublishedPage,
   pausedPage,
@@ -420,6 +421,12 @@ async function serveSiteRequest(
       404,
       cacheControlFor("", "platform"),
     );
+  }
+
+  if (pointer.supportPaused) {
+    return platformResponse(domainSupportPausedPage(), 503, "no-store", {
+      "Retry-After": "3600",
+    });
   }
 
   if (pointer.planLapsed) {

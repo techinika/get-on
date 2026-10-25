@@ -31,6 +31,8 @@ export type SitePointer = {
   redirectToPrimary?: boolean;
   /** The plan no longer includes this domain, so serving pauses. */
   planLapsed?: boolean;
+  /** Our team paused this address while we look into a problem. */
+  supportPaused?: boolean;
 };
 
 /**
@@ -42,6 +44,8 @@ export type SiteHostPointer = {
   siteId: string;
   /** The plan no longer includes this address, so only this host pauses. */
   planLapsed?: boolean;
+  /** Our team paused this address while we look into a problem. */
+  supportPaused?: boolean;
 };
 
 export type SiteFile = {
