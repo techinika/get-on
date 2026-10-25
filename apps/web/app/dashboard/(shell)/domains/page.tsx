@@ -6,11 +6,12 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentTeam } from "@/lib/team";
+import { getCurrentTeam, planLimits } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { DomainStatusBadge } from "../projects/[projectId]/settings/address/address-status";
+import { AttachDomainButton } from "./attach-domain-button";
 import { ConnectDomainButton } from "./connect-domain-button";
 
 type Props = { searchParams: Promise<{ filter?: string }> };
@@ -83,6 +84,16 @@ export default async function DomainsPage({ searchParams }: Props) {
 
   const projects = new Map(websites.map((website) => [website.id, website]));
   const visible = domains.filter((domain) => inFilter(domain, filter));
+  const limit = current ? planLimits(current.team.planId).customDomainsPerSite : 0;
+  const counts = new Map<string, number>();
+  for (const domain of domains) {
+    if (!domain.projectId) continue;
+    if (["draft", "removed", "failed", "plan_lapsed"].includes(domain.status)) continue;
+    counts.set(domain.projectId, (counts.get(domain.projectId) ?? 0) + 1);
+  }
+  const attachWebsites = websites
+    .filter((website) => (counts.get(website.id) ?? 0) < limit)
+    .map(({ id, name }) => ({ id, name }));
 
   const filters: { id: Filter; label: string }[] = [
     { id: "all", label: "All" },
@@ -178,7 +189,9 @@ export default async function DomainsPage({ searchParams }: Props) {
                       <td className="px-4 py-3">
                         {project ? (
                           <Link href={`/dashboard/projects/${project.id}/settings/address/domains/${domain.id}`} className="text-sm font-semibold text-primary hover:underline">Manage</Link>
-                        ) : null}
+                        ) : (
+                          <AttachDomainButton domainId={domain.id} domainName={domain.displayName} websites={attachWebsites} />
+                        )}
                       </td>
                     </tr>
                   );
@@ -209,7 +222,11 @@ export default async function DomainsPage({ searchParams }: Props) {
                     <Link href={`/dashboard/projects/${project.id}/settings/address/domains/${domain.id}`} className="mt-3 inline-flex text-sm font-semibold text-primary hover:underline">
                       Manage
                     </Link>
-                  ) : null}
+                  ) : (
+                    <div className="mt-3">
+                      <AttachDomainButton domainId={domain.id} domainName={domain.displayName} websites={attachWebsites} />
+                    </div>
+                  )}
                 </AppCard>
               );
             })}

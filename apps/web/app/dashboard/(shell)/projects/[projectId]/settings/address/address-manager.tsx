@@ -198,7 +198,11 @@ export function AddressManager({
 
         {domains.map((domain) => {
           const hosts = hostnames.filter((host) => host.domainId === domain.id);
-          const needsSetup = domain.status === "draft" || domain.status === "awaiting_txt" || domain.status === "verified";
+          const needsSetup =
+            domain.status === "draft" ||
+            domain.status === "awaiting_txt" ||
+            domain.status === "verified" ||
+            (domain.status === "connecting" && hosts.length === 0);
           return (
             <AppCard
               key={domain.id}

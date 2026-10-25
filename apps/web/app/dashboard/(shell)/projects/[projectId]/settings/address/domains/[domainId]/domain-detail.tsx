@@ -33,6 +33,7 @@ import type { DomainEventRow } from "./page";
 import {
   checkDomainAction,
   detachDomainAction,
+  reassignDomainAction,
   refreshAddressAction,
   removeDomainAction,
   saveAddressOptionsAction,
@@ -69,7 +70,9 @@ function statusTitle(domain: Domain, hosts: DomainHostname[]): string {
     case "verified":
       return hosts.length === 0 ? "Choose how people reach your website" : "Waiting for your connection record";
     case "connecting":
-      return "Waiting for your connection record";
+      return hosts.length === 0
+        ? "Choose how people reach your website"
+        : "Waiting for your connection record";
     case "live":
       return "Your website is live";
     case "attention":
@@ -109,6 +112,7 @@ export function DomainDetail({
   events,
   freeUrl,
   redirectFreeAddress,
+  websites,
   canManage,
   tab,
 }: {
@@ -118,6 +122,7 @@ export function DomainDetail({
   events: DomainEventRow[];
   freeUrl: string;
   redirectFreeAddress: boolean;
+  websites: { id: string; name: string }[];
   canManage: boolean;
   tab: Tab;
 }) {
@@ -127,6 +132,8 @@ export function DomainDetail({
   const [error, setError] = useState<string | null>(null);
   const [pendingMain, setPendingMain] = useState<DomainHostname | null>(null);
   const [detachOpen, setDetachOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveTarget, setMoveTarget] = useState("");
   const [removeOpen, setRemoveOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
   const [redirect, setRedirect] = useState(redirectFreeAddress);
@@ -209,6 +216,21 @@ export function DomainDetail({
     router.refresh();
   }
 
+  async function move() {
+    if (!moveTarget) return;
+    setBusy("move");
+    const result = await reassignDomainAction(projectId, domain.id, moveTarget);
+    setBusy(null);
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    setMoveOpen(false);
+    toast("Domain moved to another website");
+    router.push(`/dashboard/projects/${moveTarget}/settings/address/domains/${domain.id}`);
+    router.refresh();
+  }
+
   async function remove() {
     setBusy("remove");
     const result = await removeDomainAction(projectId, domain.id);
@@ -280,7 +302,9 @@ export function DomainDetail({
                     : domain.status === "verified"
                       ? "Choose the address people will use for your website."
                       : domain.status === "connecting"
-                        ? "Add the connection record below. We check it automatically."
+                        ? hosts.length === 0
+                          ? "Choose the address people will use for your website."
+                          : "Add the connection record below. We check it automatically."
                         : domain.status === "live"
                           ? liveHost ? `${liveHost.hostname} is connected.` : "This domain is connected."
                           : domain.status === "plan_lapsed"
@@ -309,7 +333,7 @@ export function DomainDetail({
                   </div>
                 ) : null}
 
-                {domain.status === "verified" && hosts.length === 0 ? (
+                {hosts.length === 0 && (domain.status === "verified" || domain.status === "connecting") ? (
                   <Link href={connectHref}><Button type="button" size="sm" className="mt-4">Choose an address</Button></Link>
                 ) : null}
 
@@ -567,6 +591,14 @@ export function DomainDetail({
             <AppCard className="border-l-4 border-l-danger p-5">
               <h2 className="text-[17px] font-semibold text-danger-text">Danger area</h2>
               <div className="mt-3 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={websites.length === 0}
+                  onClick={() => setMoveOpen(true)}
+                >
+                  Move to another website
+                </Button>
                 <Button type="button" variant="secondary" onClick={() => setDetachOpen(true)}>
                   Disconnect from this website
                 </Button>
@@ -615,6 +647,38 @@ export function DomainDetail({
         <p className="text-[15px] text-text-muted">
           Visitors and Google will move to {pendingMain?.hostname}. This can take a few days to show in search results.
         </p>
+      </Dialog>
+
+      <Dialog
+        open={moveOpen}
+        onClose={() => { setMoveOpen(false); setMoveTarget(""); }}
+        title="Move to another website?"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => { setMoveOpen(false); setMoveTarget(""); }}>Cancel</Button>
+            <Button type="button" onClick={move} disabled={!moveTarget} loading={busy === "move"} loadingLabel="Moving...">
+              Move domain
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          The old website stops using this domain. Visitors will go to the website you choose here.
+        </p>
+        <label htmlFor="move-website" className="mt-4 block text-sm font-semibold text-text">
+          Website
+        </label>
+        <select
+          id="move-website"
+          value={moveTarget}
+          onChange={(event) => setMoveTarget(event.target.value)}
+          className="mt-2 h-11 w-full rounded-card border border-border bg-surface px-3 text-[15px] text-text"
+        >
+          <option value="">Choose a website</option>
+          {websites.map((website) => (
+            <option key={website.id} value={website.id}>{website.name}</option>
+          ))}
+        </select>
       </Dialog>
 
       <Dialog

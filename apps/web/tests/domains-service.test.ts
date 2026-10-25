@@ -218,6 +218,24 @@ class FakeSupabase {
       if (project) project.primary_host = host.hostname;
       return { data: null, error: null };
     }
+    if (name === "reassign_domain") {
+      const domain = domains.find((row) => row.id === args.p_domain_id)!;
+      domain.project_id = args.p_project_id;
+      domain.status = "connecting";
+      for (const host of hosts) {
+        if (host.domain_id === domain.id) host.project_id = args.p_project_id;
+      }
+      return { data: null, error: null };
+    }
+    if (name === "detach_domain") {
+      const domain = domains.find((row) => row.id === args.p_domain_id)!;
+      domain.project_id = null;
+      domain.status = "unassigned";
+      for (const host of hosts) {
+        if (host.domain_id === domain.id) host.project_id = null;
+      }
+      return { data: null, error: null };
+    }
     if (name === "begin_domain_removal") {
       const domain = domains.find((row) => row.id === args.p_domain_id)!;
       domain.status = "removing";
@@ -664,6 +682,48 @@ describe("domain service", () => {
     expect(pointers.site.deleted).toContain(host.hostname);
     expect(db.rows.projects?.[0]?.primary_host).toBeNull();
     await expect(provider.getHostname(host.providerId!)).resolves.toBeNull();
+  });
+
+  it("lets a disconnected domain be used by a website again", async () => {
+    const { service, resolver, provider } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.detachDomain(started.id);
+    expect((await service.checkDomain(started.id)).domain.status).toBe(
+      "unassigned",
+    );
+
+    await service.reassignDomain(started.id, "project-1");
+
+    const result = await service.checkDomain(started.id);
+    expect(result.domain.status).toBe("verified");
+    expect(result.domain.projectId).toBe("project-1");
   });
 
   it("removes provider hostnames and the KV mapping", async () => {

@@ -169,6 +169,31 @@ export async function removeDomainAction(
   }
 }
 
+export async function reassignDomainAction(
+  projectId: string,
+  domainId: string,
+  targetProjectId: string,
+): Promise<AddressResult<null>> {
+  const ctx = await context(projectId);
+  if ("error" in ctx) return { ok: false, error: ctx.error ?? "Please try again." };
+  const { data: target } = await ctx.supabase
+    .from("projects")
+    .select("id")
+    .eq("id", targetProjectId)
+    .eq("team_id", ctx.current.team.teamId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!target) return { ok: false, error: "We could not find that website." };
+  try {
+    await service(ctx.supabase).reassignDomain(domainId, targetProjectId);
+    invalidate(projectId);
+    invalidate(targetProjectId);
+    return { ok: true, data: null };
+  } catch (error) {
+    return { ok: false, error: messageFor(error) };
+  }
+}
+
 export async function detachDomainAction(
   projectId: string,
   domainId: string,

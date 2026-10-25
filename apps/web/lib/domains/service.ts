@@ -491,6 +491,14 @@ export class DomainService {
       waiting_since: string | null;
     }[];
 
+    if (hosts.length === 0) {
+      await this.updateDomain(domainId, {
+        status: "verified",
+        status_reason: null,
+      });
+      return;
+    }
+
     const mainLive = hosts.some(
       (host) => host.role === "main" && host.status === "live",
     );
