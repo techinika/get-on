@@ -78,7 +78,11 @@ export function createNodeStore(rootDir: string): SiteStore {
 
       try {
         const raw = await readFile(hostPointerPath(rootDir, hostname), "utf8");
-        const mapping = JSON.parse(raw) as { v?: number; siteId?: string };
+        const mapping = JSON.parse(raw) as {
+          v?: number;
+          siteId?: string;
+          planLapsed?: boolean;
+        };
         if (mapping.v !== 2 || typeof mapping.siteId !== "string") return null;
         const siteRaw = await readFile(
           sitePointerPath(rootDir, mapping.siteId),
@@ -93,7 +97,9 @@ export function createNodeStore(rootDir: string): SiteStore {
         ) {
           return null;
         }
-        return pointer;
+        return mapping.planLapsed === true
+          ? { ...pointer, planLapsed: true }
+          : pointer;
       } catch {
         return null;
       }
@@ -144,10 +150,19 @@ export async function writeNodeHostPointer(
   rootDir: string,
   hostname: string,
   siteId: string,
+  options?: { planLapsed?: boolean },
 ): Promise<void> {
   const file = hostPointerPath(rootDir, hostname);
   await mkdir(path.dirname(file), { recursive: true });
-  await writeFile(file, `${JSON.stringify({ v: 2, siteId }, null, 2)}\n`, "utf8");
+  await writeFile(
+    file,
+    `${JSON.stringify(
+      { v: 2, siteId, ...(options?.planLapsed ? { planLapsed: true } : {}) },
+      null,
+      2,
+    )}\n`,
+    "utf8",
+  );
 }
 
 /** Lists the files of one published version. */

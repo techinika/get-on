@@ -4,6 +4,7 @@ import type { BuiltFile } from "@get-on/publisher";
 import {
   createNodeStore,
   hostPointerPath,
+  pointerPath,
   sharedPath,
   sitePath,
   writeNodeHostPointer,
@@ -30,7 +31,11 @@ export type PublishStore = {
   /** Writes the free-address pointer and the site pointer it points at. */
   writePointer(hostname: string, pointer: SitePointer): Promise<void>;
   /** Points a custom address at a website without copying the full pointer. */
-  writeHostPointer(hostname: string, siteId: string): Promise<void>;
+  writeHostPointer(
+    hostname: string,
+    siteId: string,
+    options?: { planLapsed?: boolean },
+  ): Promise<void>;
   /** Removes the mapping for an address that is no longer connected. */
   deleteHostPointer(hostname: string): Promise<void>;
 };
@@ -190,11 +195,14 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       ) {
         return null;
       }
-      const siteId = (value as unknown as { siteId: string }).siteId;
-      const site = await read(`site:${siteId}`);
+      const mapping = value as unknown as { siteId: string; planLapsed?: boolean };
+      const site = await read(`site:${mapping.siteId}`);
       if (!site || typeof site !== "object") return null;
       const pointer = site as SitePointer;
-      return pointer.siteId === siteId && pointer.publishId ? pointer : null;
+      if (pointer.siteId !== mapping.siteId || !pointer.publishId) return null;
+      return mapping.planLapsed === true
+        ? { ...pointer, planLapsed: true }
+        : pointer;
     },
     async writePointer(hostname, pointer) {
       const put = async (key: string, value: unknown): Promise<void> => {
@@ -215,7 +223,7 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       await put(`site:${pointer.siteId}`, pointer);
       await put(`host:${hostname}`, { v: 2, siteId: pointer.siteId });
     },
-    async writeHostPointer(hostname, siteId) {
+    async writeHostPointer(hostname, siteId, options) {
       const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
         kvNamespaceId,
       )}/values/${encodeURIComponent(`host:${hostname}`)}`;
@@ -225,7 +233,11 @@ function cloudflareStore(config: PublishConfig): PublishStore {
           ...headers,
           "Content-Type": "application/octet-stream",
         },
-        body: JSON.stringify({ v: 2, siteId }),
+        body: JSON.stringify({
+          v: 2,
+          siteId,
+          ...(options?.planLapsed ? { planLapsed: true } : {}),
+        }),
       });
       await readCloudflareResponse(response, "POINTER_WRITE_FAILED");
     },
@@ -275,15 +287,15 @@ function localStore(config: PublishConfig): PublishStore {
     async writePointer(hostname, pointer) {
       await writeNodePointer(config.localDir, hostname, pointer);
     },
-    async writeHostPointer(hostname, siteId) {
-      await writeNodeHostPointer(config.localDir, hostname, siteId);
+    async writeHostPointer(hostname, siteId, options) {
+      await unlink(pointerPath(config.localDir, hostname)).catch(() => undefined);
+      await writeNodeHostPointer(config.localDir, hostname, siteId, options);
     },
     async deleteHostPointer(hostname) {
-      try {
-        await unlink(hostPointerPath(config.localDir, hostname));
-      } catch {
-        // Already absent.
-      }
+      await unlink(pointerPath(config.localDir, hostname)).catch(() => undefined);
+      await unlink(hostPointerPath(config.localDir, hostname)).catch(
+        () => undefined,
+      );
     },
   };
 }

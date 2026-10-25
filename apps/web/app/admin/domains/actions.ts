@@ -121,20 +121,11 @@ export async function rejectDomainAction(
     .maybeSingle();
   if (!domain) return { ok: false, error: "We could not find that domain." };
 
-  const { error } = await admin
-    .from("domains")
-    .update({
-      review_state: "rejected",
-      status: "failed",
-      status_reason: "blocked",
-    })
-    .eq("id", domainId);
-  if (error) return { ok: false, error: "We could not save that." };
-  await admin.from("domain_events").insert({
-    domain_id: domainId,
-    event: "review_rejected",
-    summary: cleaned.slice(0, 200),
-  });
+  try {
+    await new DomainService({ supabase: admin }).blockDomain(domainId, cleaned);
+  } catch (error) {
+    return { ok: false, error: asDomainError(error).message };
+  }
   await audit("domain_reject", domain.project_id ?? null, cleaned, { domainId });
   refresh(domainId);
   return { ok: true };

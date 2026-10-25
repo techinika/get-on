@@ -62,7 +62,7 @@ The site design system is prepared for a future "dark-mode" plugin:
 - No provider hostname is created before TXT verification. Cloudflare for SaaS is behind `HostnameProvider`; the fake provider is the development default.
 - `switch_now` uses HTTP DCV; `prepare_first` uses TXT DCV so HTTPS can be ready before the CNAME moves.
 - One main address per website; other addresses, alias domains and the free address (when enabled) 301 GET/HEAD to it. POST is never redirected. HSTS on customer hosts omits `includeSubDomains` and `preload`.
-- KV pointer v2 uses `host:{hostname}` and `site:{siteId}`. Keep the old reader for one release and run `pnpm job:migrate-pointers`.
+- KV pointer v2 uses `host:{hostname}` and `site:{siteId}`. Host mappings may carry `planLapsed` so one address pauses without pausing the free address. Keep the old reader for one release and run `pnpm job:migrate-pointers`.
 - Domains are Basic and above. Limits come from `plans.custom_domains_per_site`; Free is 0.
 - See `docs/domains.md`, `docs/domains-spike.md` and `docs/ui-spec-domains.md`.
 

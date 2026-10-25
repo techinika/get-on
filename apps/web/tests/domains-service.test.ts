@@ -58,6 +58,12 @@ class FakeTable {
     return this;
   }
 
+  upsert(values: Row) {
+    this.mode = "insert";
+    this.values = values;
+    return this;
+  }
+
   maybeSingle() {
     return this.run().then((result) => ({
       data: Array.isArray(result.data) ? result.data[0] ?? null : result.data,
@@ -191,6 +197,15 @@ class FakeSupabase {
       domain.status = "connecting";
       return { data: id, error: null };
     }
+    if (name === "enforce_domain_plan") {
+      for (const domain of domains) {
+        if (domain.team_id === args.p_team_id && domain.project_id) {
+          domain.status = "plan_lapsed";
+          domain.status_reason = "plan";
+        }
+      }
+      return { data: null, error: null };
+    }
     if (name === "set_main_hostname") {
       const host = hosts.find((row) => row.id === args.p_hostname_id)!;
       for (const item of hosts) {
@@ -231,10 +246,14 @@ class FakeResolver implements DnsResolver {
   txt: DnsRecord[] = [];
   cname: DnsRecord[] = [];
   ns: DnsRecord[] = [];
+  failCname = false;
 
   async lookup(_name: string, type: DnsRecordType): Promise<DnsAnswer> {
     if (type === "TXT") return { status: "ok", records: this.txt };
-    if (type === "CNAME") return { status: "ok", records: this.cname };
+    if (type === "CNAME") {
+      if (this.failCname) throw new Error("DNS unavailable");
+      return { status: "ok", records: this.cname };
+    }
     if (type === "NS") return { status: "ok", records: this.ns };
     return { status: "ok", records: [] };
   }
@@ -242,11 +261,17 @@ class FakeResolver implements DnsResolver {
 
 function memoryPointers(initial: SitePointer | null): {
   store: DomainPointerStore;
-  site: { pointer: SitePointer | null; hosts: string[]; deleted: string[] };
+  site: {
+    pointer: SitePointer | null;
+    hosts: string[];
+    planLapsed: Record<string, boolean>;
+    deleted: string[];
+  };
 } {
   const site = {
     pointer: initial,
     hosts: [] as string[],
+    planLapsed: {} as Record<string, boolean>,
     deleted: [] as string[],
   };
   return {
@@ -258,8 +283,9 @@ function memoryPointers(initial: SitePointer | null): {
       async writePointer(_hostname, pointer) {
         site.pointer = pointer;
       },
-      async writeHostPointer(hostname) {
+      async writeHostPointer(hostname, _siteId, options) {
         site.hosts.push(hostname);
+        site.planLapsed[hostname] = options?.planLapsed === true;
       },
       async deleteHostPointer(hostname) {
         site.deleted.push(hostname);
@@ -399,6 +425,245 @@ describe("domain service", () => {
     expect(pointers.site.pointer?.redirectToPrimary).toBe(true);
     expect(db.rows.projects?.[0]?.primary_host).toBe("www.rosebakery.com");
     expect(db.rows.domains?.[0]?.status).toBe("live");
+  });
+
+  it("does not go live before the provider is ready", async () => {
+    const { service, resolver } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: "www.rosebakery.com",
+        value: "customers.get-on.tech",
+      },
+    ];
+
+    const checked = await service.refreshAddress(host.id);
+
+    expect(checked.status).not.toBe("live");
+  });
+
+  it("keeps the domain live when an extra address is still pending", async () => {
+    const { service, resolver, provider, pointers } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const main = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(main.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: main.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(main.id);
+
+    const extra = await service.addAddress({
+      domainId: started.id,
+      label: "shop",
+      role: "extra",
+      mode: "switch_now",
+    });
+    const checked = await service.refreshAddress(extra.id);
+
+    expect(checked.status).not.toBe("live");
+    expect(pointers.site.pointer?.primaryHost).toBe(main.hostname);
+    expect((await service.checkDomain(started.id)).domain.status).toBe("live");
+  });
+
+  it("keeps a live address live when the DNS lookup fails", async () => {
+    const { service, resolver, provider, pointers } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    resolver.failCname = true;
+    const checked = await service.refreshAddress(host.id);
+
+    expect(checked.status).toBe("live");
+    expect(pointers.site.deleted).not.toContain(host.hostname);
+    expect((await service.checkDomain(started.id)).domain.status).toBe("live");
+  });
+
+  it("promotes another live domain when the main one is removed", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: "www.example.com",
+        value: "customers.get-on.tech",
+      },
+    ];
+
+    async function connect(domain: string) {
+      const started = await service.startDomain({
+        projectId: "project-1",
+        domain,
+      });
+      resolver.txt = [
+        {
+          type: "TXT",
+          name: `_geton-verify.${domain}`,
+          value: started.verificationValue,
+        },
+      ];
+      await service.verifyDomain(started.id);
+      const host = await service.addAddress({
+        domainId: started.id,
+        label: "www",
+        role: "main",
+        mode: "switch_now",
+      });
+      provider.markDnsReady(host.hostname);
+      await service.refreshAddress(host.id);
+      return { domain: started, host };
+    }
+
+    const first = await connect("rosebakery.com");
+    const second = await connect("rosebakery.co");
+    expect(db.rows.projects?.[0]?.primary_host).toBe(second.host.hostname);
+
+    await service.removeDomain(first.domain.id);
+
+    expect(db.rows.projects?.[0]?.primary_host).toBe(second.host.hostname);
+    expect(pointers.site.pointer?.primaryHost).toBe(second.host.hostname);
+    expect(pointers.site.pointer?.redirectToPrimary).toBe(true);
+  });
+
+  it("pauses only the lapsed addresses and frees the free address", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.enforcePlan("team-1");
+
+    expect(db.rows.domains?.[0]?.status).toBe("plan_lapsed");
+    expect(pointers.site.planLapsed[host.hostname]).toBe(true);
+    expect(pointers.site.deleted).not.toContain(host.hostname);
+    expect(pointers.site.pointer?.primaryHost).toBeNull();
+    expect(pointers.site.pointer?.redirectToPrimary).toBe(false);
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+  });
+
+  it("blocks a domain, removes serving and frees the primary address", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.blockDomain(started.id, "Reported for abuse");
+
+    expect(db.rows.domains?.[0]?.status).toBe("failed");
+    expect(db.rows.domains?.[0]?.review_state).toBe("rejected");
+    expect(db.rows.domain_hostnames?.[0]?.status).toBe("blocked");
+    expect(pointers.site.deleted).toContain(host.hostname);
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+    await expect(provider.getHostname(host.providerId!)).resolves.toBeNull();
   });
 
   it("removes provider hostnames and the KV mapping", async () => {

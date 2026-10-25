@@ -23,12 +23,18 @@ function isState(value: unknown): value is SiteState {
   );
 }
 
-function parseHostMapping(value: unknown): { v: 2; siteId: string } | null {
+function parseHostMapping(
+  value: unknown,
+): { v: 2; siteId: string; planLapsed?: boolean } | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (record.v !== 2 || typeof record.siteId !== "string") return null;
   if (!ID_RE.test(record.siteId)) return null;
-  return { v: 2, siteId: record.siteId };
+  return {
+    v: 2,
+    siteId: record.siteId,
+    ...(record.planLapsed === true ? { planLapsed: true } : {}),
+  };
 }
 
 function parsePointer(value: unknown): SitePointer | null {
@@ -133,7 +139,10 @@ export function createCloudflareStore(
         cacheTtl: 60,
       });
       const pointer = parsePointer(site);
-      return pointer?.siteId === mapping.siteId ? pointer : null;
+      if (pointer?.siteId !== mapping.siteId) return null;
+      return mapping.planLapsed === true
+        ? { ...pointer, planLapsed: true }
+        : pointer;
     },
 
     async getFile(

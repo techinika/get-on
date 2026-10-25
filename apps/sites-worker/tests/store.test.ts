@@ -200,6 +200,23 @@ describe("v2 pointers", () => {
     });
   });
 
+  it("overlays planLapsed from the host mapping only", async () => {
+    const kv = fakeKv({
+      "host:www.example.com": {
+        v: 2,
+        siteId: "site-1",
+        planLapsed: true,
+      },
+      "site:site-1": { ...pointer, primaryHost: "www.example.com" },
+    });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      planLapsed: true,
+      primaryHost: "www.example.com",
+    });
+  });
+
   it("refuses a mapping that points at a missing site", async () => {
     const kv = fakeKv({ "host:www.example.com": { v: 2, siteId: "site-1" } });
     const store = createCloudflareStore({ kv, bucket: fakeBucket() });

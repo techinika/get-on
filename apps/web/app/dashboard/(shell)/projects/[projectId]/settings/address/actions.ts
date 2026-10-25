@@ -50,6 +50,7 @@ function invalidate(projectId: string) {
   revalidatePath(`/dashboard/projects/${projectId}/settings/address`);
   revalidatePath(`/dashboard/projects/${projectId}/settings/address/connect`);
   revalidatePath(`/dashboard/projects/${projectId}`);
+  revalidatePath("/dashboard/domains");
 }
 
 export async function startDomainAction(

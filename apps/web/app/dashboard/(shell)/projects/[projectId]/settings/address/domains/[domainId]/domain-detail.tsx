@@ -225,9 +225,7 @@ export function DomainDetail({
 
   function recordStatus(host: DomainHostname): "found" | "wrong" | "missing" {
     if (host.status === "moved") return "wrong";
-    if (host.status === "live" || host.cnameSeen || host.status === "active" || host.status === "ready_to_switch") {
-      return "found";
-    }
+    if (host.cnameSeen || host.status === "live") return "found";
     return "missing";
   }
 

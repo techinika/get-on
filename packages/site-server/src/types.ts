@@ -40,6 +40,8 @@ export type SitePointer = {
 export type SiteHostPointer = {
   v: 2;
   siteId: string;
+  /** The plan no longer includes this address, so only this host pauses. */
+  planLapsed?: boolean;
 };
 
 export type SiteFile = {

@@ -363,7 +363,14 @@ export class DomainService {
     if (host.status === "removed") return host;
 
     const domain = await this.loadDomain(host.domainId);
-    if (domain.status === "removing" || domain.status === "removed") return host;
+    if (
+      domain.status === "removing" ||
+      domain.status === "removed" ||
+      domain.status === "plan_lapsed" ||
+      domain.status === "unassigned"
+    ) {
+      return host;
+    }
 
     let providerStatus: Exclude<HostnameStatus, "removed"> = host.status;
     if (host.providerId) {
@@ -394,9 +401,16 @@ export class DomainService {
       host.cnameTarget || this.cnameTarget(),
     ).catch(() => null);
 
-    const cnameSeen = cname?.status === "found";
     const checkedAt = this.now();
-    const ageMs = checkedAt.getTime() - new Date(host.waitingSince).getTime();
+    if (cname == null) {
+      await this.updateHostname(host.id, {
+        status: host.status === "live" ? "live" : providerStatus,
+        cname_checked_at: checkedAt.toISOString(),
+      });
+      return this.loadHostname(host.id);
+    }
+
+    const cnameSeen = cname.status === "found";
     const providerReady =
       providerStatus === "active" ||
       providerStatus === "ready_to_switch" ||
@@ -406,8 +420,6 @@ export class DomainService {
     if (providerStatus === "moved" || providerStatus === "blocked") {
       nextStatus = providerStatus;
     } else if (cnameSeen && providerReady) {
-      nextStatus = "active";
-    } else if (cnameSeen) {
       nextStatus = "active";
     } else if (host.status === "live" && cname != null) {
       nextStatus = "moved";
@@ -451,33 +463,60 @@ export class DomainService {
 
     await this.updateHostname(host.id, patch);
 
-    if (live && project) {
-      if (host.role === "main") {
-        await this.updateDomain(domain.id, {
-          status: "live",
-          status_reason: null,
-        });
-      }
-      if (host.status !== "live") {
-        await this.event(
-          domain.id,
-          "hostname_live",
-          "Website connected",
-          host.id,
-        );
-      }
-    } else if (nextStatus === "moved" || nextStatus === "blocked") {
-      await this.updateDomain(domain.id, {
-        status: "attention",
-        status_reason: nextStatus,
-      });
-    } else if (ageMs > 14 * 24 * 60 * 60 * 1000) {
-      await this.updateDomain(domain.id, { status: "stalled" });
-    } else {
-      await this.updateDomain(domain.id, { status: "connecting" });
+    if (live && project && host.status !== "live") {
+      await this.event(
+        domain.id,
+        "hostname_live",
+        "Website connected",
+        host.id,
+      );
     }
 
+    await this.refreshDomainStatus(domain.id, checkedAt);
     return this.loadHostname(host.id);
+  }
+
+  private async refreshDomainStatus(
+    domainId: string,
+    checkedAt: Date,
+  ): Promise<void> {
+    const { data } = await this.supabase
+      .from("domain_hostnames")
+      .select("role, status, waiting_since")
+      .eq("domain_id", domainId)
+      .neq("status", "removed");
+    const hosts = (data ?? []) as {
+      role: string;
+      status: string;
+      waiting_since: string | null;
+    }[];
+
+    const mainLive = hosts.some(
+      (host) => host.role === "main" && host.status === "live",
+    );
+    const attention = hosts.find(
+      (host) => host.status === "moved" || host.status === "blocked",
+    );
+    const oldest = hosts
+      .filter((host) => host.status !== "live")
+      .map((host) => new Date(host.waiting_since ?? checkedAt).getTime())
+      .sort((a, b) => a - b)[0];
+
+    if (mainLive) {
+      await this.updateDomain(domainId, { status: "live", status_reason: null });
+    } else if (attention) {
+      await this.updateDomain(domainId, {
+        status: "attention",
+        status_reason: attention.status,
+      });
+    } else if (
+      oldest != null &&
+      checkedAt.getTime() - oldest > 14 * 24 * 60 * 60 * 1000
+    ) {
+      await this.updateDomain(domainId, { status: "stalled" });
+    } else {
+      await this.updateDomain(domainId, { status: "connecting" });
+    }
   }
 
   private async linkSitePointer(
@@ -489,9 +528,7 @@ export class DomainService {
     if (!pointer) return;
 
     const primaryHost =
-      host.role === "main"
-        ? host.hostname
-        : pointer.primaryHost ?? host.hostname;
+      host.role === "main" ? host.hostname : pointer.primaryHost ?? null;
 
     await this.pointers.writePointer(freeHost, {
       ...pointer,
@@ -565,7 +602,7 @@ export class DomainService {
       });
     }
 
-    await this.clearFreeAddressRedirect(domain.projectId, domain.id);
+    await this.refreshPrimaryAddress(domain.projectId);
   }
 
   async reassignDomain(domainId: string, projectId: string): Promise<void> {
@@ -592,42 +629,55 @@ export class DomainService {
     }
 
     if (oldProjectId && oldProjectId !== projectId) {
-      await this.clearFreeAddressRedirect(oldProjectId, domain.id);
+      await this.refreshPrimaryAddress(oldProjectId);
     }
+    await this.refreshDomainStatus(domain.id, this.now());
   }
 
-  private async clearFreeAddressRedirect(
-    projectId: string | null,
-    domainId: string,
-  ): Promise<void> {
+  private async refreshPrimaryAddress(projectId: string | null): Promise<void> {
     if (!projectId) return;
-    const { data } = await this.supabase
-      .from("domains")
-      .select("id")
-      .eq("project_id", projectId)
-      .neq("id", domainId)
-      .eq("status", "live")
-      .limit(1);
-    if ((data ?? []).length > 0) return;
-
     const { data: project } = await this.supabase
       .from("projects")
-      .select("subdomain")
+      .select("subdomain, redirect_free_address")
       .eq("id", projectId)
       .maybeSingle();
     if (!project) return;
+
+    const { data: others } = await this.supabase
+      .from("domains")
+      .select("id")
+      .eq("project_id", projectId)
+      .eq("status", "live");
+
+    let replacement: string | null = null;
+    for (const row of others ?? []) {
+      const { data: main } = await this.supabase
+        .from("domain_hostnames")
+        .select("hostname")
+        .eq("domain_id", row.id)
+        .eq("role", "main")
+        .eq("status", "live")
+        .maybeSingle();
+      if (main?.hostname) {
+        replacement = String(main.hostname);
+        break;
+      }
+    }
+
     const freeHost = siteHostname(this.publishConfig, String(project.subdomain));
     const pointer = await this.pointers.getPointer(freeHost);
-    if (!pointer) return;
-    await this.pointers.writePointer(freeHost, {
-      ...pointer,
-      primaryHost: null,
-      freeHost,
-      redirectToPrimary: false,
-    });
+    if (pointer) {
+      await this.pointers.writePointer(freeHost, {
+        ...pointer,
+        primaryHost: replacement,
+        freeHost,
+        redirectToPrimary:
+          replacement != null && project.redirect_free_address !== false,
+      });
+    }
     await this.supabase
       .from("projects")
-      .update({ primary_host: null })
+      .update({ primary_host: replacement })
       .eq("id", projectId);
   }
 
@@ -642,6 +692,89 @@ export class DomainService {
       );
       await this.linkSitePointer({ ...host, role: "main" }, project);
     }
+  }
+
+  async enforcePlan(teamId: string): Promise<number> {
+    await this.rpc<void>("enforce_domain_plan", { p_team_id: teamId });
+
+    const { data: domains } = await this.supabase
+      .from("domains")
+      .select("id, status, project_id")
+      .eq("team_id", teamId)
+      .neq("status", "removed");
+
+    let paused = 0;
+    const projects = new Set<string>();
+    for (const row of domains ?? []) {
+      const domainId = String(row.id);
+      const projectId = row.project_id ? String(row.project_id) : null;
+      if (!projectId) continue;
+      projects.add(projectId);
+
+      const { data: hosts } = await this.supabase
+        .from("domain_hostnames")
+        .select("hostname")
+        .eq("domain_id", domainId)
+        .eq("status", "live");
+      for (const host of hosts ?? []) {
+        const planLapsed = row.status === "plan_lapsed";
+        await this.pointers.writeHostPointer(String(host.hostname), projectId, {
+          planLapsed,
+        });
+        if (planLapsed) paused += 1;
+      }
+    }
+
+    for (const projectId of projects) {
+      await this.refreshPrimaryAddress(projectId);
+    }
+    return paused;
+  }
+
+  async blockDomain(domainId: string, reason: string): Promise<void> {
+    const domain = await this.loadDomain(domainId);
+    const { data } = await this.supabase
+      .from("domain_hostnames")
+      .select(HOSTNAME_COLUMNS)
+      .eq("domain_id", domainId)
+      .neq("status", "removed");
+    const hostnames = (data ?? []).map(asHostname);
+
+    await this.updateDomain(domainId, {
+      status: "failed",
+      status_reason: "blocked",
+      review_state: "rejected",
+    });
+
+    for (const host of hostnames) {
+      if (host.providerId) {
+        try {
+          await this.provider.deleteHostname(host.providerId);
+        } catch {
+          await this.supabase.from("released_hostnames").insert({
+            provider_id: host.providerId,
+            hostname: host.hostname,
+            delete_after: new Date(
+              this.now().getTime() + 7 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
+            reason: "domain_blocked",
+          });
+        }
+      }
+      await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+      await this.updateHostname(host.id, {
+        status: "blocked",
+        status_reason: "blocked",
+        attention_since: this.now().toISOString(),
+      });
+    }
+
+    await this.supabase.from("blocked_domains").upsert({
+      hostname_pattern: domain.registrable,
+      reason: reason.slice(0, 200),
+    });
+    await this.refreshPrimaryAddress(domain.projectId);
+    await this.event(domainId, "blocked", reason.slice(0, 200));
   }
 
   async removeDomain(domainId: string): Promise<void> {
@@ -674,6 +807,6 @@ export class DomainService {
     }
 
     await this.rpc<void>("finish_domain_removal", { p_domain_id: domainId });
-    await this.clearFreeAddressRedirect(domain.projectId, domain.id);
+    await this.refreshPrimaryAddress(domain.projectId);
   }
 }

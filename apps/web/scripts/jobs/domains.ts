@@ -112,25 +112,16 @@ async function checkHealth(): Promise<number> {
 }
 
 async function enforcePlans(): Promise<number> {
-  const { admin } = service();
+  const { admin, service: domains } = service();
   const { data } = await admin.from("teams").select("id");
   let changed = 0;
   for (const row of data ?? []) {
     try {
-      await admin.rpc("enforce_domain_plan", { p_team_id: row.id });
+      await domains.enforcePlan(String(row.id));
       changed += 1;
     } catch (error) {
       console.error(`[domains] plan ${row.id} failed`, error);
     }
-  }
-
-  const store = createPublishStore(readPublishConfig());
-  const { data: lapsed } = await admin
-    .from("domain_hostnames")
-    .select("hostname, domains!inner(status)")
-    .eq("domains.status", "plan_lapsed");
-  for (const row of lapsed ?? []) {
-    await store.deleteHostPointer(String(row.hostname)).catch(() => undefined);
   }
   return changed;
 }

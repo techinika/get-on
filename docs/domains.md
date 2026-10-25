@@ -13,10 +13,10 @@ Get-On connects domains that customers already own. We do not host DNS, sell dom
 7. A domain is a registrable domain from the Public Suffix List. Each domain has at most two addresses: one main and one optional extra that redirects.
 8. Hostnames are globally unique among non-removed connections. A domain may be verified by multiple teams; an address connects to one website at a time.
 9. HSTS on customer hosts: `Strict-Transport-Security: max-age=31536000` without `includeSubDomains` or `preload`. Platform hosts keep the stricter header.
-10. KV pointer v2: `host:{hostname}` → `{ v:2, siteId }`; `site:{siteId}` → pointer with `primaryHost`, `redirectToPrimary`, etc. The reader accepts the old single-key pointer for one release.
+10. KV pointer v2: `host:{hostname}` → `{ v:2, siteId, planLapsed? }`; `site:{siteId}` → pointer with `primaryHost`, `redirectToPrimary`, etc. The reader accepts the old single-key pointer for one release. A per-host `planLapsed` flag pauses only that address, so the free address keeps working.
 11. Heavy changes take the project lock; provider calls for one domain take a per-domain lock.
 12. Nothing publishes automatically except the explicit safe auto-publish when a domain goes live and there are no unpublished changes.
-13. Provider limits are configurable: global rate limiter/queue, pending-hostname cap, quota alerts at 80% and maximum. Prices live only in docs/admin copy.
+13. Provider limits are configurable: global rate limiter/queue, pending-hostname cap, quota alerts at 80% and maximum. Prices live only in docs/admin copy. `pnpm job:domains-plan` reconciles plan lapses per website: it restores addresses that fit, pauses the oldest over the limit, clears or promotes the project's primary address, and leaves the free address working.
 14. TXT proof is valid for adding addresses for 90 days. Existing live addresses keep working if the record is later removed.
 15. Never log tokens or full provider responses; never send provider ids to the browser.
 

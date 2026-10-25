@@ -250,6 +250,11 @@ begin
     raise exception 'DOMAIN_BLOCKED';
   end if;
 
+  if tg_op = 'UPDATE'
+     and (old.status = 'plan_lapsed' or new.status = 'plan_lapsed') then
+    return new;
+  end if;
+
   if new.project_id is not null
      and new.status not in ('draft','removed','failed','plan_lapsed') then
     if tg_op = 'INSERT' or old.status is distinct from new.status then
@@ -747,6 +752,11 @@ begin
     raise exception 'DOMAIN_LIMIT_REACHED';
   end if;
 
+  update public.projects
+  set primary_host = null
+  where id = v_domain.project_id
+    and primary_host in (select hostname from public.domain_hostnames where domain_id = p_domain_id);
+
   update public.domains
   set project_id = p_project_id, status = 'connecting', status_reason = null
   where id = p_domain_id;
@@ -809,6 +819,7 @@ as $$
 declare
   v_limit int;
   v_keep int;
+  v_restored int;
 begin
   if auth.role() <> 'service_role'
      and not public.user_has_team_role(p_team_id, array['owner','admin']) then
@@ -817,19 +828,34 @@ begin
   v_limit := public.domain_plan_limit(p_team_id);
   v_keep := greatest(v_limit, 0);
 
-  with lapsed as (
+  with restored as (
     update public.domains
-    set plan_previous_status = status,
+    set status = coalesce(plan_previous_status, 'connecting'),
+        plan_previous_status = null,
+        status_reason = null
+    where team_id = p_team_id and status = 'plan_lapsed'
+    returning id
+  )
+  select count(*) into v_restored from restored;
+
+  with ranked as (
+    select id,
+           row_number() over (
+             partition by project_id
+             order by created_at asc, id asc
+           ) as position
+    from public.domains
+    where team_id = p_team_id
+      and project_id is not null
+      and status in ('live','attention','connecting','stalled','verified')
+  ),
+  lapsed as (
+    update public.domains d
+    set plan_previous_status = d.status,
         status = 'plan_lapsed',
         status_reason = 'plan'
-    where id in (
-      select id from public.domains
-      where team_id = p_team_id
-        and status in ('live','attention','connecting','stalled','verified')
-      order by updated_at asc
-      offset v_keep
-    )
-    returning id
+    where d.id in (select id from ranked where position > v_keep)
+    returning d.id
   )
   insert into public.domain_events (domain_id, event, summary)
   select id, 'plan_lapsed', 'Domain paused because of the plan' from lapsed;
