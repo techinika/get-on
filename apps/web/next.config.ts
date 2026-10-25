@@ -19,6 +19,7 @@ function storagePattern() {
 
 const nextConfig: NextConfig = {
   transpilePackages: [
+    "@get-on/ai",
     "@get-on/blocks",
     "@get-on/publisher",
     "@get-on/renderer",
