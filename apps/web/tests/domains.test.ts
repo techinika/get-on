@@ -10,6 +10,7 @@ import {
   normalizeHostname,
   otherForm,
 } from "@/lib/domains/normalize";
+import { checkCaaRecords, evaluateCaa } from "@/lib/domains/diagnostics";
 import { screenDomain } from "@/lib/domains/protected";
 import {
   caaRecords,
@@ -29,6 +30,79 @@ import {
 function env(values: Record<string, string>): NodeJS.ProcessEnv {
   return values as unknown as NodeJS.ProcessEnv;
 }
+
+describe("CAA diagnostics", () => {
+  const record = (value: string) => ({ type: "CAA" as const, name: "example.com", value });
+
+  it("accepts a CAA record that allows one of our authorities", () => {
+    const result = evaluateCaa(
+      [record('0 issue "letsencrypt.org"')],
+      "example.com",
+      "example.com",
+    );
+    expect(result.found).toBe(true);
+    expect(result.blocking).toBe(false);
+    expect(result.suggested).toEqual([]);
+  });
+
+  it("flags CAA records that block every allowed authority", () => {
+    const result = evaluateCaa(
+      [record('0 issue "digicert.com"')],
+      "example.com",
+      "example.com",
+    );
+    expect(result.blocking).toBe(true);
+    expect(result.suggested).toHaveLength(3);
+    expect(result.suggested[0]).toMatchObject({ type: "CAA", name: "@" });
+  });
+
+  it("ignores reports-only CAA records", () => {
+    const result = evaluateCaa(
+      [record('0 iodef "mailto:security@example.com"')],
+      "example.com",
+      "example.com",
+    );
+    expect(result.blocking).toBe(false);
+  });
+
+  it("checks parents and follows a CNAME", async () => {
+    const calls: string[] = [];
+    const resolver = {
+      async lookup(name: string) {
+        calls.push(name);
+        if (name === "www.example.com") {
+          return {
+            status: "ok" as const,
+            records: [
+              {
+                type: "CNAME" as const,
+                name,
+                value: "target.example.net",
+              },
+            ],
+          };
+        }
+        if (name === "target.example.net") {
+          return {
+            status: "ok" as const,
+            records: [record('0 issue "pki.goog"')],
+          };
+        }
+        return { status: "ok" as const, records: [] };
+      },
+    };
+
+    const result = await checkCaaRecords(
+      resolver,
+      "www.example.com",
+      "example.com",
+    );
+    expect(result.found).toBe(true);
+    expect(result.blocking).toBe(false);
+    expect(calls).toContain("www.example.com");
+    expect(calls).toContain("target.example.net");
+  });
+});
 
 describe("domain input", () => {
   it("normalises a pasted URL and suggests the subdomain", () => {

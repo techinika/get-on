@@ -24,6 +24,8 @@ import {
   verificationRecord,
 } from "@/lib/domains/records";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
+import type { CaaCheck } from "@/lib/domains/diagnostics";
+import { CaaNotice } from "../caa-notice";
 import { RecordCard } from "../record-card";
 import { HostnameStatusBadge } from "../address-status";
 import {
@@ -123,12 +125,14 @@ export function ConnectWizard({
   projectId,
   initialDomain,
   initialHosts,
+  caa,
   freeUrl,
   published,
 }: {
   projectId: string;
   initialDomain: Domain | null;
   initialHosts: DomainHostname[];
+  caa: CaaCheck | null;
   freeUrl: string;
   published: boolean;
 }) {
@@ -553,6 +557,9 @@ export function ConnectWizard({
               <p className="text-[15px] leading-6 text-text-muted">
                 Add this record so your address points to your Get-On website.
               </p>
+              {caa?.blocking ? (
+                <CaaNotice records={caa.suggested} registrable={domain.registrable} />
+              ) : null}
               <div className="mt-5 grid gap-4">
                 {hosts.map((host) => {
                   const record = {

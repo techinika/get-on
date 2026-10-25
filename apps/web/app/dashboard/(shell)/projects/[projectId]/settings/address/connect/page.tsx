@@ -4,6 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
+import { DohResolver } from "@/lib/domains/dns";
+import { checkCaaRecords, type CaaCheck } from "@/lib/domains/diagnostics";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { ConnectWizard } from "./connect-wizard";
 
@@ -20,6 +22,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
   let published = false;
   let domain: Domain | null = null;
   let hosts: DomainHostname[] = [];
+  let caa: CaaCheck | null = null;
 
   if (current) {
     const supabase = await createClient();
@@ -53,6 +56,12 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         .neq("status", "removed")
         .order("created_at", { ascending: true });
       hosts = (hostRows ?? []).map(asHostname);
+      const mainHost = hosts.find((host) => host.role === "main") ?? hosts[0];
+      caa = await checkCaaRecords(
+        new DohResolver(),
+        mainHost?.hostname ?? domain.registrable,
+        domain.registrable,
+      ).catch(() => null);
     }
   }
 
@@ -68,6 +77,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         projectId={projectId}
         initialDomain={domain}
         initialHosts={hosts}
+        caa={caa}
         freeUrl={freeUrl}
         published={published}
       />

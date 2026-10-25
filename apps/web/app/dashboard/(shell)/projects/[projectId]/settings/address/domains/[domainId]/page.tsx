@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam, planLimits } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
+import { DohResolver } from "@/lib/domains/dns";
+import { checkCaaRecords } from "@/lib/domains/diagnostics";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { DomainDetail } from "./domain-detail";
 
@@ -58,6 +60,16 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
     .order("created_at", { ascending: false })
     .limit(50);
 
+  const mainHost = hosts.find((host) => host.role === "main") ?? hosts[0];
+  const caa =
+    domain.status === "attention" || domain.status === "stalled"
+      ? await checkCaaRecords(
+          new DohResolver(),
+          mainHost?.hostname ?? domain.registrable,
+          domain.registrable,
+        ).catch(() => null)
+      : null;
+
   const { data: settings } = await supabase
     .from("project_settings")
     .select("auto_publish_on_domain")
@@ -109,6 +121,7 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
       freeUrl={freeUrl}
       redirectFreeAddress={project.redirect_free_address !== false}
       autoPublish={settings?.auto_publish_on_domain !== false}
+      caa={caa}
       websites={websites.map(({ id, name }) => ({ id, name }))}
       canManage={current.team.role === "owner" || current.team.role === "admin"}
       tab={tab === "settings" || tab === "activity" ? tab : "overview"}

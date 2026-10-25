@@ -27,6 +27,8 @@ import {
   verificationRecord,
 } from "@/lib/domains/records";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
+import type { CaaCheck } from "@/lib/domains/diagnostics";
+import { CaaNotice } from "../../caa-notice";
 import { RecordCard } from "../../record-card";
 import { DomainStatusBadge, HostnameStatusBadge } from "../../address-status";
 import type { DomainEventRow } from "./page";
@@ -114,6 +116,7 @@ export function DomainDetail({
   freeUrl,
   redirectFreeAddress,
   autoPublish: initialAutoPublish,
+  caa,
   websites,
   canManage,
   tab,
@@ -125,6 +128,7 @@ export function DomainDetail({
   freeUrl: string;
   redirectFreeAddress: boolean;
   autoPublish: boolean;
+  caa: CaaCheck | null;
   websites: { id: string; name: string }[];
   canManage: boolean;
   tab: Tab;
@@ -374,6 +378,9 @@ export function DomainDetail({
                         />
                       );
                     })}
+                    {caa?.blocking ? (
+                      <CaaNotice records={caa.suggested} registrable={domain.registrable} />
+                    ) : null}
                     <div>
                       <Button type="button" size="sm" variant="secondary" onClick={checkDomain} loading={busy === "domain"} loadingLabel="Checking...">
                         Check now
