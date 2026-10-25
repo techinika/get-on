@@ -8,7 +8,8 @@ export type Plan = {
   maxPagesPerSite: number | null;
   maxMembers: number | null;
   storageMb: number | null;
-  aiCreditsMonthly: number;
+  aiMonthlyCredits: number;
+  aiDailyActions: number;
   customDomainAllowed: boolean;
   customDomainsPerSite: number;
   watermarked: boolean;
@@ -29,7 +30,8 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     maxPagesPerSite: 1,
     maxMembers: 1,
     storageMb: 100,
-    aiCreditsMonthly: 0,
+    aiMonthlyCredits: 0,
+    aiDailyActions: 30,
     customDomainAllowed: false,
     customDomainsPerSite: 0,
     watermarked: true,
@@ -48,7 +50,8 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     maxPagesPerSite: 10,
     maxMembers: 3,
     storageMb: 500,
-    aiCreditsMonthly: 50,
+    aiMonthlyCredits: 100,
+    aiDailyActions: 100,
     customDomainAllowed: true,
     customDomainsPerSite: 1,
     watermarked: false,
@@ -67,7 +70,8 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     maxPagesPerSite: 50,
     maxMembers: 10,
     storageMb: 2048,
-    aiCreditsMonthly: 200,
+    aiMonthlyCredits: 400,
+    aiDailyActions: 300,
     customDomainAllowed: true,
     customDomainsPerSite: 3,
     watermarked: false,
@@ -86,7 +90,8 @@ export const PLAN_BY_ID: Record<PlanId, Plan> = {
     maxPagesPerSite: null,
     maxMembers: null,
     storageMb: 10240,
-    aiCreditsMonthly: 1000,
+    aiMonthlyCredits: 1500,
+    aiDailyActions: 1000,
     customDomainAllowed: true,
     customDomainsPerSite: 10,
     watermarked: false,

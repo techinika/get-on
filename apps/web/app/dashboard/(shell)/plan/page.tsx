@@ -51,8 +51,8 @@ export default async function PlanPage({
     },
     {
       label: "AI credits this month",
-      used: plan.aiCreditsMonthly,
-      limit: plan.aiCreditsMonthly,
+      used: plan.aiMonthlyCredits,
+      limit: plan.aiMonthlyCredits,
     },
     {
       label: "Storage (MB)",
