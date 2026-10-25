@@ -56,7 +56,7 @@ Transition data and exhaustive tests live in `apps/web/lib/domains/state.ts`.
 4. Add the Worker route for custom-hostname traffic and more specific Worker: None routes for dashboard/platform hosts. Confirm the exact patterns on the deployed zone.
 5. Create `CF_API_TOKEN_DOMAINS` with custom hostnames read/write and the setup-read scopes.
 6. Set `CF_SAAS_ZONE_ID`, `CF_SAAS_CNAME_TARGET`, `CF_SAAS_HOSTNAMES_INCLUDED`, `DOMAINS_MAX_PENDING_HOSTNAMES`, `DOMAINS_PROVIDER_RPS`, `DOH_ENDPOINTS`, `RDAP_BOOTSTRAP_URL`, `DOMAINS_PROVIDER`.
-7. Run `pnpm job:migrate-pointers` once, then schedule the domain jobs.
+7. Run `pnpm job:migrate-pointers` once, then schedule the domain jobs, including `pnpm job:domains-cleanup` for provider hostnames whose 7-day grace period has passed.
 
 ## Serving
 
@@ -68,5 +68,5 @@ The Worker resolves `host:{host}` first, then `site:{siteId}`. Unknown hosts get
 - **Padlock pending:** check CAA, validation records and provider SSL status. Do not delete the hostname while the customer is fixing records.
 - **Moved hostname:** show attention, ask the customer to restore the CNAME. Keep provider resources; removal/reconcile handles deletion.
 - **Claim dispute:** verify TXT, inspect pending age, use takeover only for never-live claims older than 7 days; live reassignment is admin-only with evidence.
-- **Abuse takedown:** block the domain, remove KV mappings, queue provider deletion and notify the team.
+- **Abuse takedown:** block the domain, remove KV mappings, delete the provider hostnames (queued for `pnpm job:domains-cleanup` if deletion fails) and notify the team.
 - **Pointer migration:** run the idempotent job, compare old and new keys, then retire the old reader after one release.
