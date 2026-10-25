@@ -34,7 +34,7 @@ import {
 } from "./settings";
 import { structuredTask, textTask, type TaskConfig } from "./tasks";
 
-type Admin = ReturnType<typeof createAdminClient>;
+export type Admin = ReturnType<typeof createAdminClient>;
 
 export type RunTextTaskInput = {
   taskId: AiTaskId;
@@ -66,12 +66,12 @@ export type RunTextTaskFailure = {
 
 export type RunTextTaskResult = RunTextTaskSuccess | RunTextTaskFailure;
 
-function numeric(value: unknown, fallback = 0): number {
+export function numeric(value: unknown, fallback = 0): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function failure(error: unknown, requestId?: string): RunTextTaskFailure {
+export function failure(error: unknown, requestId?: string): RunTextTaskFailure {
   const ai = isAiError(error)
     ? error
     : new AiError("AI_PROVIDER_ERROR", { cause: error });
@@ -84,7 +84,7 @@ function failure(error: unknown, requestId?: string): RunTextTaskFailure {
   };
 }
 
-function mapDbError(error: { message?: string } | null): AiError {
+export function mapDbError(error: { message?: string } | null): AiError {
   const message = error?.message ?? "";
   for (const code of AI_ERROR_CODES) {
     if (!message.includes(code)) continue;
@@ -101,7 +101,7 @@ function mapDbError(error: { message?: string } | null): AiError {
   return new AiError("AI_PROVIDER_ERROR", { cause: error });
 }
 
-function gatewayMetadata(
+export function gatewayMetadata(
   teamId: string,
   taskId: AiTaskId,
   requestId: string,
@@ -113,7 +113,7 @@ function gatewayMetadata(
   };
 }
 
-async function loadAccess(
+export async function loadAccess(
   admin: Admin,
   teamId: string,
   userId: string,
@@ -141,7 +141,7 @@ async function loadAccess(
   return { planId: ((team?.plan_id as PlanId) ?? "free") satisfies PlanId };
 }
 
-async function verifyProject(
+export async function verifyProject(
   admin: Admin,
   teamId: string,
   projectId: string | null | undefined,
@@ -159,7 +159,7 @@ async function verifyProject(
   }
 }
 
-async function checkRateLimits(
+export async function checkRateLimits(
   admin: Admin,
   teamId: string,
   userId: string,
@@ -186,7 +186,7 @@ async function checkRateLimits(
   }
 }
 
-async function updateRequest(
+export async function updateRequest(
   admin: Admin,
   requestId: string,
   values: Record<string, unknown>,
@@ -200,14 +200,14 @@ async function updateRequest(
   }
 }
 
-async function releaseRequest(admin: Admin, requestId: string): Promise<void> {
+export async function releaseRequest(admin: Admin, requestId: string): Promise<void> {
   const { error } = await admin.rpc("ai_release", { p_request: requestId });
   if (error) {
     console.error("[ai] could not release request", requestId, error);
   }
 }
 
-async function storePayload(
+export async function storePayload(
   admin: Admin,
   requestId: string,
   input: Record<string, unknown>,
@@ -228,7 +228,7 @@ async function storePayload(
   }
 }
 
-async function recordUsage(
+export async function recordUsage(
   admin: Admin,
   teamId: string,
   credits: number,
@@ -245,7 +245,7 @@ async function recordUsage(
   }
 }
 
-async function moderateText(
+export async function moderateText(
   provider: ReturnType<typeof createAiProvider>,
   modelId: string | undefined,
   text: string,

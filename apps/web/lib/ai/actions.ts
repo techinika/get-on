@@ -3,6 +3,7 @@
 import type { AiTaskId } from "@get-on/ai";
 import { getCurrentTeam } from "@/lib/team";
 import { runTask, type RunTextTaskResult } from "./pipeline";
+import { runImageTask, type RunImageTaskResult } from "./image-pipeline";
 
 export type AiTextActionResult =
   | RunTextTaskResult
@@ -23,6 +24,15 @@ export type AiSectionActionInput = {
 
 export type AiSectionActionResult =
   | RunTextTaskResult
+  | { ok: false; code: "AUTH" | "FORBIDDEN"; message: string };
+
+export type AiImageActionInput = {
+  projectId: string;
+  prompt: string;
+};
+
+export type AiImageActionResult =
+  | RunImageTaskResult
   | { ok: false; code: "AUTH" | "FORBIDDEN"; message: string };
 
 export async function writeWithAi(
@@ -98,5 +108,42 @@ export async function generateSectionsWithAi(
     projectId: input.projectId ?? null,
     userInput: input.brief,
     existingText: input.existingText,
+  });
+}
+
+export async function generateImageWithAi(
+  input: AiImageActionInput,
+): Promise<AiImageActionResult> {
+  const current = await getCurrentTeam();
+  if (!current) {
+    return { ok: false, code: "AUTH", message: "Please sign in again." };
+  }
+  if (!["owner", "admin", "editor"].includes(current.team.role)) {
+    return {
+      ok: false,
+      code: "FORBIDDEN",
+      message: "Only editors, admins and the owner can use AI here.",
+    };
+  }
+  if (input.prompt.trim().length === 0) {
+    return {
+      ok: false,
+      code: "AI_TOO_LONG",
+      message: "Please describe the picture you want first.",
+    };
+  }
+  if (input.prompt.length > 2000) {
+    return {
+      ok: false,
+      code: "AI_TOO_LONG",
+      message: "That is too long for AI to work with. Try a shorter description.",
+    };
+  }
+
+  return runImageTask({
+    teamId: current.team.teamId,
+    userId: current.user.id,
+    projectId: input.projectId,
+    prompt: input.prompt,
   });
 }
