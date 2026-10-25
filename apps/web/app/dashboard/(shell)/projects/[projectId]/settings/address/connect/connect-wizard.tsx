@@ -24,8 +24,9 @@ import {
   verificationRecord,
 } from "@/lib/domains/records";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
-import type { CaaCheck } from "@/lib/domains/diagnostics";
+import type { CaaCheck, HostnameDnsCheck } from "@/lib/domains/diagnostics";
 import { CaaNotice } from "../caa-notice";
+import { DnsChecks } from "../dns-checks";
 import { RecordCard } from "../record-card";
 import { HostnameStatusBadge } from "../address-status";
 import {
@@ -126,6 +127,7 @@ export function ConnectWizard({
   initialDomain,
   initialHosts,
   caa,
+  dnsChecks,
   autoPublish,
   freeUrl,
   published,
@@ -134,6 +136,7 @@ export function ConnectWizard({
   initialDomain: Domain | null;
   initialHosts: DomainHostname[];
   caa: CaaCheck | null;
+  dnsChecks: HostnameDnsCheck[];
   autoPublish: "published" | "failed" | null;
   freeUrl: string;
   published: boolean;
@@ -572,6 +575,7 @@ export function ConnectWizard({
               {caa?.blocking ? (
                 <CaaNotice records={caa.suggested} registrable={domain.registrable} />
               ) : null}
+              <DnsChecks checks={dnsChecks} />
               <div className="mt-5 grid gap-4">
                 {hosts.map((host) => {
                   const record = {

@@ -5,7 +5,13 @@ import { getCurrentTeam } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
 import { DohResolver } from "@/lib/domains/dns";
-import { checkCaaRecords, type CaaCheck } from "@/lib/domains/diagnostics";
+import {
+  checkCaaRecords,
+  checkHostnameDns,
+  type CaaCheck,
+  type HostnameDnsCheck,
+} from "@/lib/domains/diagnostics";
+import { readDomainsConfig } from "@/lib/domains/config";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { ConnectWizard } from "./connect-wizard";
 
@@ -24,6 +30,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
   let hosts: DomainHostname[] = [];
   let caa: CaaCheck | null = null;
   let autoPublish: "published" | "failed" | null = null;
+  let dnsChecks: HostnameDnsCheck[] = [];
 
   if (current) {
     const supabase = await createClient();
@@ -63,6 +70,19 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         mainHost?.hostname ?? domain.registrable,
         domain.registrable,
       ).catch(() => null);
+      dnsChecks = (
+        await Promise.all(
+          hosts
+            .filter((host) => host.label !== "@")
+            .map((host) =>
+              checkHostnameDns(
+                new DohResolver(),
+                host.hostname,
+                readDomainsConfig().cnameTarget,
+              ).catch(() => null),
+            ),
+        )
+      ).filter((check): check is HostnameDnsCheck => check != null);
 
       const { data: event } = await supabase
         .from("domain_events")
@@ -95,6 +115,7 @@ export default async function ConnectPage({ params, searchParams }: Props) {
         initialDomain={domain}
         initialHosts={hosts}
         caa={caa}
+        dnsChecks={dnsChecks}
         autoPublish={autoPublish}
         freeUrl={freeUrl}
         published={published}
