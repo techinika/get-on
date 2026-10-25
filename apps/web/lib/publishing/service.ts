@@ -31,6 +31,8 @@ export type PublishContext = {
   project: { id: string; name: string; subdomain: string };
   /** The admin console publishes without the normal per-project rate limit. */
   bypassRateLimit?: boolean;
+  /** Rebuild even when there are no draft changes (used after a domain goes live). */
+  force?: boolean;
 };
 
 export class PublishError extends Error {
@@ -204,20 +206,22 @@ export async function publishProject(
     if (rateOk !== true) throw new PublishError("PUBLISH_RATE_LIMITED");
   }
 
-  const { data: hasChanges, error: changesError } = await ctx.supabase.rpc(
-    "project_has_unpublished_changes",
-    { p_project_id: project.id },
-  );
-  if (changesError) throw new PublishError("UNKNOWN");
-  if (hasChanges !== true) {
-    return {
-      publishId: "",
-      status: "no_changes",
-      url: primaryAddress(config, project.subdomain, project.primary_host),
-      warnings: [],
-      pagesCount: pages.filter((page) => !page.is_hidden).length,
-      sizeBytes: 0,
-    };
+  if (!ctx.force) {
+    const { data: hasChanges, error: changesError } = await ctx.supabase.rpc(
+      "project_has_unpublished_changes",
+      { p_project_id: project.id },
+    );
+    if (changesError) throw new PublishError("UNKNOWN");
+    if (hasChanges !== true) {
+      return {
+        publishId: "",
+        status: "no_changes",
+        url: primaryAddress(config, project.subdomain, project.primary_host),
+        warnings: [],
+        pagesCount: pages.filter((page) => !page.is_hidden).length,
+        sizeBytes: 0,
+      };
+    }
   }
 
   const { data: publishRow, error: insertError } = await ctx.supabase

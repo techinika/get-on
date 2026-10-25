@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { publishProject } from "@/lib/publishing/service";
 import {
   readPublishConfig,
   siteHostname,
@@ -62,6 +63,7 @@ export type DomainServiceOptions = {
   pointers?: DomainPointerStore;
   publishConfig?: PublishConfig;
   healthCheck?: (hostname: string) => Promise<boolean>;
+  publish?: typeof publishProject;
   now?: () => Date;
 };
 
@@ -115,6 +117,7 @@ export class DomainService {
   private readonly pointers: DomainPointerStore;
   private readonly publishConfig: PublishConfig;
   private readonly healthCheck: (hostname: string) => Promise<boolean>;
+  private readonly publish: typeof publishProject;
   private readonly now: () => Date;
 
   constructor(options: DomainServiceOptions) {
@@ -130,6 +133,7 @@ export class DomainService {
     this.publishConfig = options.publishConfig ?? readPublishConfig();
     this.pointers = options.pointers ?? createPublishStore(this.publishConfig);
     this.healthCheck = options.healthCheck ?? defaultHealthCheck;
+    this.publish = options.publish ?? publishProject;
     this.now = options.now ?? (() => new Date());
   }
 
@@ -471,6 +475,9 @@ export class DomainService {
         "Website connected",
         host.id,
       );
+      if (host.role === "main") {
+        await this.autoPublishLiveDomain(domain.id, project.id);
+      }
     }
 
     await this.refreshDomainStatus(domain.id, checkedAt);
@@ -641,6 +648,80 @@ export class DomainService {
       await this.refreshPrimaryAddress(oldProjectId);
     }
     await this.refreshDomainStatus(domain.id, this.now());
+  }
+
+  /**
+   * Rebuilds the live website so its canonical links use the new main address.
+   * This never publishes unfinished draft changes.
+   */
+  private async autoPublishLiveDomain(
+    domainId: string,
+    projectId: string,
+  ): Promise<void> {
+    try {
+      const [{ data: project }, { data: settings }, { data: domain }] =
+        await Promise.all([
+          this.supabase
+            .from("projects")
+            .select("id, name, subdomain, team_id")
+            .eq("id", projectId)
+            .maybeSingle(),
+          this.supabase
+            .from("project_settings")
+            .select("auto_publish_on_domain")
+            .eq("project_id", projectId)
+            .maybeSingle(),
+          this.supabase
+            .from("domains")
+            .select("created_by")
+            .eq("id", domainId)
+            .maybeSingle(),
+        ]);
+      if (!project || settings?.auto_publish_on_domain === false) return;
+
+      const { data: hasChanges, error } = await this.supabase.rpc(
+        "project_has_unpublished_changes",
+        { p_project_id: projectId },
+      );
+      if (error || hasChanges !== false) return;
+
+      const { data: team } = await this.supabase
+        .from("teams")
+        .select("plan_id")
+        .eq("id", project.team_id)
+        .maybeSingle();
+      if (!team?.plan_id || !domain?.created_by) return;
+
+      await this.publish({
+        supabase: this.supabase as unknown as Parameters<
+          typeof publishProject
+        >[0]["supabase"],
+        user: { id: String(domain.created_by) },
+        team: {
+          teamId: String(project.team_id),
+          planId: String(team.plan_id),
+        },
+        project: {
+          id: String(project.id),
+          name: String(project.name),
+          subdomain: String(project.subdomain),
+        },
+        bypassRateLimit: true,
+        force: true,
+      });
+      await this.event(
+        domainId,
+        "auto_published",
+        "Website updated for the new address",
+      );
+    } catch (error) {
+      console.error("[domains] auto publish failed", error);
+      await this.event(
+        domainId,
+        "auto_publish_failed",
+        "We could not update the website automatically",
+      ).catch(() => undefined);
+    }
   }
 
   private async refreshPrimaryAddress(projectId: string | null): Promise<void> {

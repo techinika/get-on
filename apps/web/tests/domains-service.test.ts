@@ -105,11 +105,13 @@ class FakeTable {
 }
 
 class FakeSupabase {
+  unpublished = true;
   rows: Record<string, Row[]> = {
     domains: [],
     domain_hostnames: [],
     domain_events: [],
     projects: [],
+    project_settings: [],
     released_hostnames: [],
   };
 
@@ -147,6 +149,7 @@ class FakeSupabase {
         project_id: args.p_project_id,
         registrable: args.p_registrable,
         display_name: args.p_display,
+        created_by: "user-1",
         role: "primary",
         status: "draft",
         status_reason: null,
@@ -221,6 +224,9 @@ class FakeSupabase {
       });
       domain.status = "connecting";
       return { data: id, error: null };
+    }
+    if (name === "project_has_unpublished_changes") {
+      return { data: this.unpublished, error: null };
     }
     if (name === "enforce_domain_plan") {
       for (const domain of domains) {
@@ -351,13 +357,22 @@ const domainsConfig = readDomainsConfig({
   ROOT_DOMAIN: "get-on.tech",
 } as unknown as NodeJS.ProcessEnv);
 
-function setup(config = domainsConfig) {
+function setup(
+  config = domainsConfig,
+  publish?: ConstructorParameters<typeof DomainService>[0]["publish"],
+) {
   const db = new FakeSupabase();
   db.rows.projects!.push({
     id: "project-1",
+    name: "Rose Bakery",
+    team_id: "team-1",
     subdomain: "rose",
     redirect_free_address: true,
     primary_host: null,
+  });
+  db.rows.project_settings!.push({
+    project_id: "project-1",
+    auto_publish_on_domain: false,
   });
   const provider = new FakeHostnameProvider();
   const resolver = new FakeResolver();
@@ -378,6 +393,7 @@ function setup(config = domainsConfig) {
     pointers: pointers.store,
     publishConfig,
     healthCheck: async () => true,
+    ...(publish ? { publish } : {}),
     now: () => new Date(iso()),
   });
   return { db, provider, resolver, pointers, service };
@@ -440,6 +456,113 @@ describe("domain service", () => {
         mode: "switch_now",
       }),
     ).rejects.toMatchObject({ code: "DOMAIN_REVIEW_PENDING" });
+  });
+
+  it("updates the website for a new main address when there are no draft changes", async () => {
+    const calls: unknown[] = [];
+    const { service, resolver, provider, db } = setup(domainsConfig, async (ctx) => {
+      calls.push(ctx);
+      return {
+        publishId: "pub-2",
+        status: "live",
+        url: "https://www.rosebakery.com",
+        warnings: [],
+        pagesCount: 1,
+        sizeBytes: 10,
+      };
+    });
+    db.unpublished = false;
+    db.rows.project_settings![0]!.auto_publish_on_domain = true;
+    db.rows.teams = [{ id: "team-1", plan_id: "basic" }];
+
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+
+    await service.refreshAddress(host.id);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      force: true,
+      user: { id: "user-1" },
+      team: { teamId: "team-1", planId: "basic" },
+      project: { id: "project-1", subdomain: "rose" },
+    });
+    expect(db.rows.domain_events).toContainEqual(
+      expect.objectContaining({ event: "auto_published" }),
+    );
+  });
+
+  it("does not update the website when the owner has draft changes", async () => {
+    const calls: unknown[] = [];
+    const { service, resolver, provider, db } = setup(domainsConfig, async (ctx) => {
+      calls.push(ctx);
+      return {
+        publishId: "pub-2",
+        status: "live",
+        url: "",
+        warnings: [],
+        pagesCount: 1,
+        sizeBytes: 10,
+      };
+    });
+    db.unpublished = true;
+    db.rows.project_settings![0]!.auto_publish_on_domain = true;
+    db.rows.teams = [{ id: "team-1", plan_id: "basic" }];
+
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+
+    await service.refreshAddress(host.id);
+
+    expect(calls).toHaveLength(0);
   });
 
   it("stops adding hostnames when the provider pending cap is reached", async () => {
