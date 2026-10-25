@@ -2,8 +2,8 @@ import { buildSite } from "@get-on/publisher";
 import { createClient } from "@/lib/supabase/server";
 import { invalidateQuickFind } from "@/lib/project-activity";
 import {
+  primaryAddress,
   readPublishConfig,
-  siteAddress,
   siteHostname,
 } from "./config";
 import {
@@ -213,7 +213,7 @@ export async function publishProject(
     return {
       publishId: "",
       status: "no_changes",
-      url: siteAddress(config, project.subdomain),
+      url: primaryAddress(config, project.subdomain, project.primary_host),
       warnings: [],
       pagesCount: pages.filter((page) => !page.is_hidden).length,
       sizeBytes: 0,
@@ -314,7 +314,7 @@ export async function publishProject(
     return {
       publishId,
       status: "live",
-      url: siteAddress(config, project.subdomain),
+      url: primaryAddress(config, project.subdomain, project.primary_host),
       warnings: result.warnings,
       pagesCount,
       sizeBytes: result.totalBytes,
@@ -395,7 +395,7 @@ export async function restorePublish(
   if (target.status === "live") {
     return {
       publishId: String(target.id),
-      url: siteAddress(config, loaded.project.subdomain),
+      url: primaryAddress(config, loaded.project.subdomain, loaded.project.primary_host),
     };
   }
   if (!["offline", "superseded"].includes(String(target.status))) {
@@ -437,6 +437,6 @@ export async function restorePublish(
 
   return {
     publishId: String(target.id),
-    url: siteAddress(config, loaded.project.subdomain),
+    url: primaryAddress(config, loaded.project.subdomain, loaded.project.primary_host),
   };
 }

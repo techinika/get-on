@@ -65,7 +65,7 @@ export async function POST(
 
   let projectQuery = admin
     .from("projects")
-    .select("id, name, subdomain, status, suspended_at, review_state, team_id");
+    .select("id, name, subdomain, primary_host, status, suspended_at, review_state, team_id");
 
   if (parsedHost.custom) {
     const { data: address } = await admin
@@ -243,6 +243,8 @@ export async function POST(
       projectId: project.id,
       projectName: project.name,
       subdomain: project.subdomain,
+      primaryHost:
+        typeof project.primary_host === "string" ? project.primary_host : null,
       teamId: project.team_id,
       planId,
       name: submission.name,

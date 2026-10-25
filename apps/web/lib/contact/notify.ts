@@ -5,7 +5,7 @@ import {
 } from "@get-on/email";
 import { sendEmail, type SendEmailResult } from "@/lib/email/send";
 import { parseContactSettings } from "@/lib/contact/settings";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import type { PlanId } from "@/lib/plans";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -17,6 +17,7 @@ export type NotifyMessage = {
   projectId: string;
   projectName: string;
   subdomain: string;
+  primaryHost?: string | null;
   teamId: string;
   planId: PlanId;
   name: string;
@@ -102,7 +103,11 @@ async function notifyRecipients(
   message: NotifyMessage,
   recipients: string[],
 ): Promise<SendEmailResult[]> {
-  const address = siteAddress(readPublishConfig(), message.subdomain);
+  const address = primaryAddress(
+    readPublishConfig(),
+    message.subdomain,
+    message.primaryHost,
+  );
   const rendered = contactNotificationEmail({
     site: message.projectName,
     pagePath: message.pagePath ?? "",

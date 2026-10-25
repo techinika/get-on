@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireProject } from "../../pages/_lib";
-import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 
 export const runtime = "nodejs";
 
@@ -35,6 +35,10 @@ export async function GET(_request: Request, { params }: Params) {
     createdAt: publish.created_at,
     finishedAt: publish.finished_at,
     liveAt: publish.live_at,
-    url: siteAddress(readPublishConfig(), ctx.project.subdomain),
+    url: primaryAddress(
+      readPublishConfig(),
+      ctx.project.subdomain,
+      ctx.project.primary_host,
+    ),
   });
 }
