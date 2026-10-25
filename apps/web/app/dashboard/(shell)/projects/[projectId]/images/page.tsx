@@ -28,7 +28,7 @@ export default async function ImagesPage({ params }: Params) {
 
   const { data: media } = await supabase
     .from("media")
-    .select("id, path, filename, mime, size_bytes, width, height, created_at")
+    .select("id, path, filename, mime, size_bytes, width, height, alt, created_at")
     .eq("project_id", projectId)
     .is("deleted_at", null)
     .order("created_at", { ascending: false });

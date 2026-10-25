@@ -67,7 +67,7 @@ export async function POST(request: Request, { params }: Params) {
       height,
       created_by: ctx.current.user.id,
     })
-    .select("id, path, filename, mime, size_bytes, width, height, created_at")
+    .select("id, path, filename, mime, size_bytes, width, height, alt, created_at")
     .single();
 
   if (insertError || !media) {
@@ -79,6 +79,42 @@ export async function POST(request: Request, { params }: Params) {
 
   const { data: signed } = await ctx.supabase.storage.from(BUCKET).createSignedUrl(name, 3600);
   return NextResponse.json({ media: { ...media, url: signed?.signedUrl ?? null } });
+}
+
+
+/** Save a picture description. */
+export async function PATCH(request: Request, { params }: Params) {
+  const { projectId } = await params;
+  const guard = await requireProject(projectId);
+  if (!guard.ok) return guard.response;
+  const ctx = guard.ctx;
+
+  if (ctx.current.team.role === "viewer") {
+    return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
+  }
+
+  const body = await request.json().catch(() => null);
+  const id = body && typeof body === "object" ? String((body as Record<string, unknown>).id ?? "") : "";
+  const alt = body && typeof body === "object" ? String((body as Record<string, unknown>).alt ?? "") : "";
+  if (!id) {
+    return NextResponse.json({ error: "UNKNOWN" }, { status: 400 });
+  }
+  if (alt.length > 160) {
+    return NextResponse.json({ error: "UNKNOWN" }, { status: 400 });
+  }
+
+  const { error } = await ctx.supabase
+    .from("media")
+    .update({ alt: alt.trim() })
+    .eq("id", id)
+    .eq("project_id", projectId)
+    .is("deleted_at", null);
+  if (error) {
+    return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
+  }
+
+  await touchProject(ctx.supabase, projectId);
+  return NextResponse.json({ ok: true });
 }
 
 /** Delete a picture. Editors archive it, owners and admins remove it for good. */

@@ -2,15 +2,18 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { ImagePlus, MoreVertical, Upload } from "lucide-react";
+import { ImagePlus, MoreVertical, Sparkles, Upload } from "lucide-react";
 import { AppCard } from "@/components/app/card";
 import { AppEmptyState } from "@/components/app/empty-state";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Button } from "@/components/ui/button";
+import { Dialog } from "@/components/ui/dialog";
+import { Label, Textarea } from "@/components/ui/input";
 import { Menu, MenuItem, MenuSeparator } from "@/components/ui/menu";
 import { useToast } from "@/components/ui/toast";
+import { describeImageWithAi } from "@/lib/ai/actions";
 import { processImageForUpload } from "@/lib/images/process";
 import { formatBytes, publicMediaUrl } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -23,6 +26,7 @@ export type MediaItem = {
   size_bytes: number | null;
   width: number | null;
   height: number | null;
+  alt: string | null;
   created_at: string | null;
 };
 
@@ -40,6 +44,10 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
   const [dragging, setDragging] = React.useState(false);
   const [deleteId, setDeleteId] = React.useState<string | null>(null);
   const [deleting, setDeleting] = React.useState(false);
+  const [describeId, setDescribeId] = React.useState<string | null>(null);
+  const [describing, setDescribing] = React.useState(false);
+  const [description, setDescription] = React.useState("");
+  const [savingDescription, setSavingDescription] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   async function upload(file: File) {
@@ -87,7 +95,55 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
     toast("Picture removed.", "success");
   }
 
+  async function describe(item: MediaItem) {
+    setDescribing(true);
+    setDescribeId(item.id);
+    try {
+      const result = await describeImageWithAi({
+        projectId,
+        mediaId: item.id,
+      });
+      if (!result.ok) {
+        toast(result.message, "error");
+        setDescribeId(null);
+        return;
+      }
+      setDescription(result.text);
+    } catch {
+      toast("We could not describe that picture. Please try again.", "error");
+      setDescribeId(null);
+    } finally {
+      setDescribing(false);
+    }
+  }
+
+  async function saveDescription() {
+    if (!describeId) return;
+    setSavingDescription(true);
+    const res = await fetch(`/api/projects/${projectId}/media`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: describeId, alt: description }),
+    });
+    setSavingDescription(false);
+    if (!res.ok) {
+      toast("We could not save that description. Please try again.", "error");
+      return;
+    }
+    setMedia((prev) =>
+      prev.map((item) =>
+        item.id === describeId ? { ...item, alt: description.trim() } : item,
+      ),
+    );
+    setDescribeId(null);
+    setDescription("");
+    toast("Description saved.", "success");
+  }
+
   const target = deleteId ? media.find((item) => item.id === deleteId) ?? null : null;
+  const describeTarget = describeId
+    ? media.find((item) => item.id === describeId) ?? null
+    : null;
 
   return (
     <AppPage width="default">
@@ -201,11 +257,19 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
                     )}
                   >
                     <MenuItem
-                      onClick={() =>
-                        toast("Picture details can be updated from the Images library.", "info")
-                      }
+                      onClick={() => {
+                        setDescription(item.alt ?? "");
+                        setDescribeId(item.id);
+                      }}
                     >
-                      Edit details
+                      Edit description
+                    </MenuItem>
+                    <MenuItem
+                      onClick={() => void describe(item)}
+                      disabled={describing}
+                    >
+                      <Sparkles size={16} strokeWidth={1.75} aria-hidden />
+                      Describe with AI
                     </MenuItem>
                     <MenuItem
                       onClick={() =>
@@ -225,6 +289,69 @@ export function PicturesContent({ projectId, teamName, projectName, items }: Pic
           ))}
         </ul>
       )}
+
+      <Dialog
+        open={describeTarget !== null}
+        onClose={() => {
+          if (describing || savingDescription) return;
+          setDescribeId(null);
+          setDescription("");
+        }}
+        title="Picture description"
+        width="form"
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={() => {
+                setDescribeId(null);
+                setDescription("");
+              }}
+              type="button"
+              disabled={describing || savingDescription}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={() => void saveDescription()}
+              loading={savingDescription}
+              loadingLabel="Saving..."
+              type="button"
+              disabled={describing || description.trim().length === 0}
+            >
+              Save description
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm leading-6 text-text-muted">
+          Tell people who cannot see the picture what it shows.
+        </p>
+        <div className="mt-4">
+          <Label htmlFor="picture-description">Description</Label>
+          <Textarea
+            id="picture-description"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            maxLength={160}
+            placeholder="For example: A bright bakery counter with fresh bread."
+            disabled={describing}
+            className="mt-1.5 min-h-[96px]"
+          />
+          <p className="mt-1.5 text-sm text-text-muted">
+            {description.length} of 160 characters
+          </p>
+        </div>
+        {describing ? (
+          <p className="mt-3 flex items-center gap-2 text-sm text-text-muted" role="status">
+            <Sparkles size={16} strokeWidth={1.75} aria-hidden />
+            Describing...
+          </p>
+        ) : null}
+      </Dialog>
 
       <ConfirmDialog
         open={target !== null}

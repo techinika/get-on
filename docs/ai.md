@@ -1,6 +1,6 @@
 # AI generation
 
-Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
+Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can describe a picture with AI; the rest of the AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
 
 ## Invariants
 
