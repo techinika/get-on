@@ -28,7 +28,24 @@ export type StructuredTaskConfig = {
   validate: (value: unknown) => StructuredValidation;
 };
 
-export type TaskConfig = TextTaskConfig | StructuredTaskConfig;
+export type VisionTaskConfig = {
+  kind: "vision";
+  taskId: AiTaskId;
+  feature: string;
+  purpose: AiPurpose;
+  requirement: ModelRequirement;
+  rules: string;
+  version: string;
+  expectedOutputTokens: number;
+  maxOutputTokens: number;
+  moderateOutput: boolean;
+  maxChars: number;
+};
+
+export type TaskConfig =
+  | TextTaskConfig
+  | StructuredTaskConfig
+  | VisionTaskConfig;
 
 export type TextTaskConfig = {
   kind: "text";
@@ -199,6 +216,24 @@ Do not invent facts, numbers, awards, prices, guarantees or reviews. Keep headin
   },
 };
 
+export const VISION_TASKS: Partial<Record<AiTaskId, VisionTaskConfig>> = {
+  "alt.describe": {
+    kind: "vision",
+    taskId: "alt.describe",
+    feature: "images",
+    purpose: "vision",
+    requirement: { needsVision: true },
+    rules: `Describe the picture in one short sentence, at most 120 characters.
+Say what is shown, not what it means. Do not name people, brands or guess a location.
+Do not start with "Image of" or "Picture of".`,
+    version: "alt.describe@1",
+    expectedOutputTokens: 60,
+    maxOutputTokens: 160,
+    moderateOutput: false,
+    maxChars: 160,
+  },
+};
+
 export function textTask(taskId: AiTaskId): TextTaskConfig | null {
   return TEXT_TASKS[taskId] ?? null;
 }
@@ -207,6 +242,10 @@ export function structuredTask(taskId: AiTaskId): StructuredTaskConfig | null {
   return STRUCTURED_TASKS[taskId] ?? null;
 }
 
+export function visionTask(taskId: AiTaskId): VisionTaskConfig | null {
+  return VISION_TASKS[taskId] ?? null;
+}
+
 export function taskConfig(taskId: AiTaskId): TaskConfig | null {
-  return textTask(taskId) ?? structuredTask(taskId);
+  return textTask(taskId) ?? structuredTask(taskId) ?? visionTask(taskId);
 }

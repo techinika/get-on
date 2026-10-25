@@ -1,6 +1,6 @@
 # AI generation
 
-Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text and section pipelines, image generation and the credit/payload jobs exist. The AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
+Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
 
 ## Invariants
 
@@ -90,7 +90,7 @@ The pipeline never writes to a page or publishes. The caller applies the result.
 - `profile.write`
 - `design.suggest`
 
-`section.generate` and `page.generate` are structured tasks. They use strict JSON mode, Zod validation and one repair call. `image.generate` is implemented with input moderation, credit reservation, provider generation, server-side re-encoding and media storage. The other structured tasks (`site.generate`, `template.fill`, `template.generate`, `alt.describe`, `repair`) still need their task runners and schemas. `tips.fix` is deterministic and does not call a model.
+`section.generate` and `page.generate` are structured tasks. They use strict JSON mode, Zod validation and one repair call. `alt.describe` uses the vision model to describe a stored picture. `image.generate` is implemented with input moderation, credit reservation, provider generation, server-side re-encoding and media storage. The other structured tasks (`site.generate`, `template.fill`, `template.generate`, `repair`) still need their task runners and schemas. `tips.fix` is deterministic and does not call a model.
 
 ## Credits
 

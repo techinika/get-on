@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_TASKS, textTask } from "@/lib/ai/tasks";
+import { TEXT_TASKS, VISION_TASKS, textTask, visionTask } from "@/lib/ai/tasks";
 
 describe("AI text task definitions", () => {
   it("covers the editor text actions", () => {
@@ -28,5 +28,12 @@ describe("AI text task definitions", () => {
       expect(task?.maxChars).toBeGreaterThan(0);
       expect(task?.version).toContain("@");
     }
+  });
+
+  it("uses a vision model for picture descriptions", () => {
+    const task = visionTask("alt.describe");
+    expect(task?.requirement.needsVision).toBe(true);
+    expect(task?.maxChars).toBeLessThanOrEqual(160);
+    expect(VISION_TASKS["alt.describe"]?.version).toBe("alt.describe@1");
   });
 });

@@ -32,7 +32,12 @@ import {
   loadPlatformUsage,
   loadSkills,
 } from "./settings";
-import { structuredTask, textTask, type TaskConfig } from "./tasks";
+import {
+  structuredTask,
+  textTask,
+  visionTask,
+  type TaskConfig,
+} from "./tasks";
 
 export type Admin = ReturnType<typeof createAdminClient>;
 
@@ -44,6 +49,7 @@ export type RunTextTaskInput = {
   userInput: string;
   existingText?: string;
   idempotencyKey?: string;
+  image?: { base64: string; mime: string };
 };
 
 export type RunTextTaskSuccess = {
@@ -397,8 +403,9 @@ async function runTextTaskWithConfig(
       .map((message) => message.content)
       .join("\n");
     const inputTokens = estimateTokens(promptText);
+    const estimateInputTokens = task.kind === "vision" ? inputTokens + 1000 : inputTokens;
     const estimate = estimateCredits({
-      inputTokens,
+      inputTokens: estimateInputTokens,
       expectedOutputTokens: task.expectedOutputTokens,
       model,
       creditNeurons: settings.creditNeurons,
@@ -507,6 +514,26 @@ async function runTextTaskWithConfig(
           messages: composed.messages,
           maxTokens: maxOutputTokens,
           temperature: task.temperature,
+          timeoutMs: AI_TASKS[task.taskId].timeoutMs,
+          metadata,
+        });
+        outputText = sanitiseText(providerResult.value, task.maxChars);
+        outputData = undefined;
+        providerUsage = providerResult.usage;
+      } else if (task.kind === "vision") {
+        if (!input.image) {
+          throw new AiError("AI_PROVIDER_ERROR", {
+            details: { reason: "image_required" },
+          });
+        }
+        const providerResult = await provider.describeImage({
+          modelId: model.modelId,
+          imageBase64: input.image.base64,
+          mime: input.image.mime,
+          prompt: composed.messages
+            .map((message) => message.content)
+            .join("\n\n"),
+          maxTokens: maxOutputTokens,
           timeoutMs: AI_TASKS[task.taskId].timeoutMs,
           metadata,
         });
@@ -633,7 +660,7 @@ async function runTextTaskWithConfig(
     }
 
     const usage: AiUsage = {
-      inputTokens: providerUsage.inputTokens ?? inputTokens,
+      inputTokens: providerUsage.inputTokens ?? estimateInputTokens,
       outputTokens: providerUsage.outputTokens ?? estimateTokens(outputText),
     };
     const neurons = usageToNeurons(usage, model);
@@ -689,7 +716,7 @@ async function runTextTaskWithConfig(
         skills: composed.manifest.skills,
         promptVersion: composed.manifest.task,
       },
-      task.kind === "text" ? { text: outputText } : { data: outputData },
+      task.kind === "structured" ? { data: outputData } : { text: outputText },
       settings.payloadRetentionDays,
     );
     await recordUsage(admin, input.teamId, charged, neurons);
@@ -723,8 +750,8 @@ export async function runTask(
   taskId: AiTaskId,
   input: Omit<RunTextTaskInput, "taskId">,
 ): Promise<RunTextTaskResult> {
-  return runTextTaskWithConfig(textTask(taskId) ?? structuredTask(taskId), {
-    ...input,
-    taskId,
-  });
+  return runTextTaskWithConfig(
+    textTask(taskId) ?? structuredTask(taskId) ?? visionTask(taskId),
+    { ...input, taskId },
+  );
 }
