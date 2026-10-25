@@ -841,6 +841,50 @@ describe("domain service", () => {
     expect(db.rows.projects?.[0]?.primary_host).toBeNull();
   });
 
+  it("simulates and restores a plan lapse", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.simulatePlanLapse(started.id);
+
+    expect(db.rows.domains?.[0]?.status).toBe("plan_lapsed");
+    expect(pointers.site.planLapsed[host.hostname]).toBe(true);
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+
+    await service.restorePlanLapse(started.id);
+
+    expect(db.rows.domains?.[0]?.status).toBe("live");
+    expect(pointers.site.planLapsed[host.hostname]).toBe(false);
+    expect(db.rows.projects?.[0]?.primary_host).toBe(host.hostname);
+    expect(pointers.site.pointer?.redirectToPrimary).toBe(true);
+  });
+
   it("blocks a domain, removes serving and frees the primary address", async () => {
     const { service, resolver, provider, pointers, db } = setup();
     const started = await service.startDomain({

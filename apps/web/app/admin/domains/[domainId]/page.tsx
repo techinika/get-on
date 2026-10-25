@@ -62,6 +62,11 @@ export default async function AdminDomainPage({ params }: Props) {
       <AdminDomainActions
         domainId={domain.id}
         reviewState={domain.reviewState}
+        status={domain.status}
+        canSimulate={
+          process.env.NODE_ENV !== "production" ||
+          process.env.DOMAINS_ALLOW_SIMULATION === "true"
+        }
         hostnames={hostnames.map((host) => ({
           id: host.id,
           hostname: host.hostname,

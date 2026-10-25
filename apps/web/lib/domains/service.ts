@@ -786,6 +786,70 @@ export class DomainService {
     }
   }
 
+  async simulatePlanLapse(domainId: string): Promise<void> {
+    const domain = await this.loadDomain(domainId);
+    if (domain.status === "plan_lapsed") return;
+    if (!domain.projectId) throw new DomainError("DOMAIN_NOT_CONNECTED");
+
+    await this.updateDomain(domainId, {
+      status: "plan_lapsed",
+      plan_previous_status: domain.status,
+      status_reason: "simulated",
+    });
+    const { data } = await this.supabase
+      .from("domain_hostnames")
+      .select("hostname, status")
+      .eq("domain_id", domainId)
+      .eq("status", "live");
+    for (const host of data ?? []) {
+      await this.pointers.writeHostPointer(String(host.hostname), domain.projectId, {
+        planLapsed: true,
+      });
+    }
+    await this.refreshPrimaryAddress(domain.projectId);
+    await this.event(
+      domainId,
+      "plan_lapse_simulated",
+      "Plan lapse simulated by support",
+    );
+  }
+
+  async restorePlanLapse(domainId: string): Promise<void> {
+    const { data } = await this.supabase
+      .from("domains")
+      .select("status, project_id, plan_previous_status")
+      .eq("id", domainId)
+      .maybeSingle();
+    if (!data) throw new DomainError("DOMAIN_NOT_CONNECTED");
+    if (data.status !== "plan_lapsed") return;
+
+    await this.updateDomain(domainId, {
+      status: String(data.plan_previous_status ?? "connecting"),
+      plan_previous_status: null,
+      status_reason: null,
+    });
+    if (data.project_id) {
+      const { data: hosts } = await this.supabase
+        .from("domain_hostnames")
+        .select("hostname, status")
+        .eq("domain_id", domainId)
+        .eq("status", "live");
+      for (const host of hosts ?? []) {
+        await this.pointers.writeHostPointer(
+          String(host.hostname),
+          String(data.project_id),
+          { planLapsed: false },
+        );
+      }
+      await this.refreshPrimaryAddress(String(data.project_id));
+    }
+    await this.event(
+      domainId,
+      "plan_restore_simulated",
+      "Plan restore simulated by support",
+    );
+  }
+
   async enforcePlan(teamId: string): Promise<number> {
     await this.rpc<void>("enforce_domain_plan", { p_team_id: teamId });
 

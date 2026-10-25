@@ -79,6 +79,63 @@ export async function retryHostnameAction(hostnameId: string): Promise<AdminDoma
   return { ok: true };
 }
 
+function canSimulate(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" ||
+    process.env.DOMAINS_ALLOW_SIMULATION === "true"
+  );
+}
+
+export async function simulatePlanLapseAction(
+  domainId: string,
+): Promise<AdminDomainResult> {
+  await requireAdmin();
+  if (!canSimulate()) return { ok: false, error: "Not available in production." };
+  const admin = createAdminClient();
+  const { data: domain } = await admin
+    .from("domains")
+    .select("id, project_id")
+    .eq("id", domainId)
+    .maybeSingle();
+  if (!domain) return { ok: false, error: "We could not find that domain." };
+
+  try {
+    await new DomainService({ supabase: admin }).simulatePlanLapse(domainId);
+  } catch (error) {
+    return { ok: false, error: asDomainError(error).message };
+  }
+  await audit("domain_simulate_plan_lapse", domain.project_id ?? null, null, {
+    domainId,
+  });
+  refresh(domainId);
+  return { ok: true };
+}
+
+export async function restorePlanLapseAction(
+  domainId: string,
+): Promise<AdminDomainResult> {
+  await requireAdmin();
+  if (!canSimulate()) return { ok: false, error: "Not available in production." };
+  const admin = createAdminClient();
+  const { data: domain } = await admin
+    .from("domains")
+    .select("id, project_id")
+    .eq("id", domainId)
+    .maybeSingle();
+  if (!domain) return { ok: false, error: "We could not find that domain." };
+
+  try {
+    await new DomainService({ supabase: admin }).restorePlanLapse(domainId);
+  } catch (error) {
+    return { ok: false, error: asDomainError(error).message };
+  }
+  await audit("domain_restore_plan_lapse", domain.project_id ?? null, null, {
+    domainId,
+  });
+  refresh(domainId);
+  return { ok: true };
+}
+
 export async function deleteProviderHostnameAction(
   hostnameId: string,
   confirmation: string,
