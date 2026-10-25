@@ -70,6 +70,48 @@ export function evaluateCaa(
  * Checks CAA at the hostname and its parents. A CNAME is followed so a
  * customer's CAA records cannot silently block our certificate authority.
  */
+export type HostnameDnsCheck = {
+  hostname: string;
+  cname: string | null;
+  wrongCname: boolean;
+  conflicts: string[];
+};
+
+function normalizeHost(value: string): string {
+  return value.toLowerCase().replace(/\.$/, "");
+}
+
+export async function checkHostnameDns(
+  resolver: DnsResolver,
+  hostname: string,
+  target: string,
+): Promise<HostnameDnsCheck> {
+  const empty = { status: "ok" as const, records: [] };
+  const [cnameAnswer, aAnswer, aaaaAnswer] = await Promise.all([
+    resolver.lookup(hostname, "CNAME").catch(() => empty),
+    resolver.lookup(hostname, "A").catch(() => empty),
+    resolver.lookup(hostname, "AAAA").catch(() => empty),
+  ]);
+  const cname =
+    cnameAnswer.records.find((record) => record.type === "CNAME")?.value ?? null;
+  const normalized = cname ? normalizeHost(cname) : null;
+  const conflicts = normalized
+    ? []
+    : [...aAnswer.records, ...aaaaAnswer.records]
+        .filter((record) => record.type === "A" || record.type === "AAAA")
+        .map((record) => record.value);
+
+  return {
+    hostname,
+    cname: normalized,
+    wrongCname:
+      normalized != null &&
+      target.trim() !== "" &&
+      normalized !== normalizeHost(target),
+    conflicts,
+  };
+}
+
 export async function checkCaaRecords(
   resolver: DnsResolver,
   hostname: string,

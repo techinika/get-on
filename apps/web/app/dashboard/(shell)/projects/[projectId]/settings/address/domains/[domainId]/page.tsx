@@ -4,7 +4,12 @@ import { getCurrentTeam, planLimits } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
 import { DohResolver } from "@/lib/domains/dns";
-import { checkCaaRecords } from "@/lib/domains/diagnostics";
+import {
+  checkCaaRecords,
+  checkHostnameDns,
+  type HostnameDnsCheck,
+} from "@/lib/domains/diagnostics";
+import { readDomainsConfig } from "@/lib/domains/config";
 import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { DomainDetail } from "./domain-detail";
 
@@ -61,6 +66,25 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
     .limit(50);
 
   const mainHost = hosts.find((host) => host.role === "main") ?? hosts[0];
+  const dnsChecks: HostnameDnsCheck[] =
+    domain.status === "attention" ||
+    domain.status === "stalled" ||
+    domain.status === "connecting"
+      ? (
+          await Promise.all(
+            hosts
+              .filter((host) => host.label !== "@")
+              .map((host) =>
+                checkHostnameDns(
+                  new DohResolver(),
+                  host.hostname,
+                  readDomainsConfig().cnameTarget,
+                ).catch(() => null),
+              ),
+          )
+        ).filter((check): check is HostnameDnsCheck => check != null)
+      : [];
+
   const caa =
     domain.status === "attention" || domain.status === "stalled"
       ? await checkCaaRecords(
@@ -122,6 +146,7 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
       redirectFreeAddress={project.redirect_free_address !== false}
       autoPublish={settings?.auto_publish_on_domain !== false}
       caa={caa}
+      dnsChecks={dnsChecks}
       websites={websites.map(({ id, name }) => ({ id, name }))}
       canManage={current.team.role === "owner" || current.team.role === "admin"}
       tab={tab === "settings" || tab === "activity" ? tab : "overview"}

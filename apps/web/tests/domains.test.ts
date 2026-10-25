@@ -10,7 +10,11 @@ import {
   normalizeHostname,
   otherForm,
 } from "@/lib/domains/normalize";
-import { checkCaaRecords, evaluateCaa } from "@/lib/domains/diagnostics";
+import {
+  checkCaaRecords,
+  checkHostnameDns,
+  evaluateCaa,
+} from "@/lib/domains/diagnostics";
 import { screenDomain } from "@/lib/domains/protected";
 import {
   caaRecords,
@@ -63,6 +67,58 @@ describe("CAA diagnostics", () => {
       "example.com",
     );
     expect(result.blocking).toBe(false);
+  });
+
+  it("finds a connection record that points somewhere else", async () => {
+    const resolver = {
+      async lookup(name: string, type: string) {
+        if (type === "CNAME") {
+          return {
+            status: "ok" as const,
+            records: [
+              { type: "CNAME" as const, name, value: "old.example.net" },
+            ],
+          };
+        }
+        return { status: "ok" as const, records: [] };
+      },
+    };
+
+    const result = await checkHostnameDns(
+      resolver,
+      "www.example.com",
+      "customers.get-on.tech",
+    );
+    expect(result.cname).toBe("old.example.net");
+    expect(result.wrongCname).toBe(true);
+    expect(result.conflicts).toEqual([]);
+  });
+
+  it("finds old address records that block the connection record", async () => {
+    const resolver = {
+      async lookup(name: string, type: string) {
+        if (type === "CNAME") {
+          return { status: "ok" as const, records: [] };
+        }
+        if (type === "A") {
+          return {
+            status: "ok" as const,
+            records: [
+              { type: "A" as const, name, value: "203.0.113.10" },
+            ],
+          };
+        }
+        return { status: "ok" as const, records: [] };
+      },
+    };
+
+    const result = await checkHostnameDns(
+      resolver,
+      "www.example.com",
+      "customers.get-on.tech",
+    );
+    expect(result.conflicts).toEqual(["203.0.113.10"]);
+    expect(result.wrongCname).toBe(false);
   });
 
   it("checks parents and follows a CNAME", async () => {
