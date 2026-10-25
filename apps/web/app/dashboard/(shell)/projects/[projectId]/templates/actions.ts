@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam, planLimits } from "@/lib/team";
 import { applyTemplateToProject, restoreTemplateSnapshot, type ApplyMode } from "@/lib/templates/apply";
+import {
+  fillTemplateTextWithAi,
+  type TemplateFillActionResult,
+} from "@/lib/ai/template-fill";
 
 export type TemplateActionResult =
   | { ok: true; homePageId: string; pages: number }
@@ -69,4 +73,17 @@ export async function restoreTemplateAction(projectId: string): Promise<Template
   revalidatePath(`/dashboard/projects/${projectId}/pages`);
   revalidatePath(`/dashboard/projects/${projectId}/templates`);
   return { ok: true, homePageId: result.homePageId, pages: 0 };
+}
+
+export async function fillTemplateTextAction(
+  projectId: string,
+  notes: string,
+): Promise<TemplateFillActionResult> {
+  const result = await fillTemplateTextWithAi({ projectId, notes });
+  if (result.ok) {
+    revalidatePath(`/dashboard/projects/${projectId}`);
+    revalidatePath(`/dashboard/projects/${projectId}/pages`);
+    revalidatePath(`/dashboard/projects/${projectId}/templates`);
+  }
+  return result;
 }

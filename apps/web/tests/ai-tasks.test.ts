@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TEXT_TASKS, VISION_TASKS, textTask, visionTask } from "@/lib/ai/tasks";
+import { STRUCTURED_TASKS, TEXT_TASKS, VISION_TASKS, structuredTask, textTask, visionTask } from "@/lib/ai/tasks";
 
 describe("AI text task definitions", () => {
   it("covers the editor text actions", () => {
@@ -28,6 +28,16 @@ describe("AI text task definitions", () => {
       expect(task?.maxChars).toBeGreaterThan(0);
       expect(task?.version).toContain("@");
     }
+  });
+
+  it("has a template fill structured task", () => {
+    const task = structuredTask("template.fill");
+    expect(task?.schemaName).toBe("template_fill");
+    expect(STRUCTURED_TASKS["template.fill"]?.version).toBe("template.fill@1");
+    expect(task?.validate({ slots: [{ id: "hero:heading", text: "New heading" }] })).toEqual({
+      ok: true,
+      data: { slots: [{ id: "hero:heading", text: "New heading" }] },
+    });
   });
 
   it("uses a vision model for picture descriptions", () => {

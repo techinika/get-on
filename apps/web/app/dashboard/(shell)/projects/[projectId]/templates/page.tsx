@@ -2,8 +2,10 @@ import { notFound, redirect } from "next/navigation";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { TemplateGallery } from "@/components/templates/template-gallery";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { loadAiSettings, loadTeamBalance } from "@/lib/ai/settings";
 import { snapshotOf, templateOriginOf } from "@/lib/templates/apply";
 import { templatesForPlan } from "@/lib/templates/catalog";
 
@@ -30,6 +32,11 @@ export default async function ProjectTemplatesPage({ params }: Params) {
   const templates = templatesForPlan(current.team.planId);
   const origin = templateOriginOf(project.settings);
   const snapshot = snapshotOf(project.settings);
+  const admin = createAdminClient();
+  const [aiSettings, aiBalance] = await Promise.all([
+    loadAiSettings(admin),
+    loadTeamBalance(admin, current.team.teamId),
+  ]);
 
   return (
     <AppPage width="wide">
@@ -46,8 +53,11 @@ export default async function ProjectTemplatesPage({ params }: Params) {
         items={templates}
         mode="project"
         projectId={project.id}
+        projectName={project.name}
         currentSlug={origin?.slug}
         canRestore={Boolean(snapshot)}
+        aiEnabled={aiSettings.enabled}
+        aiCredits={aiBalance.total}
       />
     </AppPage>
   );

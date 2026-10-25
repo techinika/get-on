@@ -9,6 +9,7 @@
     ".": "./src/index.ts",
     "./credits": "./src/credits/index.ts",
     "./errors": "./src/errors.ts",
+    "./eval": "./src/eval.ts",
     "./prompts": "./src/prompts/composer.ts",
     "./registry": "./src/registry/models.ts",
     "./tasks": "./src/tasks/registry.ts",

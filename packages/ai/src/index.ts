@@ -5,3 +5,4 @@ export * from "./registry/models";
 export * from "./tasks/registry";
 export * from "./prompts/composer";
 export * from "./providers/fake";
+export * from "./eval";

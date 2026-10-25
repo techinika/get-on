@@ -7,11 +7,16 @@ import { ArrowRight, Check, Eye, RotateCcw } from "lucide-react";
 import type { TemplateCatalogItem } from "@get-on/templates/catalog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ConfirmDialog } from "@/components/app/confirm-dialog";
 import { Dialog } from "@/components/ui/dialog";
+import { Label, Textarea } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
-import { applyTemplateAction, restoreTemplateAction } from "@/app/dashboard/(shell)/projects/[projectId]/templates/actions";
+import {
+  applyTemplateAction,
+  fillTemplateTextAction,
+  restoreTemplateAction,
+} from "@/app/dashboard/(shell)/projects/[projectId]/templates/actions";
 
 export type GalleryTemplate = TemplateCatalogItem & {
   available: boolean;
@@ -27,6 +32,9 @@ type Props = {
   projects?: ProjectOption[];
   currentSlug?: string;
   canRestore?: boolean;
+  projectName?: string;
+  aiEnabled?: boolean;
+  aiCredits?: number;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -45,6 +53,9 @@ export function TemplateGallery({
   projects = [],
   currentSlug,
   canRestore = false,
+  projectName,
+  aiEnabled = false,
+  aiCredits,
 }: Props) {
   const [category, setCategory] = React.useState("all");
   const [pending, setPending] = React.useState<GalleryTemplate | null>(null);
@@ -52,22 +63,70 @@ export function TemplateGallery({
   const [targetProjectId, setTargetProjectId] = React.useState(projects[0]?.id ?? "");
   const [restoring, setRestoring] = React.useState(false);
   const [working, setWorking] = React.useState(false);
+  const [phase, setPhase] = React.useState<"idle" | "design" | "text">("idle");
+  const [aiText, setAiText] = React.useState(false);
+  const [aiNotes, setAiNotes] = React.useState("");
   const router = useRouter();
   const { toast } = useToast();
 
   const categories = ["all", ...Array.from(new Set(items.map((item) => item.category)))];
   const visible = category === "all" ? items : items.filter((item) => item.category === category);
+  const estimate = pending && pending.pageCount > 3 ? 12 : 5;
+  const canUseAi =
+    aiEnabled && (typeof aiCredits !== "number" || aiCredits >= estimate);
+  const targetName = projectName ?? "your website";
+
+  function closePending() {
+    if (working) return;
+    setPending(null);
+    setAiText(false);
+    setAiNotes("");
+  }
 
   async function apply() {
     if (!pending || !projectId) return;
     setWorking(true);
+    setPhase("design");
     const result = await applyTemplateAction(projectId, pending.slug, "full");
-    setWorking(false);
-    setPending(null);
     if (!result.ok) {
+      setWorking(false);
+      setPhase("idle");
+      setPending(null);
       toast(result.message, "error");
       return;
     }
+
+    if (aiText) {
+      setPhase("text");
+      const aiResult = await fillTemplateTextAction(projectId, aiNotes);
+      setWorking(false);
+      setPhase("idle");
+      setPending(null);
+      setAiText(false);
+      setAiNotes("");
+      if (!aiResult.ok) {
+        toast(
+          `Your design is ready, but AI could not write the text. ${aiResult.message}`,
+          "error",
+        );
+      } else if (aiResult.changed === 0) {
+        toast(
+          "Your design is ready. AI did not find any text it could safely replace.",
+          "error",
+        );
+      } else {
+        toast(
+          `Your website now uses the ${pending.name} design and AI wrote your words. You can change anything you like.`,
+          "success",
+        );
+      }
+      router.refresh();
+      return;
+    }
+
+    setWorking(false);
+    setPhase("idle");
+    setPending(null);
     toast(`Your website now uses the ${pending.name} design. You can change anything you like.`, "success");
     router.refresh();
   }
@@ -213,15 +272,83 @@ export function TemplateGallery({
         </p>
       ) : null}
 
-      <ConfirmDialog
+      <Dialog
         open={pending !== null}
+        onClose={closePending}
         title={`Use the ${pending?.name ?? ""} design?`}
-        description="Your pages and text will be replaced with this design. The colours and fonts will change too. Your current pages are saved for 30 days, so you can undo this."
-        confirmLabel="Use this design"
-        loading={working}
-        onConfirm={apply}
-        onClose={() => setPending(null)}
-      />
+        width="form"
+        dismissible={!working}
+        footer={
+          <>
+            <Button
+              variant="secondary"
+              size="md"
+              onClick={closePending}
+              disabled={working}
+              type="button"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              onClick={apply}
+              loading={working}
+              loadingLabel={phase === "text" ? "Writing your words..." : "Applying design..."}
+              type="button"
+            >
+              {phase === "text" ? "Writing your words..." : "Use this design"}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-base leading-6 text-text-muted">
+          Your pages and text will be replaced with this design. The colours and fonts will
+          change too. Your current pages are saved for 30 days, so you can undo this.
+        </p>
+
+        {aiEnabled ? (
+          <div className="mt-5 rounded-card border border-border bg-surface-muted p-4">
+            <Switch
+              checked={aiText}
+              onCheckedChange={setAiText}
+              disabled={!canUseAi || working}
+              label="Let AI write my text"
+              description={`AI replaces the sample words with words about ${targetName}. It uses your Writing style and business facts.`}
+            />
+            {!canUseAi ? (
+              <p className="mt-2 text-sm text-danger-text">
+                You need about {estimate} credits.{" "}
+                <Link href="/dashboard/plan" className="font-semibold underline">
+                  See plans
+                </Link>
+              </p>
+            ) : null}
+            {aiText ? (
+              <div className="mt-4 space-y-3">
+                <div>
+                  <Label htmlFor="template-ai-notes" optional>
+                    Anything AI should know?
+                  </Label>
+                  <Textarea
+                    id="template-ai-notes"
+                    value={aiNotes}
+                    onChange={(event) => setAiNotes(event.target.value)}
+                    maxLength={2000}
+                    disabled={working}
+                    className="mt-2 min-h-[96px]"
+                    placeholder="For example: we deliver in Leeds and offer free quotes."
+                  />
+                </div>
+                <p className="text-sm text-text-muted">
+                  About {estimate} credits. AI never makes up reviews, numbers or contact
+                  details.
+                </p>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+      </Dialog>
 
       <Dialog
         open={applying !== null}

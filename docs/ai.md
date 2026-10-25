@@ -1,6 +1,6 @@
 # AI generation
 
-Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can create a picture with AI (when images are enabled) and describe a picture with AI. The AI credits page, the admin AI settings/model/usage console, the wizard AI first-page flow and a page-editor AI section composer are built. The rest of the AI UI, evaluation runner and the remaining generation tasks are still to be built.
+Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can create a picture with AI (when images are enabled) and describe a picture with AI. The AI credits page, the admin AI settings/model/usage console, the wizard AI first-page flow, the page-editor AI section composer, the writing-style settings page and the AI history page are built. The template gallery can now apply a design and let AI rewrite the sample text. The rest of the AI UI, the admin Evals pages and the remaining generation tasks are still to be built. The evaluation runner library is in `packages/ai/src/eval.ts` and works with any provider, including the fake provider.
 
 ## Invariants
 
@@ -90,7 +90,7 @@ The pipeline never writes to a page or publishes. The caller applies the result.
 - `profile.write`
 - `design.suggest`
 
-`section.generate` and `page.generate` are structured tasks. They use strict JSON mode, Zod validation and one repair call. `alt.describe` uses the vision model to describe a stored picture. `image.generate` is implemented with input moderation, credit reservation, provider generation, server-side re-encoding and media storage. The other structured tasks (`site.generate`, `template.fill`, `template.generate`, `repair`) still need their task runners and schemas. `tips.fix` is deterministic and does not call a model.
+`section.generate` and `page.generate` are structured tasks. They use strict JSON mode, Zod validation and one repair call. `alt.describe` uses the vision model to describe a stored picture. `image.generate` is implemented with input moderation, credit reservation, provider generation, server-side re-encoding and media storage. `template.fill` rewrites text slots in a materialised template, keeps links/ids/media/contact details untouched, clamps each replacement to the block field limit and revalidates every changed block before saving. The eval runner can run text and structured cases against a provider and returns per-case issues, score, latency and usage. The other structured tasks (`site.generate`, `template.generate`, `repair`) still need their task runners and schemas. `tips.fix` is deterministic and does not call a model.
 
 ## Credits
 

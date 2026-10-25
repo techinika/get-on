@@ -6,6 +6,10 @@ import {
   sectionDraftSchema,
   sectionJsonSchema,
 } from "./section-schema";
+import {
+  templateFillDraftSchema,
+  templateFillJsonSchema,
+} from "./template-schema";
 
 export type StructuredValidation =
   | { ok: true; data: unknown }
@@ -182,6 +186,37 @@ Do not invent facts, numbers, awards, prices, guarantees or reviews. Keep headin
       }
       const built = blocksFromDraft(parsed.data);
       return built.ok ? { ok: true, data: built.data } : built;
+    },
+  },
+  "template.fill": {
+    kind: "structured",
+    taskId: "template.fill",
+    feature: "templates",
+    purpose: "writer",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Rewrite the given template text slots for this business.
+Each slot has an id and the current sample text. Return one entry for every slot, with the same id.
+Keep each replacement close to the original length and purpose. Headings stay short. Do not add new slots, remove slots or change ids.
+Use only the business facts and the user's notes. Do not invent facts, numbers, prices, awards, guarantees, reviews, addresses or contact details.
+Write in the requested brand voice. If a slot is a label or button, keep it short and useful.`,
+    version: "template.fill@1",
+    expectedOutputTokens: 1200,
+    maxOutputTokens: 4000,
+    temperature: 0.55,
+    moderateOutput: true,
+    schemaName: "template_fill",
+    jsonSchema: templateFillJsonSchema,
+    validate(value) {
+      const parsed = templateFillDraftSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
     },
   },
   "section.generate": {
