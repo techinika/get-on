@@ -67,7 +67,9 @@ describe("AI section generation", () => {
     expect(sectionJsonSchema.required).toEqual(["blocks"]);
     const task = structuredTask("section.generate");
     expect(task?.requirement.needsJson).toBe(true);
-    expect(task?.validate({ blocks: [hero] }).ok).toBe(true);
+    const result = task?.validate({ blocks: [hero] });
+    expect(result?.ok).toBe(true);
+    if (result?.ok) expect(Array.isArray(result.data)).toBe(true);
   });
 
   it("allows up to six sections for a full page", () => {
@@ -75,6 +77,8 @@ describe("AI section generation", () => {
     const blocks = Array.from({ length: 6 }, () => hero);
     expect(pageDraftSchema.safeParse({ blocks }).success).toBe(true);
     const task = structuredTask("page.generate");
-    expect(task?.validate({ blocks }).ok).toBe(true);
+    const result = task?.validate({ blocks });
+    expect(result?.ok).toBe(true);
+    if (result?.ok) expect(Array.isArray(result.data)).toBe(true);
   });
 });

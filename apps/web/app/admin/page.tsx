@@ -49,6 +49,9 @@ export default async function AdminOverviewPage() {
             <Link href="/admin/domains" className={buttonVariants({ variant: "ghost", size: "md" })}>
               Domains
             </Link>
+            <Link href="/admin/ai" className={buttonVariants({ variant: "ghost", size: "md" })}>
+              AI
+            </Link>
             <Link href="/admin/sites" className={buttonVariants({ variant: "secondary", size: "md" })}>
               All websites
               <ArrowRight size={20} strokeWidth={1.75} aria-hidden />

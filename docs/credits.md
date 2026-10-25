@@ -115,4 +115,4 @@ Run the AI jobs with `pnpm job:ai` (or `pnpm job:ai-monthly`, `pnpm job:ai-expir
 
 - Referral and purchase hooks.
 - Credit calibration against real usage.
-- AI credits page and admin credit tools.
+- Admin credit grant, adjustment and member-cap tools.

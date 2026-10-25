@@ -50,9 +50,9 @@ export default async function PlanPage({
       limit: plan.maxMembers,
     },
     {
-      label: "AI credits this month",
-      used: plan.aiMonthlyCredits,
-      limit: plan.aiMonthlyCredits,
+      label: "AI credits left",
+      used: data.usage.aiCredits ?? 0,
+      limit: null,
     },
     {
       label: "Storage (MB)",
@@ -126,7 +126,9 @@ export default async function PlanPage({
                       <span className="text-text-muted">
                         {item.label === "Storage (MB)"
                           ? `${item.used} MB / ${limit === 0 ? "—" : `${limit} MB`}`
-                          : `${item.used} / ${limit === 0 ? "—" : limit}`}
+                          : item.label === "AI credits left"
+                            ? `${item.used}`
+                            : `${item.used} / ${limit === 0 ? "—" : limit}`}
                       </span>
                     </div>
                     {limit > 0 ? (

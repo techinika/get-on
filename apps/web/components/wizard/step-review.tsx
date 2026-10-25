@@ -7,6 +7,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FREE_SUFFIX } from "@/lib/address";
 import { cn } from "@/lib/utils";
+import type { StartChoice } from "./types";
 
 const GRADIENTS: ReadonlyArray<readonly [string, string]> = [
   ["#F5A524", "#E8743B"],
@@ -56,6 +57,7 @@ export function StepReview({
   name,
   address,
   businessType,
+  startChoice,
   includeContactForm,
   submitError,
   limitReached,
@@ -64,6 +66,7 @@ export function StepReview({
   name: string;
   address: string;
   businessType: string;
+  startChoice: StartChoice;
   includeContactForm: boolean;
   submitError: string | null;
   limitReached: boolean;
@@ -134,6 +137,17 @@ export function StepReview({
             editLabel="business type"
           >
             {businessType || "—"}
+          </SummaryRow>
+          <SummaryRow
+            label="Starting point"
+            onEdit={() => onEditStep(4)}
+            editLabel="starting point"
+          >
+            {startChoice === "ai"
+              ? "AI writes my first page"
+              : startChoice === "template"
+                ? "A ready-made design"
+                : "A blank page"}
           </SummaryRow>
           <SummaryRow
             label="Contact form"

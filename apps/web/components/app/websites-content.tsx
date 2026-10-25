@@ -125,7 +125,7 @@ export function WebsitesContent({
           <UsageCell
             icon={<Sparkles size={20} strokeWidth={1.75} aria-hidden />}
             label="AI credits left"
-            value={`${aiCredits} of ${aiCredits}`}
+            value={`${aiCredits}`}
             ratio={0}
             className="min-[768px]:pl-6"
           />

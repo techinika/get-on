@@ -271,7 +271,16 @@ export function Wizard({
         } catch {
           // Ignore storage failures.
         }
-        router.push(`/dashboard/projects/${data.project.id}`);
+        const ai = isRecord(data.ai) ? data.ai : null;
+        const aiStatus = ai && typeof ai.status === "string" ? ai.status : null;
+        const aiCode = ai && typeof ai.code === "string" ? ai.code : null;
+        const query =
+          aiStatus === "failed" || aiStatus === "fallback"
+            ? `?ai=failed${aiCode ? `&code=${encodeURIComponent(aiCode)}` : ""}`
+            : aiStatus === "ready"
+              ? "?ai=ready"
+              : "";
+        router.push(`/dashboard/projects/${data.project.id}${query}`);
         return;
       }
 
@@ -398,6 +407,7 @@ export function Wizard({
                 name={state.name.trim()}
                 address={effectiveAddress}
                 businessType={state.businessType}
+                startChoice={state.startChoice}
                 includeContactForm={state.includeContactForm}
                 submitError={submitError}
                 limitReached={limitReached}
@@ -420,13 +430,17 @@ export function Wizard({
         </div>
 
         <WizardActions
-          showBack={state.step > 1 && !limitReached}
+          showBack={state.step > 1 && !limitReached && !submitting}
           onBack={() => setStep(state.step - 1)}
           onContinue={handleContinue}
           continueDisabled={!canContinue}
           continueLabel={state.step === TOTAL_STEPS ? "Create my website" : "Continue"}
           continueLoading={submitting}
-          continueLoadingLabel="Setting up your website..."
+          continueLoadingLabel={
+            state.startChoice === "ai"
+              ? "Writing your pages..."
+              : "Setting up your website..."
+          }
         />
       </main>
     </div>

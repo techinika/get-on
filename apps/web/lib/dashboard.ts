@@ -81,6 +81,18 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     teams.find((team) => team.isPersonal) ??
     teams[0]!;
 
+  const { data: balance, error: balanceError } = await supabase.rpc(
+    "ai_balance",
+    { p_team: currentTeam.id },
+  );
+  const aiCredits = balanceError
+    ? (PLAN_BY_ID[currentTeam.planId]?.aiMonthlyCredits ?? 0)
+    : Number(
+        balance && typeof balance === "object"
+          ? (balance as { total?: unknown }).total ?? 0
+          : 0,
+      );
+
   const [{ data: projects }, { count: memberCount }] = await Promise.all([
     supabase
       .from("projects")
@@ -200,6 +212,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       websites: shellProjects.length,
       members: memberCount ?? 0,
       storageBytes,
+      aiCredits: Number.isFinite(aiCredits) ? aiCredits : 0,
     },
   };
 });

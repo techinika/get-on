@@ -180,7 +180,8 @@ Do not invent facts, numbers, awards, prices, guarantees or reviews. Keep headin
             .map((item) => `${item.path.join(".")}: ${item.message}`),
         };
       }
-      return blocksFromDraft(parsed.data);
+      const built = blocksFromDraft(parsed.data);
+      return built.ok ? { ok: true, data: built.data } : built;
     },
   },
   "section.generate": {
@@ -211,7 +212,8 @@ Do not invent facts, numbers, awards, prices, guarantees or reviews. Keep headin
             .map((item) => `${item.path.join(".")}: ${item.message}`),
         };
       }
-      return blocksFromDraft(parsed.data);
+      const built = blocksFromDraft(parsed.data);
+      return built.ok ? { ok: true, data: built.data } : built;
     },
   },
 };

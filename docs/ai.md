@@ -1,6 +1,6 @@
 # AI generation
 
-Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can create a picture with AI (when images are enabled) and describe a picture with AI. The rest of the AI UI, admin console, evaluation runner and the remaining generation tasks are still to be built.
+Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can create a picture with AI (when images are enabled) and describe a picture with AI. The AI credits page, the admin AI settings/model/usage console, the wizard AI first-page flow and a page-editor AI section composer are built. The rest of the AI UI, evaluation runner and the remaining generation tasks are still to be built.
 
 ## Invariants
 

@@ -7,12 +7,14 @@ import { AppPage } from "@/components/app/app-page";
 import { RenderPage, SiteRoot, SiteHeader, SiteFooter } from "@get-on/renderer";
 import { migrateContent } from "@get-on/blocks";
 import { parseTheme } from "@/lib/publishing/build-input";
+import { getCurrentTeam } from "@/lib/team";
+import { AiSectionComposer } from "./ai-section-composer";
 
 type Params = { params: Promise<{ projectId: string; pageId: string }> };
 
 export default async function PageEditorPage({ params }: Params) {
   const { projectId, pageId } = await params;
-  const supabase = await createClient();
+  const [current, supabase] = await Promise.all([getCurrentTeam(), createClient()]);
 
   const [{ data: project }, { data: pageData }, { data: settingsRow }] =
     await Promise.all([
@@ -113,6 +115,11 @@ export default async function PageEditorPage({ params }: Params) {
             </div>
           </div>
         </Card>
+
+        {current &&
+        ["owner", "admin", "editor"].includes(current.team.role) ? (
+          <AiSectionComposer projectId={projectId} pageId={pageId} />
+        ) : null}
 
         <Card className="p-6">
           <details className="group">
