@@ -83,6 +83,18 @@ export default async function AdminOperationsPage() {
         </AppCard>
       </div>
 
+      {hosts.length >= config.includedHostnames * 0.8 ||
+      pending >= config.maxPendingHostnames * 0.8 ? (
+        <InfoBox variant="warning" className="mt-5">
+          {hosts.length >= config.includedHostnames * 0.8
+            ? `${hosts.length} hostnames are close to the included ${config.includedHostnames}. Check Cloudflare pricing before adding more. `
+            : ""}
+          {pending >= config.maxPendingHostnames * 0.8
+            ? `${pending} addresses are waiting, close to the ${config.maxPendingHostnames} limit. New addresses may be refused.`
+            : ""}
+        </InfoBox>
+      ) : null}
+
       <InfoBox variant="info" className="mt-5">
         Job runs: <code className="font-mono text-xs">pnpm job:domains-poll</code> checks hostnames,{" "}
         <code className="font-mono text-xs">pnpm job:domains-health</code> checks live addresses, and{" "}
