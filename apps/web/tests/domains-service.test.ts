@@ -124,6 +124,22 @@ class FakeSupabase {
     const domains = this.rows.domains!;
     const hosts = this.rows.domain_hostnames!;
     if (name === "start_domain") {
+      const existing = domains.find(
+        (row) =>
+          row.team_id === "team-1" &&
+          row.registrable === args.p_registrable &&
+          !["removed", "failed"].includes(String(row.status)),
+      );
+      if (existing) {
+        if (existing.project_id && existing.project_id !== args.p_project_id) {
+          return { data: null, error: { message: "DOMAIN_ALREADY_CONNECTED" } };
+        }
+        if (!existing.project_id) {
+          existing.project_id = args.p_project_id;
+          if (existing.status === "unassigned") existing.status = "verified";
+        }
+        return { data: existing.id, error: null };
+      }
       const id = `dom-${domains.length + 1}`;
       domains.push({
         id,
@@ -391,6 +407,21 @@ describe("domain service", () => {
     const verified = await service.verifyDomain(started.id);
     expect(verified.status).toBe("found");
     expect(verified.domain.status).toBe("verified");
+  });
+
+  it("refuses to start a domain that another website already uses", async () => {
+    const { service, db } = setup();
+    db.rows.projects!.push({
+      id: "project-2",
+      subdomain: "other",
+      redirect_free_address: true,
+      primary_host: null,
+    });
+    await service.startDomain({ projectId: "project-1", domain: "rosebakery.com" });
+
+    await expect(
+      service.startDomain({ projectId: "project-2", domain: "rosebakery.com" }),
+    ).rejects.toMatchObject({ code: "DOMAIN_ALREADY_CONNECTED" });
   });
 
   it("holds a brand domain for review before an address can be added", async () => {

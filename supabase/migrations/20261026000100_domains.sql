@@ -459,6 +459,7 @@ declare
   v_count int;
   v_today int;
   v_id uuid;
+  v_existing_project uuid;
   v_value text;
   v_reg text := lower(trim(p_registrable));
 begin
@@ -495,13 +496,23 @@ begin
     raise exception 'DOMAIN_PLAN';
   end if;
 
-  select id into v_id
+  select id, project_id into v_id, v_existing_project
   from public.domains
   where team_id = v_team_id
     and registrable = v_reg
     and status not in ('removed','failed')
   limit 1;
   if v_id is not null then
+    if v_existing_project is not null and v_existing_project <> p_project_id then
+      raise exception 'DOMAIN_ALREADY_CONNECTED';
+    end if;
+    if v_existing_project is null then
+      update public.domains
+      set project_id = p_project_id,
+          status = case when status = 'unassigned' then 'verified' else status end,
+          status_reason = null
+      where id = v_id;
+    end if;
     return v_id;
   end if;
 

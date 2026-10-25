@@ -70,7 +70,11 @@ export function AddressManager({
   const mainHost = hostnames.find(
     (host) => host.role === "main" && host.status === "live",
   );
-  const atLimit = domains.filter((domain) => domain.status !== "removed").length >= limit;
+  const countedDomains = domains.filter(
+    (domain) =>
+      !["draft", "removed", "failed", "plan_lapsed"].includes(domain.status),
+  );
+  const atLimit = countedDomains.length >= limit;
   const connectHref = `/dashboard/projects/${projectId}/settings/address/connect`;
 
   async function run(key: string, work: () => Promise<{ ok: boolean; error?: string }>) {
@@ -152,7 +156,7 @@ export function AddressManager({
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="text-[17px] font-semibold text-text">Your domains</h2>
           <p className="text-sm text-text-muted">
-            {domains.filter((domain) => domain.status !== "removed").length} of {limit}
+            {countedDomains.length} of {limit}
           </p>
         </div>
 
