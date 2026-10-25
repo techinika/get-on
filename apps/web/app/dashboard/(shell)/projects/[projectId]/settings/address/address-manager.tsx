@@ -16,6 +16,7 @@ import type { Domain, DomainHostname } from "@/lib/domains/types";
 import { DomainStatusBadge, HostnameStatusBadge } from "./address-status";
 import {
   checkDomainAction,
+  detachDomainAction,
   refreshAddressAction,
   removeDomainAction,
   saveAddressOptionsAction,
@@ -65,6 +66,7 @@ export function AddressManager({
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
+  const [detachId, setDetachId] = useState<string | null>(null);
   const [redirect, setRedirectChoice] = useState(redirectFreeAddress);
   const [savingRedirect, setSavingRedirect] = useState(false);
 
@@ -281,6 +283,9 @@ export function AddressManager({
                     >
                       Check now
                     </Button>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setDetachId(domain.id)}>
+                      Disconnect
+                    </Button>
                     <Button type="button" size="sm" variant="ghost" onClick={() => setRemoveId(domain.id)}>
                       Remove
                     </Button>
@@ -380,6 +385,41 @@ export function AddressManager({
       {message ? (
         <p className="max-w-[760px] text-sm text-danger-text" role="alert">{message}</p>
       ) : null}
+
+      <Dialog
+        open={detachId !== null}
+        onClose={() => setDetachId(null)}
+        title="Disconnect this domain?"
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setDetachId(null)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              loading={busy === "detach"}
+              loadingLabel="Disconnecting..."
+              onClick={() =>
+                void run("detach", async () => {
+                  const result = await detachDomainAction(projectId, detachId!);
+                  if (result.ok) {
+                    setDetachId(null);
+                    router.refresh();
+                  }
+                  return result.ok ? { ok: true } : { ok: false, error: result.error };
+                })
+              }
+            >
+              Disconnect
+            </Button>
+          </>
+        }
+      >
+        <p className="text-[15px] text-text-muted">
+          This stops using the domain on this website. The domain stays in your
+          account, and you can use it on another website later.
+        </p>
+      </Dialog>
 
       <Dialog
         open={removeId !== null}
