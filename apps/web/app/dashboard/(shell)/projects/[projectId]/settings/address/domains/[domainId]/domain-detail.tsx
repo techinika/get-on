@@ -37,6 +37,7 @@ import {
   refreshAddressAction,
   removeDomainAction,
   saveAddressOptionsAction,
+  saveAutoPublishAction,
   setMainAddressAction,
 } from "../../actions";
 
@@ -112,6 +113,7 @@ export function DomainDetail({
   events,
   freeUrl,
   redirectFreeAddress,
+  autoPublish: initialAutoPublish,
   websites,
   canManage,
   tab,
@@ -122,6 +124,7 @@ export function DomainDetail({
   events: DomainEventRow[];
   freeUrl: string;
   redirectFreeAddress: boolean;
+  autoPublish: boolean;
   websites: { id: string; name: string }[];
   canManage: boolean;
   tab: Tab;
@@ -138,6 +141,8 @@ export function DomainDetail({
   const [confirmName, setConfirmName] = useState("");
   const [redirect, setRedirect] = useState(redirectFreeAddress);
   const [savingRedirect, setSavingRedirect] = useState(false);
+  const [autoPublish, setAutoPublish] = useState(initialAutoPublish);
+  const [savingAutoPublish, setSavingAutoPublish] = useState(false);
 
   const addressHref = `/dashboard/projects/${projectId}/settings/address`;
   const connectHref = `${addressHref}/connect?domain=${domain.id}`;
@@ -185,6 +190,20 @@ export function DomainDetail({
     setPendingMain(null);
     toast("Main address changed. Publish to update your sitemap and links.");
     router.refresh();
+  }
+
+  async function saveAutoPublish(next: boolean) {
+    setAutoPublish(next);
+    setSavingAutoPublish(true);
+    setError(null);
+    const result = await saveAutoPublishAction(projectId, next);
+    setSavingAutoPublish(false);
+    if (!result.ok) {
+      setAutoPublish(!next);
+      setError(result.error);
+      return;
+    }
+    toast("Auto-publish setting saved");
   }
 
   async function saveRedirect(next: boolean) {
@@ -574,6 +593,16 @@ export function DomainDetail({
               />
             </AppCard>
           ) : null}
+
+          <AppCard className="p-5">
+            <Switch
+              checked={autoPublish}
+              onCheckedChange={saveAutoPublish}
+              disabled={!canManage || savingAutoPublish}
+              label="Publish automatically when this address goes live"
+              description="We only do this if you have no unfinished changes."
+            />
+          </AppCard>
 
           <AppCard className="p-5">
             <div className="flex items-start gap-3">

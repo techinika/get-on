@@ -209,6 +209,23 @@ export async function detachDomainAction(
   }
 }
 
+export async function saveAutoPublishAction(
+  projectId: string,
+  enabled: boolean,
+): Promise<AddressResult<null>> {
+  const ctx = await context(projectId);
+  if ("error" in ctx) return { ok: false, error: ctx.error ?? "Please try again." };
+  const { error } = await ctx.supabase
+    .from("project_settings")
+    .upsert(
+      { project_id: projectId, auto_publish_on_domain: enabled },
+      { onConflict: "project_id" },
+    );
+  if (error) return { ok: false, error: "We could not save that. Please try again." };
+  invalidate(projectId);
+  return { ok: true, data: null };
+}
+
 export async function saveAddressOptionsAction(
   projectId: string,
   formData: FormData,

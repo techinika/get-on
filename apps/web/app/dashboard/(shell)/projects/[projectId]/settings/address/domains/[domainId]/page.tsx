@@ -58,6 +58,12 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
     .order("created_at", { ascending: false })
     .limit(50);
 
+  const { data: settings } = await supabase
+    .from("project_settings")
+    .select("auto_publish_on_domain")
+    .eq("project_id", projectId)
+    .maybeSingle();
+
   const freeUrl = project.subdomain
     ? siteAddress(readPublishConfig(), project.subdomain)
     : "";
@@ -102,6 +108,7 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
       events={(eventRows ?? []) as DomainEventRow[]}
       freeUrl={freeUrl}
       redirectFreeAddress={project.redirect_free_address !== false}
+      autoPublish={settings?.auto_publish_on_domain !== false}
       websites={websites.map(({ id, name }) => ({ id, name }))}
       canManage={current.team.role === "owner" || current.team.role === "admin"}
       tab={tab === "settings" || tab === "activity" ? tab : "overview"}
