@@ -5,11 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { asDomainError } from "@/lib/domains/errors";
 import { DomainService } from "@/lib/domains/service";
+import { can } from "@/lib/permissions";
 
 export type TeamDomainResult = { ok: true } | { ok: false; error: string };
 
 function canManage(role: string): boolean {
-  return role === "owner" || role === "admin";
+  return can(role as "owner" | "admin" | "editor" | "viewer", "site.domains");
 }
 
 export async function attachDomainAction(

@@ -134,6 +134,7 @@ export function AppShell({
         collapsed={collapsed}
         onToggleCollapsed={toggleSidebar}
         isAdmin={isAdmin}
+        role={currentTeam.role}
       />
 
       <main

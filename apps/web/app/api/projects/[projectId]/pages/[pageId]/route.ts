@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { PAGE_COLUMNS, requireProject } from "../_lib";
 import { invalidateQuickFind, touchProject } from "@/lib/project-activity";
+import { can } from "@/lib/permissions";
+import { logActivity } from "@/lib/activity";
 
 type Params = { params: Promise<{ projectId: string; pageId: string }> };
 
@@ -23,7 +25,7 @@ export async function PATCH(request: Request, { params }: Params) {
   if (!guard.ok) return guard.response;
   const ctx = guard.ctx;
 
-  if (ctx.current.team.role === "viewer") {
+  if (!can(ctx.current.team.role, "page.edit")) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
   }
 
@@ -96,6 +98,7 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   updates.updated_at = new Date().toISOString();
+  updates.updated_by = ctx.current.user.id;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 400 });
@@ -113,6 +116,17 @@ export async function PATCH(request: Request, { params }: Params) {
   }
 
   await touchProject(ctx.supabase, projectId);
+  await ctx.supabase
+    .from("projects")
+    .update({ last_edited_by: ctx.current.user.id, last_edited_at: new Date().toISOString() })
+    .eq("id", projectId);
+  await logActivity({
+    projectId,
+    actorUserId: ctx.current.user.id,
+    event: "page.edited",
+    summary: `${ctx.current.user.email ?? "Someone"} edited the page ${updated.title}`,
+    meta: { pageId },
+  });
   invalidateQuickFind(ctx.current.team.teamId);
 
   return NextResponse.json({ page: updated });
@@ -124,13 +138,13 @@ export async function DELETE(_request: Request, { params }: Params) {
   if (!guard.ok) return guard.response;
   const ctx = guard.ctx;
 
-  if (ctx.current.team.role === "viewer") {
+  if (!can(ctx.current.team.role, "page.edit")) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
   }
 
   const { data: page } = await ctx.supabase
     .from("pages")
-    .select("id, is_homepage")
+    .select("id, title, is_homepage")
     .eq("id", pageId)
     .eq("project_id", projectId)
     .maybeSingle();
@@ -148,6 +162,13 @@ export async function DELETE(_request: Request, { params }: Params) {
   }
 
   await touchProject(ctx.supabase, projectId);
+  await logActivity({
+    projectId,
+    actorUserId: ctx.current.user.id,
+    event: "page_deleted",
+    summary: `${ctx.current.user.email ?? "Someone"} deleted the page ${page.title}`,
+    meta: { pageId },
+  });
   invalidateQuickFind(ctx.current.team.teamId);
 
   return NextResponse.json({ ok: true });

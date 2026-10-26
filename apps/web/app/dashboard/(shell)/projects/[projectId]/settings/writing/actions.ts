@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { logActivity } from "@/lib/activity";
+import { can } from "@/lib/permissions";
 import { parseWritingStyle } from "./style";
 
 export type WritingStyleResult = { ok: true } | { ok: false; error: string };
@@ -11,7 +12,7 @@ export type WritingStyleResult = { ok: true } | { ok: false; error: string };
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 function canEdit(role: string) {
-  return role === "owner" || role === "admin" || role === "editor";
+  return can(role as "owner" | "admin" | "editor" | "viewer", "page.edit");
 }
 
 async function findProject(

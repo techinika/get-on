@@ -4,6 +4,7 @@
  */
 const ERROR_MESSAGES: Record<string, string> = {
   LIMIT_WEBSITES_REACHED: "You have reached the number of websites your plan includes.",
+  WEBSITE_CREATE_RATE: "You have created a few websites today. Please try again later.",
   LIMIT_PAGES_REACHED: "You have reached the number of pages your plan includes.",
   SUBDOMAIN_TAKEN: "That web address is taken. Try one of these.",
   SUBDOMAIN_RESERVED: "That web address cannot be used. Please pick another.",

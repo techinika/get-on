@@ -5,17 +5,37 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { PendingForm, SubmitButton } from "@/components/auth/pending-form";
 import { Input, Label } from "@/components/ui/input";
 
-export function SignupForm({ enableGoogleAuth }: { enableGoogleAuth: boolean }) {
+export function SignupForm({
+  enableGoogleAuth,
+  next,
+  email,
+}: {
+  enableGoogleAuth: boolean;
+  next?: string;
+  email?: string;
+}) {
   return (
     <>
       <PendingForm action="/auth/sign-up" method="post" className="mt-6 flex flex-col gap-4">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="signup-name">Full name</Label>
           <Input id="signup-name" name="fullName" autoComplete="name" required />
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="signup-email">Email</Label>
-          <Input id="signup-email" type="email" name="email" autoComplete="email" required />
+          <Input
+            id="signup-email"
+            type="email"
+            name="email"
+            autoComplete="email"
+            defaultValue={email}
+            readOnly={Boolean(email)}
+            required
+          />
+          {email ? (
+            <p className="text-[13px] text-text-muted">This invitation is for this email address.</p>
+          ) : null}
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="signup-password">Password</Label>

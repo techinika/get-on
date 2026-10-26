@@ -8,6 +8,8 @@ import { friendlyError } from "@/lib/errors";
 import { invalidateQuickFind } from "@/lib/project-activity";
 import { templateAvailable, templateBySlug } from "@/lib/templates/catalog";
 import { generatePageWithAi } from "@/lib/ai/actions";
+import { getQuota } from "@/lib/quotas";
+import { logTeamActivity } from "@/lib/activity/log";
 
 export const maxDuration = 90;
 
@@ -49,14 +51,21 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const plan = planLimits(current.team.planId);
-
-  const { count } = await supabase
-    .from("projects")
-    .select("id", { count: "exact", head: true })
-    .eq("team_id", current.team.teamId);
-
-  if (plan.maxWebsites !== null && (count ?? 0) >= plan.maxWebsites) {
+  const quota = await getQuota(current.team.teamId);
+  if (quota && quota.max_websites !== null && quota.active_sites >= quota.max_websites) {
     return NextResponse.json({ error: "LIMIT_WEBSITES_REACHED" }, { status: 403 });
+  }
+
+  const dayAgo = new Date(Date.now() - 864e5).toISOString();
+  const hourAgo = new Date(Date.now() - 36e5).toISOString();
+  const [{ count: teamDay }, { count: userHour }] = await Promise.all([
+    supabase.from("projects").select("id", { count: "exact", head: true })
+      .eq("team_id", current.team.teamId).gte("created_at", dayAgo),
+    supabase.from("projects").select("id", { count: "exact", head: true })
+      .eq("team_id", current.team.teamId).eq("created_by", current.user.id).gte("created_at", hourAgo),
+  ]);
+  if ((teamDay ?? 0) >= 5 || (userHour ?? 0) >= 3) {
+    return NextResponse.json({ error: "WEBSITE_CREATE_RATE" }, { status: 429 });
   }
 
   const { data: available } = await supabase.rpc("is_subdomain_available", {
@@ -73,6 +82,10 @@ export async function POST(request: Request) {
       name,
       subdomain: address,
       status: "draft",
+      created_by: current.user.id,
+      created_via: templateSlug ? "template" : startChoice === "ai" ? "ai" : "wizard",
+      last_edited_by: current.user.id,
+      last_edited_at: new Date().toISOString(),
       stats_site_key: crypto.randomUUID().replaceAll("-", "").slice(0, 16),
       settings: {
         businessType,
@@ -116,9 +129,9 @@ export async function POST(request: Request) {
     });
     if (pluginError) {
       try {
-        await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", project.id);
-      } catch {
         await supabase.from("projects").delete().eq("id", project.id);
+      } catch {
+        console.error("[projects] could not roll back a failed website");
       }
       return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
     }
@@ -144,9 +157,9 @@ export async function POST(request: Request) {
       .single();
     if (themeError || !insertedSettings) {
       try {
-        await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", project.id);
-      } catch {
         await supabase.from("projects").delete().eq("id", project.id);
+      } catch {
+        console.error("[projects] could not roll back a failed website");
       }
       return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
     }
@@ -176,14 +189,22 @@ export async function POST(request: Request) {
 
     if (pageError) {
       try {
-        await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", project.id);
-      } catch {
         await supabase.from("projects").delete().eq("id", project.id);
+      } catch {
+        console.error("[projects] could not roll back a failed website");
       }
       return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
     }
 
     invalidateQuickFind(current.team.teamId);
+    await logTeamActivity({
+      teamId: current.team.teamId,
+      actor: { userId: current.user.id },
+      event: "website_created",
+      summary: `${current.user.email ?? "Someone"} created the website ${name} from the ${templateBySlug(templateSlug)?.name ?? "template"} template`,
+      project: { id: project.id, name },
+      meta: { via: "template", template: templateBySlug(templateSlug)?.name ?? templateSlug },
+    });
     return NextResponse.json({ project }, { status: 201 });
   }
 
@@ -212,14 +233,23 @@ export async function POST(request: Request) {
 
   if (pageError || !insertedPage) {
     try {
-      await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", project.id);
-    } catch {
       await supabase.from("projects").delete().eq("id", project.id);
+    } catch {
+      console.error("[projects] could not roll back a failed website");
     }
     return NextResponse.json({ error: "UNKNOWN" }, { status: 500 });
   }
 
   invalidateQuickFind(current.team.teamId);
+
+  await logTeamActivity({
+    teamId: current.team.teamId,
+    actor: { userId: current.user.id },
+    event: "website_created",
+    summary: `${current.user.email ?? "Someone"} created the website ${name}${startChoice === "ai" ? " with AI" : ""}`,
+    project: { id: project.id, name },
+    meta: { via: startChoice === "ai" ? "ai" : "wizard" },
+  });
 
   if (startChoice === "ai") {
     const brief = [

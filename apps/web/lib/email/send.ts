@@ -10,6 +10,16 @@ export type EmailKind =
   | "demo_request_ack"
   | "abuse_report_alert"
   | "admin_alert"
+  | "team_invite"
+  | "team_invite_reminder"
+  | "member_removed"
+  | "member_role_changed"
+  | "team_ownership_transferred"
+  | "seats_paused"
+  | "invite_accepted"
+  | "invite_declined"
+  | "referral_reward"
+  | "website_transfer"
   | "auth";
 
 export type SendEmailInput = {
@@ -30,7 +40,21 @@ export type SendEmailResult = {
   messageId: string | null;
 };
 
-const CRITICAL_KINDS = new Set(["auth", "recipient_verification", "admin_alert"]);
+const CRITICAL_KINDS = new Set([
+  "auth",
+  "recipient_verification",
+  "admin_alert",
+  "team_invite",
+  "team_invite_reminder",
+  "member_removed",
+  "member_role_changed",
+  "team_ownership_transferred",
+  "seats_paused",
+  "invite_accepted",
+  "invite_declined",
+  "referral_reward",
+  "website_transfer",
+]);
 const RETRY_MINUTES = [1, 5, 30, 60];
 const MAX_ATTEMPTS = 4;
 const TIMEOUT_MS = 8000;

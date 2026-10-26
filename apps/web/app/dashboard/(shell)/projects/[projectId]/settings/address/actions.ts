@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { asDomainError } from "@/lib/domains/errors";
+import { can } from "@/lib/permissions";
 import { DomainService } from "@/lib/domains/service";
 import type { Domain, DomainHostname, HostnameMode, HostnameRole } from "@/lib/domains/types";
 
@@ -14,7 +15,7 @@ export type AddressResult<T> =
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 function canManage(role: string): boolean {
-  return role === "owner" || role === "admin";
+  return can(role as "owner" | "admin" | "editor" | "viewer", "site.domains");
 }
 
 function messageFor(error: unknown): string {

@@ -3,10 +3,10 @@
 alter table plans add column if not exists max_deleted_pending int not null default 2;
 alter table plans add column if not exists activity_retention_days int not null default 730;
 
-update plans set max_deleted_pending = 2 where code = 'free';
-update plans set max_deleted_pending = 3 where code = 'basic';
-update plans set max_deleted_pending = 5 where code = 'pro';
-update plans set max_deleted_pending = 10 where code = 'enterprise';
+update plans set max_deleted_pending = 2 where id = 'free';
+update plans set max_deleted_pending = 3 where id = 'basic';
+update plans set max_deleted_pending = 5 where id = 'pro';
+update plans set max_deleted_pending = 10 where id = 'enterprise';
 
 update plans set activity_retention_days = 730 where activity_retention_days is null or activity_retention_days = 0;
 

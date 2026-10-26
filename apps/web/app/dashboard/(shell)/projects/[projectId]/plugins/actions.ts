@@ -6,6 +6,7 @@ import { recipientVerificationEmail } from "@get-on/email";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTeam } from "@/lib/team";
+import { can } from "@/lib/permissions";
 import { sendEmail, isSuppressed } from "@/lib/email/send";
 import { parseContactSettings, type ContactSettings } from "@/lib/contact/settings";
 import { invalidateQuickFind } from "@/lib/project-activity";
@@ -41,7 +42,7 @@ async function guard(projectId: string): Promise<
 > {
   const current = await getCurrentTeam();
   if (!current) return { ok: false, error: "Please sign in again." };
-  if (current.team.role !== "owner" && current.team.role !== "admin") {
+  if (!can(current.team.role, "site.plugins")) {
     return { ok: false, error: "NOT_ALLOWED" };
   }
   const supabase = await createClient();

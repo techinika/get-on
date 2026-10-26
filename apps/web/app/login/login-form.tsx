@@ -6,13 +6,22 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { PendingForm, SubmitButton } from "@/components/auth/pending-form";
 import { Input, Label } from "@/components/ui/input";
 
-export function LoginForm({ enableGoogleAuth }: { enableGoogleAuth: boolean }) {
+export function LoginForm({
+  enableGoogleAuth,
+  next,
+  email,
+}: {
+  enableGoogleAuth: boolean;
+  next?: string;
+  email?: string;
+}) {
   return (
     <>
       <PendingForm action="/auth/login" method="post" className="mt-6 flex flex-col gap-4">
+        {next ? <input type="hidden" name="next" value={next} /> : null}
         <div className="flex flex-col gap-1.5">
           <Label htmlFor="login-email">Email</Label>
-          <Input id="login-email" type="email" name="email" autoComplete="email" required />
+          <Input id="login-email" type="email" name="email" autoComplete="email" defaultValue={email} required />
         </div>
         <div className="flex justify-end">
           <Link href="/forgot-password" className="text-sm text-primary">
