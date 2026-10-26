@@ -1,6 +1,6 @@
 # Amazon SES setup for Get-On
 
-This document describes the steps to send all platform emails through Amazon SES from `team@get-on.tech`.
+This document describes the steps to send all platform emails through Amazon SES. Normal platform mail uses `team@get-on.tech`; billing mail uses `billing@contact.get-on.tech`.
 
 ## 1) Verify the domain
 1. In SES, go to **Verified identities** → **Create identity** → **Domain** and enter `get-on.tech`.
@@ -9,7 +9,7 @@ This document describes the steps to send all platform emails through Amazon SES
 4. Wait for verification (can take a few minutes).
 
 ## 2) Custom MAIL FROM domain
-1. In the domain identity, set a custom MAIL FROM domain (e.g. `mail.get-on.tech`).
+1. In the domain identity, set a custom MAIL FROM domain (e.g. `contact.get-on.tech`).
 2. Add the MX record SES provides (priority as shown) and the SPF TXT record (`v=spf1 include:amazonses.com ~all` or as instructed).
 3. Verify the MAIL FROM domain in SES.
 
@@ -38,6 +38,11 @@ In SES, go to **SMTP settings → Create SMTP credentials**. Use these in Supaba
 ## 8) Receive mail at team@get-on.tech
 Use Cloudflare Email Routing to forward `team@get-on.tech` to a real mailbox. Ensure SPF does not conflict between routing and SES sending; use the MAIL FROM domain to manage sending identity separately.
 
+## 8b) Verify billing@contact.get-on.tech
+1. Verify `contact.get-on.tech` as an SES identity (or add it to the verified `get-on.tech` domain setup).
+2. Confirm the address can send through the same configuration set.
+3. Set `BILLING_EMAIL=billing@contact.get-on.tech` in production. Billing receipts, renewal reminders and payment failure notices use this address with Reply-To `team@get-on.tech`; every other email keeps `team@get-on.tech`.
+
 ## 9) Testing
 Use SES mailbox simulator addresses to test bounces/complaints: `bounce@simulator.amazonses.com`, `complaint@simulator.amazonses.com`, `success@simulator.amazonses.com`.
 
@@ -47,7 +52,8 @@ See `.env.example` for required values.
 ## App environment variables
 | Variable | Purpose |
 |---|---|
-| `TEAM_EMAIL` | From address. Defaults to `team@get-on.tech`. |
+| `TEAM_EMAIL` | Default From address. Defaults to `team@get-on.tech`. |
+| `BILLING_EMAIL` | Billing From address. Defaults to `billing@contact.get-on.tech`. Billing emails also use the display name `Get-On Billing`. |
 | `EMAIL_TRANSPORT` | `ses`, `console` or `memory`. When unset, SES is used if `AWS_ACCESS_KEY_ID` exists, otherwise console. |
 | `AWS_REGION` | SES region, e.g. `eu-west-1`. |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | IAM user credentials. Keep them server-side only. |

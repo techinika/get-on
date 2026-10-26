@@ -20,6 +20,15 @@ export type EmailKind =
   | "invite_declined"
   | "referral_reward"
   | "website_transfer"
+  | "billing_receipt"
+  | "billing_payment_failed"
+  | "billing_renewal_reminder"
+  | "billing_grace_started"
+  | "billing_lapsed"
+  | "billing_debt_reminder"
+  | "billing_invoice_expired"
+  | "billing_refund"
+  | "billing_grant"
   | "auth";
 
 export type SendEmailInput = {
@@ -29,6 +38,7 @@ export type SendEmailInput = {
   html: string;
   replyTo?: string;
   fromName?: string;
+  from?: string;
   kind: EmailKind | string;
   relatedType?: string;
   relatedId?: string;
@@ -54,6 +64,12 @@ const CRITICAL_KINDS = new Set([
   "invite_declined",
   "referral_reward",
   "website_transfer",
+  "billing_receipt",
+  "billing_payment_failed",
+  "billing_renewal_reminder",
+  "billing_grace_started",
+  "billing_lapsed",
+  "billing_refund",
 ]);
 const RETRY_MINUTES = [1, 5, 30, 60];
 const MAX_ATTEMPTS = 4;
@@ -134,6 +150,7 @@ function nextAttempt(attempts: number): string {
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const to = normaliseEmail(input.to);
   const subject = safeHeader(input.subject, 180);
+  const from = billingSender(input.kind);
   const admin = adminOrNull();
   if (!admin) {
     try {
@@ -141,6 +158,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
         ...input,
         to,
         subject,
+        from,
       });
       return { status: "sent", logId: null, messageId: result.id };
     } catch (error) {
@@ -195,7 +213,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   try {
-    const result = await sendWithTimeout({ ...input, to, subject });
+    const result = await sendWithTimeout({ ...input, to, subject, from });
     await admin
       .from("email_log")
       .update({
@@ -284,4 +302,11 @@ export async function processEmailQueue(limit = 50): Promise<{ processed: number
 export async function readMemoryOutbox() {
   const { memorySender } = await import("@get-on/email");
   return memorySender.messages;
+}
+
+
+/** Billing email uses its own verified identity; all other mail uses team@. */
+export function billingSender(kind: string): string | undefined {
+  if (!kind.startsWith("billing_")) return undefined;
+  return process.env.BILLING_EMAIL ?? "billing@contact.get-on.tech";
 }

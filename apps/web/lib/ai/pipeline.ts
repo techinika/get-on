@@ -123,7 +123,7 @@ export async function loadAccess(
   admin: Admin,
   teamId: string,
   userId: string,
-): Promise<{ planId: PlanId }> {
+): Promise<{ planId: PlanId; status: string }> {
   const { data: member } = await admin
     .from("team_members")
     .select("role")
@@ -140,12 +140,19 @@ export async function loadAccess(
     });
   }
 
-  const { data: team } = await admin
-    .from("teams")
-    .select("plan_id")
-    .eq("id", teamId)
-    .maybeSingle();
-  return { planId: ((team?.plan_id as PlanId) ?? "free") satisfies PlanId };
+  const { data, error } = await admin.rpc("billing_resolve_team", {
+    p_team: teamId,
+  });
+  if (error) {
+    throw new AiError("AI_PROVIDER_ERROR", {
+      details: { reason: "plan_lookup_failed" },
+    });
+  }
+  const access = (data ?? {}) as { plan_id?: string; status?: string };
+  return {
+    planId: ((access.plan_id as PlanId) ?? "free") satisfies PlanId,
+    status: access.status ?? "free",
+  };
 }
 
 export async function verifyProject(
@@ -327,7 +334,10 @@ async function runTextTaskWithConfig(
     const settings = await loadAiSettings(admin);
     if (!settings.enabled) throw new AiError("AI_DISABLED");
 
-    const { planId } = await loadAccess(admin, input.teamId, input.userId);
+    const { planId, status: accessStatus } = await loadAccess(admin, input.teamId, input.userId);
+    if (accessStatus === "lapsed") {
+      throw new AiError("AI_PLAN_INACTIVE");
+    }
     await verifyProject(admin, input.teamId, input.projectId);
     await checkRateLimits(admin, input.teamId, input.userId);
 

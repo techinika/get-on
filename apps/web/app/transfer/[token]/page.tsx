@@ -127,18 +127,23 @@ export default async function TransferPage({ params }: Params) {
   const teamIds = (memberships ?? []).map((row) => row.team_id);
   const [{ data: teams }, pageTotal, { data: siteRows }] = await Promise.all([
     teamIds.length
-      ? admin.from("teams").select("id, name, plan_id").in("id", teamIds)
-      : Promise.resolve({ data: [] as Array<{ id: string; name: string; plan_id: string }> }),
+      ? admin.from("teams").select("id, name").in("id", teamIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; name: string }> }),
     admin.from("pages").select("id", { count: "exact", head: true }).eq("project_id", project.id),
     teamIds.length
       ? admin.from("projects").select("team_id").in("team_id", teamIds).is("deleted_at", null)
       : Promise.resolve({ data: [] as Array<{ team_id: string }> }),
   ]);
-  const planIds = Array.from(new Set((teams ?? []).map((team) => team.plan_id)));
-  const { data: plans } = planIds.length
-    ? await admin.from("plans").select("id, max_websites, max_pages_per_site").in("id", planIds)
-    : { data: [] as Array<{ id: string; max_websites: number | null; max_pages_per_site: number | null }> };
-  const planById = new Map((plans ?? []).map((plan) => [plan.id, plan]));
+
+  type Limits = { maxWebsites: number | null; maxPagesPerSite: number | null };
+  const accessRows = await Promise.all(
+    (teams ?? []).map(async (team) => {
+      const { data } = await admin.rpc("billing_resolve_team", { p_team: team.id });
+      const limits = (data as { limits?: Limits } | null)?.limits;
+      return [team.id, limits ?? null] as const;
+    }),
+  );
+  const limitsByTeam = new Map(accessRows);
   const sitesByTeam = new Map<string, number>();
   for (const row of siteRows ?? []) {
     sitesByTeam.set(row.team_id, (sitesByTeam.get(row.team_id) ?? 0) + 1);
@@ -147,13 +152,16 @@ export default async function TransferPage({ params }: Params) {
   const roleByTeam = new Map((memberships ?? []).map((row) => [row.team_id, row.role]));
 
   const options: TeamOption[] = (teams ?? []).map((team) => {
-    const plan = planById.get(team.plan_id);
+    const limits = limitsByTeam.get(team.id);
     const used = sitesByTeam.get(team.id) ?? 0;
-    const siteRoom = plan?.max_websites === null || plan?.max_websites === undefined || used < plan.max_websites;
+    const siteRoom =
+      !limits ||
+      limits.maxWebsites === null ||
+      used < limits.maxWebsites;
     const pageRoom =
-      plan?.max_pages_per_site === null ||
-      plan?.max_pages_per_site === undefined ||
-      pages <= plan.max_pages_per_site;
+      !limits ||
+      limits.maxPagesPerSite === null ||
+      pages <= limits.maxPagesPerSite;
     return {
       id: team.id,
       name: team.name,

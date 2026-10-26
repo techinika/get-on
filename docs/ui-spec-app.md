@@ -1,18 +1,7 @@
 See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.
-
-# See also
-See also `docs/ui-spec-settings.md` for the Settings area.
-- docs/ui-spec-settings.md
-
-# See also
-See also `docs/ui-spec-settings.md` for the Settings area.
-- docs/ui-spec-settings.md
-
-See also `docs/ui-spec-templates.md` for the templates system.
-
-See also  for the templates system.
-
-See also  for the templates system.
+See `docs/ui-spec-billing.md` for Plan and billing, checkout, invoices and renewal; it wins where it conflicts.
+See `docs/ui-spec-settings.md` for the Settings area.
+See `docs/ui-spec-templates.md` for the templates system.
 
 # Get-On UI Specification v1 - Dashboard app
 

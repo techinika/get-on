@@ -167,7 +167,7 @@ export async function inviteMembers(input: {
 
   const { data: team } = await admin
     .from("teams")
-    .select("name, plan_id")
+    .select("name")
     .eq("id", teamId)
     .maybeSingle();
   if (!team) return { ok: false, error: "We could not find your team." };

@@ -12,6 +12,7 @@ export const AI_ERROR_CODES = [
   "AI_TOO_LONG",
   "AI_BUSY",
   "AI_IMAGES_OFF",
+  "AI_PLAN_INACTIVE",
 ] as const;
 
 export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
@@ -35,6 +36,8 @@ export const AI_ERROR_MESSAGES: Record<AiErrorCode, string> = {
   AI_TOO_LONG: "That is too long for AI to work with. Try a shorter piece.",
   AI_BUSY: "AI is already working on this website. Please wait a moment.",
   AI_IMAGES_OFF: "AI pictures are not available yet.",
+  AI_PLAN_INACTIVE:
+    "Your plan is not active right now. Renew it to use AI again.",
 };
 
 const RETRYABLE = new Set<AiErrorCode>([

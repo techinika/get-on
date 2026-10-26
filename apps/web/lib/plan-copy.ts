@@ -32,7 +32,7 @@ export const PLAN_COPY: Record<PlanId, PlanCopy> = {
   },
   basic: {
     descriptor: "For a small business site",
-    summary: "For a small business site. Up to two websites with five pages each.",
+    summary: "For a small business site. Two websites with up to five pages each.",
     priceLabel: "$7.99 per month",
     cta: "Choose Basic",
     ctaVariant: "primary",
@@ -98,7 +98,7 @@ export const COMPARE_ROWS: CompareRow[] = [
     label: "Support priority",
     values: { free: "Standard", basic: "Standard", pro: "Priority", enterprise: "Highest" },
   },
-  { label: "AI credits per month", values: { free: "10", basic: "100", pro: "400", enterprise: "1500" } },
+  { label: "AI credits per month", values: { free: "0", basic: "100", pro: "400", enterprise: "1,500" } },
   { label: "Picture storage", values: { free: "100 MB", basic: "1 GB", pro: "5 GB", enterprise: "25 GB" } },
   {
     label: "Subscriber emails per month",

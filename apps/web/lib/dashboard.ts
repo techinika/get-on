@@ -71,14 +71,25 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
         .in("id", teamIds)
     : { data: [] as TeamRow[] };
 
+  const accesses = await Promise.all(
+    (teamRows ?? []).map(async (team) => {
+      const { data } = await supabase.rpc("billing_resolve_team", { p_team: team.id });
+      return { teamId: team.id, access: (data ?? {}) as { plan_id?: string; status?: string } };
+    }),
+  );
+  const accessByTeam = new Map(accesses.map((row) => [row.teamId, row.access]));
+
   const teams: ShellTeam[] = (teamRows ?? []).map((team) => {
     const membership = rows.find((row) => row.team_id === team.id);
+    const access = accessByTeam.get(team.id);
+    const planId = (access?.plan_id as PlanId | undefined) ?? ((team.plan_id as PlanId) ?? "free");
     return {
       id: team.id,
       name: team.name,
-      planId: (team.plan_id as PlanId) ?? "free",
+      planId,
       role: (membership?.role ?? "viewer") as ShellRole,
       isPersonal: Boolean(team.is_personal),
+      billingStatus: (access?.status as ShellTeam["billingStatus"]) ?? "free",
     };
   });
 

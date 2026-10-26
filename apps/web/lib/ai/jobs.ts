@@ -30,7 +30,7 @@ export async function grantMonthlyCredits(
 
   const [{ data: plans }, { data: teams }] = await Promise.all([
     admin.from("plans").select("id, ai_monthly_credits"),
-    admin.from("teams").select("id, plan_id").neq("plan_id", "free"),
+    admin.from("teams").select("id"),
   ]);
 
   const amountByPlan = new Map(
@@ -43,7 +43,17 @@ export async function grantMonthlyCredits(
   let processed = 0;
   let failed = 0;
   for (const team of teams ?? []) {
-    const amount = amountByPlan.get(String(team.plan_id)) ?? 0;
+    const { data: access, error: accessError } = await admin.rpc(
+      "billing_resolve_team",
+      { p_team: team.id },
+    );
+    if (accessError) {
+      failed += 1;
+      console.error(`[ai] monthly plan lookup failed for ${team.id}`, accessError);
+      continue;
+    }
+    const planId = String((access as { plan_id?: string } | null)?.plan_id ?? "free");
+    const amount = amountByPlan.get(planId) ?? 0;
     if (amount <= 0) continue;
     const { error } = await admin.rpc("grant_credits", {
       p_team: team.id,

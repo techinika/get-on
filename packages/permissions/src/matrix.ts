@@ -34,6 +34,9 @@ export type Action =
   | "site.activity"
   | "plan.view"
   | "plan.manage"
+  | "billing.invoices"
+  | "billing.pay"
+  | "billing.notices"
   | "referral.use";
 
 export const matrix: Record<Action, Record<Role, boolean>> = {
@@ -70,6 +73,9 @@ export const matrix: Record<Action, Record<Role, boolean>> = {
   "site.activity": { owner: true, admin: true, editor: true, viewer: false },
   "plan.view": { owner: true, admin: true, editor: false, viewer: false },
   "plan.manage": { owner: true, admin: false, editor: false, viewer: false },
+  "billing.invoices": { owner: true, admin: true, editor: false, viewer: false },
+  "billing.pay": { owner: true, admin: false, editor: false, viewer: false },
+  "billing.notices": { owner: true, admin: true, editor: false, viewer: false },
   "referral.use": { owner: true, admin: true, editor: true, viewer: true },
 };
 
