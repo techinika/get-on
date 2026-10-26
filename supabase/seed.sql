@@ -48,5 +48,20 @@ values
   ('help'),
   ('blog'),
   ('ftp'),
-  ('dashboard')
+  ('dashboard'),
+  ('dashboard'),
+  ('dev'),
+  ('test'),
+  ('staging'),
+  ('beta'),
+  ('alpha'),
+  ('demo'),
+  ('portal'),
+  ('login'),
+  ('register'),
+  ('signup'),
+  ('secure'),
+  ('cdn'),
+  ('static'),
+  ('media')
 on conflict (name) do nothing;
