@@ -16,9 +16,9 @@ const SEED = readFileSync(
 
 function parseSeedPlans(): Map<string, Record<string, string>> {
   const plans = new Map<string, Record<string, string>>();
-  // Rows look like: ('free', 'Free', 0.00, 1, 1, 1, 1, 10, 100, 0, false, 0, true),
+  // Rows look like: ('free', 'Free', 0, 1, 1, 1, 1, 0, 30, 100, 100, false, 0, true),
   const rowRe =
-    /\('([a-z]+)',\s*'([^']+)',\s*([0-9.]+),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+),\s*(\d+),\s*(\d+),\s*(true|false),\s*(\d+),\s*(true|false)\)/g;
+    /\('([a-z]+)',\s*'([^']+)',\s*([0-9.]+),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+|null),\s*(\d+),\s*(\d+),\s*(\d+),\s*(\d+),\s*(true|false),\s*(\d+),\s*(true|false)\)/g;
   for (const m of SEED.matchAll(rowRe)) {
     plans.set(m[1]!, {
       name: m[2]!,
@@ -27,12 +27,13 @@ function parseSeedPlans(): Map<string, Record<string, string>> {
       maxPages: m[5]!,
       maxMembers: m[6]!,
       maxPlugins: m[7]!,
-      aiCredits: m[8]!,
-      storage: m[9]!,
-      emails: m[10]!,
-      customDomain: m[11]!,
-      customDomainsPerSite: m[12]!,
-      watermark: m[13]!,
+      aiMonthlyCredits: m[8]!,
+      aiDailyActions: m[9]!,
+      storage: m[10]!,
+      emails: m[11]!,
+      customDomain: m[12]!,
+      customDomainsPerSite: m[13]!,
+      watermark: m[14]!,
     });
   }
   return plans;
@@ -61,7 +62,8 @@ describe("plan definitions match the database seed", () => {
       expect(plan.maxPagesPerSite).toBe(num(row.maxPages));
       expect(plan.maxMembers).toBe(num(row.maxMembers));
       expect(plan.maxPlugins).toBe(num(row.maxPlugins));
-      expect(plan.aiCreditsMonthly).toBe(Number(row.aiCredits));
+      expect(plan.aiMonthlyCredits).toBe(Number(row.aiMonthlyCredits));
+      expect(plan.aiDailyActions).toBe(Number(row.aiDailyActions));
       expect(plan.storageMb).toBe(Number(row.storage));
       expect(plan.monthlyEmails).toBe(Number(row.emails));
       expect(plan.customDomainAllowed).toBe(bool(row.customDomain));

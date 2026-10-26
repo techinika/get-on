@@ -19,7 +19,7 @@ export default async function DashboardPage() {
       maxWebsites={plan.maxWebsites}
       memberCount={data.usage.members}
       maxMembers={plan.maxMembers}
-      aiCredits={plan.aiCreditsMonthly}
+      aiCredits={data.usage.aiCredits ?? 0}
       websites={data.projects.map((project) => ({
         id: project.id,
         name: project.name,

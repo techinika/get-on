@@ -1,3 +1,5 @@
+See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.
+
 # See also
 See also `docs/ui-spec-settings.md` for the Settings area.
 - docs/ui-spec-settings.md

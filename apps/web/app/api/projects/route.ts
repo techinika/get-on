@@ -7,6 +7,9 @@ import { normalizeAddress, validateAddress } from "@/lib/address";
 import { friendlyError } from "@/lib/errors";
 import { invalidateQuickFind } from "@/lib/project-activity";
 import { templateAvailable, templateBySlug } from "@/lib/templates/catalog";
+import { generatePageWithAi } from "@/lib/ai/actions";
+
+export const maxDuration = 90;
 
 export async function POST(request: Request) {
   const current = await getCurrentTeam();
@@ -194,16 +197,20 @@ export async function POST(request: Request) {
     includeContactForm,
   });
 
-  const { error: pageError } = await supabase.from("pages").insert({
-    project_id: project.id,
-    title: "Home",
-    path: "/",
-    position: 0,
-    is_homepage: true,
-    blocks: content.blocks,
-  });
+  const { data: insertedPage, error: pageError } = await supabase
+    .from("pages")
+    .insert({
+      project_id: project.id,
+      title: "Home",
+      path: "/",
+      position: 0,
+      is_homepage: true,
+      blocks: content.blocks,
+    })
+    .select("id")
+    .single();
 
-  if (pageError) {
+  if (pageError || !insertedPage) {
     try {
       await supabase.from("projects").update({ deleted_at: new Date().toISOString() }).eq("id", project.id);
     } catch {
@@ -213,6 +220,77 @@ export async function POST(request: Request) {
   }
 
   invalidateQuickFind(current.team.teamId);
+
+  if (startChoice === "ai") {
+    const brief = [
+      `Create the home page for ${name}.`,
+      businessType ? `Business type: ${businessType}.` : "",
+      about.trim() ? `About the business: ${about.trim()}.` : "",
+      contact.phone ? `Phone: ${contact.phone}.` : "",
+      contact.email ? `Email: ${contact.email}.` : "",
+      contact.address ? `Address: ${contact.address}.` : "",
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    const generated = await generatePageWithAi({
+      projectId: project.id,
+      brief,
+    }).catch((error) => {
+      console.error("[projects] AI first page failed", error);
+      return null;
+    });
+
+    if (generated?.ok) {
+      const blocks = Array.isArray(generated.data) ? [...generated.data] : null;
+      if (blocks && blocks.length > 0) {
+        const hasContactForm = blocks.some(
+          (block) =>
+            block &&
+            typeof block === "object" &&
+            (block as { type?: string }).type === "contact-form",
+        );
+        if (includeContactForm && !hasContactForm) {
+          const starterContact = content.blocks.find(
+            (block) =>
+              block &&
+              typeof block === "object" &&
+              (block as { type?: string }).type === "contact-form",
+          );
+          if (starterContact) blocks.push(starterContact);
+        }
+        const { error: updateError } = await supabase
+          .from("pages")
+          .update({
+            blocks,
+            seo_title: name.slice(0, 60),
+            seo_description: about.trim().slice(0, 155) || null,
+          })
+          .eq("id", insertedPage.id);
+        if (!updateError) {
+          invalidateQuickFind(current.team.teamId);
+          return NextResponse.json(
+            {
+              project,
+              ai: { status: "ready", credits: generated.credits },
+            },
+            { status: 201 },
+          );
+        }
+      }
+    }
+
+    return NextResponse.json(
+      {
+        project,
+        ai: {
+          status: "fallback",
+          code: generated?.ok ? "AI_BAD_RESULT" : generated?.code ?? "UNKNOWN",
+        },
+      },
+      { status: 201 },
+    );
+  }
 
   return NextResponse.json({ project }, { status: 201 });
 }

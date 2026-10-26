@@ -6,10 +6,12 @@ import {
   Globe,
   History,
   Map,
+  PenLine,
   Rocket,
   Search,
   Send,
   ShieldCheck,
+  Sparkles,
   Trash2,
 } from "lucide-react";
 
@@ -36,6 +38,7 @@ export const SETTINGS_GROUPS: SettingsNavGroup[] = [
     label: "Website",
     items: [
       { href: "business", label: "Business", description: "Name, tagline and contact details.", icon: Building2 },
+      { href: "writing", label: "Writing style", description: "How AI sounds when it writes for you.", icon: PenLine },
       { href: "address", label: "Address", description: "Your web address and sharing.", icon: Globe },
       { href: "publishing", label: "Publishing", description: "Pause your website and edit messages.", icon: Rocket },
     ],
@@ -65,6 +68,9 @@ export const SETTINGS_GROUPS: SettingsNavGroup[] = [
   },
   {
     label: "History",
-    items: [{ href: "activity", label: "Activity", description: "What has happened on this website.", icon: History }],
+    items: [
+      { href: "activity", label: "Activity", description: "What has happened on this website.", icon: History },
+      { href: "ai-history", label: "AI history", description: "What AI wrote and what it cost.", icon: Sparkles },
+    ],
   },
 ];

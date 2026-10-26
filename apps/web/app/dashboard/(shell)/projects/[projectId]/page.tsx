@@ -4,6 +4,7 @@ import Link from "next/link";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { AppCard } from "@/components/app/card";
+import { InfoBox } from "@/components/app/info-box";
 import { StatCard } from "@/components/app/stat-card";
 import { PublishCard } from "@/components/project/publish-card";
 import { OpenHelpButton } from "@/components/app/open-help-button";
@@ -14,8 +15,12 @@ import { getShellData } from "@/lib/dashboard";
 import { planLimits } from "@/lib/team";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
+import { friendlyError } from "@/lib/errors";
 
-type Params = { params: Promise<{ projectId: string }> };
+type Params = {
+  params: Promise<{ projectId: string }>;
+  searchParams: Promise<{ ai?: string; code?: string }>;
+};
 
 type ProjectRow = {
   id: string;
@@ -33,8 +38,8 @@ type ProjectSettings = {
   logoData?: string | null;
 };
 
-export default async function OverviewPage({ params }: Params) {
-  const { projectId } = await params;
+export default async function OverviewPage({ params, searchParams }: Params) {
+  const [{ projectId }, query] = await Promise.all([params, searchParams]);
   const data = await getShellData();
   if (!data) {
     redirect("/login");
@@ -164,6 +169,18 @@ export default async function OverviewPage({ params }: Params) {
           </>
         }
       />
+
+      {query.ai === "ready" ? (
+        <InfoBox variant="success" className="mb-6">
+          We wrote your first page with AI. You can change anything.
+        </InfoBox>
+      ) : query.ai === "failed" ? (
+        <InfoBox variant="warning" className="mb-6">
+          {query.code
+            ? `${friendlyError(query.code)} We set up a starter page you can edit.`
+            : "We could not write your first page with AI. We set up a starter page you can edit."}
+        </InfoBox>
+      ) : null}
 
       <div className="flex flex-col gap-6 min-[1024px]:grid min-[1024px]:grid-cols-[minmax(0,1fr)_280px] min-[1024px]:gap-6">
         <div className="order-1 min-[1024px]:col-start-1 min-[1024px]:row-start-1">

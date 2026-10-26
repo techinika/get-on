@@ -41,4 +41,5 @@ export type ShellUsage = {
   websites: number;
   members: number;
   storageBytes?: number;
+  aiCredits?: number;
 };

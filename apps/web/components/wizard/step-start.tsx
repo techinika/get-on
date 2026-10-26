@@ -22,9 +22,9 @@ const START_OPTIONS: ReadonlyArray<{
   {
     value: "ai",
     label: "Create it for me with AI",
-    description: "Answer a few questions and we write your pages.",
+    description: "Answer a few questions and we write your first page.",
     Icon: Sparkles,
-    comingSoon: true,
+    comingSoon: false,
   },
   {
     value: "template",
@@ -127,8 +127,7 @@ export function StepStart({
         <div className="mt-4 flex items-start gap-3 rounded-info bg-info-soft px-4 py-3.5">
           <Info size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-info-text" />
           <p className="text-sm text-info-text">
-            This is coming very soon. For now we will set you up with a simple starter page you can
-            build on.
+            We will write a first draft for you. You can change everything. This uses AI credits.
           </p>
         </div>
       ) : null}

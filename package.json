@@ -9,8 +9,8 @@
     "seed:site": "pnpm --filter web seed:site",
     "build": "pnpm --filter web build",
     "lint": "pnpm --filter web lint",
-    "typecheck": "pnpm --filter web typecheck",
-    "test": "pnpm --filter web test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test && pnpm --filter @get-on/sites-worker test",
+    "typecheck": "pnpm --filter web typecheck && pnpm --filter @get-on/ai typecheck",
+    "test": "pnpm --filter web test && pnpm --filter @get-on/ai test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test && pnpm --filter @get-on/sites-worker test",
     "test:e2e": "pnpm --filter web test:e2e",
     "screenshots": "pnpm --filter web screenshots",
     "job:email": "pnpm --filter web job:email",
@@ -32,7 +32,11 @@
     "job:domains-verify": "pnpm --filter web job:domains-verify",
     "job:domains-plan": "pnpm --filter web job:domains-plan",
     "job:domains-cleanup": "pnpm --filter web job:domains-cleanup",
-    "job:migrate-pointers": "pnpm --filter web job:migrate-pointers"
+    "job:migrate-pointers": "pnpm --filter web job:migrate-pointers",
+    "job:ai": "pnpm --filter web job:ai",
+    "job:ai-monthly": "pnpm --filter web job:ai-monthly",
+    "job:ai-expire": "pnpm --filter web job:ai-expire",
+    "job:ai-payloads": "pnpm --filter web job:ai-payloads"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

@@ -1,4 +1,4 @@
-import { Check, Info, Minus } from "lucide-react";
+import { Check, Info, Minus, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppPage } from "@/components/app/app-page";
@@ -50,9 +50,9 @@ export default async function PlanPage({
       limit: plan.maxMembers,
     },
     {
-      label: "AI credits this month",
-      used: plan.aiCreditsMonthly,
-      limit: plan.aiCreditsMonthly,
+      label: "AI credits left",
+      used: data.usage.aiCredits ?? 0,
+      limit: null,
     },
     {
       label: "Storage (MB)",
@@ -126,7 +126,9 @@ export default async function PlanPage({
                       <span className="text-text-muted">
                         {item.label === "Storage (MB)"
                           ? `${item.used} MB / ${limit === 0 ? "—" : `${limit} MB`}`
-                          : `${item.used} / ${limit === 0 ? "—" : limit}`}
+                          : item.label === "AI credits left"
+                            ? `${item.used}`
+                            : `${item.used} / ${limit === 0 ? "—" : limit}`}
                       </span>
                     </div>
                     {limit > 0 ? (
@@ -147,6 +149,28 @@ export default async function PlanPage({
               })}
             </ul>
           </div>
+        </div>
+      </AppCard>
+
+      <AppCard className="mt-4 p-5">
+        <div className="flex flex-col gap-4 min-[640px]:flex-row min-[640px]:items-center min-[640px]:justify-between">
+          <div className="flex items-start gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
+              <Sparkles size={20} strokeWidth={1.75} aria-hidden />
+            </span>
+            <div>
+              <p className="text-[15px] font-semibold text-text">AI credits</p>
+              <p className="mt-1 text-sm text-text-muted">
+                See what AI wrote for your team and what it cost.
+              </p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/ai"
+            className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
+          >
+            View AI credits
+          </Link>
         </div>
       </AppCard>
 

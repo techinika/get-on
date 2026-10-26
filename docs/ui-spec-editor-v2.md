@@ -1,5 +1,7 @@
 # Visual editor v2
 
+See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.
+
 For the editor, `docs/ui-spec-editor-v2.md` overrides `docs/ui-spec-editor.md` where they conflict.
 
 ## 8. Editor UI specification (atom level)

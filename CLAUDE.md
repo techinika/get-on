@@ -76,8 +76,22 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Personal templates per team with limits; workspaces use the same editor in template mode.
 - Sample content is never copied as real business facts; sample claims warn before publishing.
 - Plan limits adapted, not bypassed. Restore points for 30 days on replace operations.
-- AI hooks only (no AI calls).
+- AI hooks now use the shared AI pipeline; the UI wiring is still being built.
 
+
+## AI generation
+- `packages/ai` owns the provider interface, fake provider, model registry, credit maths, task registry, prompt composer and AI error codes.
+- `apps/web/lib/ai` owns the Workers AI adapter, runtime settings, skill/fact loaders, guards, text pipeline and server action.
+- AI is optional, draft-only and undoable. Nothing auto-publishes.
+- Every paid action moderates first, reserves credits, calls the provider, validates/screens the output, settles actual usage and stores a 30-day payload. Failures, refusals and pre-call cancellations are free.
+- Workers AI goes through AI Gateway REST. Always send `cf-aig-gateway-id`, `cf-aig-skip-cache: true`, `cf-aig-collect-log-payload: false` and `cf-aig-max-attempts: 1`. Never send user id, email or content in Gateway metadata.
+- 1 credit = 100 neurons. Monthly credits expire at the end of the following month. Free gets a one-time 25-credit grant and no refill.
+- Plan values: Free 0 monthly / 30 daily actions; Basic 100/100; Pro 400/300; Enterprise 1,500/1,000.
+- `AI_PROVIDER=fake` is the development and test default. Live Workers AI needs `CF_AI_ACCOUNT_ID`, `CF_AI_API_TOKEN` and `AI_GATEWAY_ID`.
+- Model ids live in `ai_models`, never in feature code. Seed only current JSON-capable models for structured tasks.
+- Viewers cannot start AI actions. Owners/admins manage member caps. Team members can read their own ledger and requests.
+- Plain language in normal UI: never show token, prompt, model, neuron, schema, JSON or LLM.
+- See `docs/ai.md`, `docs/ai-prompts.md`, `docs/credits.md`, `docs/skill-packs.md`, `docs/ai-spike.md` and `docs/ui-spec-ai.md`.
 
 ## See also
 - docs/settings.md

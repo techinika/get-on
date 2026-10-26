@@ -10,6 +10,10 @@ This repository contains the app: Next.js web app, Supabase schema and migration
 - `docs/ui-spec-editor.md` - the visual editor, site look, images library, version history and preview, plus what is still to be built.
 - `docs/ui-spec-publish.md` - publishing, public site pages, safety/moderation, the report page and the admin console.
 - `docs/legal.md` - legal pages setup, company details, review markers and the pre-launch checklist.
+- `docs/ai.md` - AI architecture, providers, pipeline and invariants.
+- `docs/ai-spike.md` - Workers AI and AI Gateway research and manual checks.
+- `docs/ai-prompts.md`, `docs/credits.md`, `docs/skill-packs.md` - AI prompt, credit and skill-pack rules.
+- `docs/ui-spec-ai.md` - the AI UI specification.
 - `docs/screenshots/` - the UI at 360, 768, 1024, 1280 and 1440 px wide, in light and dark.
 
 ## Prerequisites
@@ -24,6 +28,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
 - `packages/renderer` - the page renderer used by the site output
 - `packages/publisher` - turns a project into the static files for a published site
 - `packages/site-server` - shared request handling for published sites (Worker and local Node)
+- `packages/ai` - AI provider interface, fake provider, model registry, credits and prompts
 - `apps/sites-worker` - the Cloudflare Worker for `*.get-on.tech`
 - `supabase` - local Supabase config, migrations, seed, SQL tests
 - `docs` - specifications and screenshots
@@ -51,6 +56,11 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `EMAIL_FROM`: the from address for those emails
    - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys. When the secret is set, the form must pass Turnstile
    - `NEXT_PUBLIC_COOKIE_CONSENT`: set to `true` to show the cookie notice
+
+   AI (see `apps/web/.env.example` for the full list):
+   - `AI_PROVIDER`: `fake` in development; `workers-ai` for live calls
+   - `CF_AI_ACCOUNT_ID`, `CF_AI_API_TOKEN`, `AI_GATEWAY_ID`: Cloudflare Workers AI and AI Gateway
+   - `AI_ENABLED`, `AI_CREDIT_NEURONS`, `AI_DAILY_CAP_CREDITS`, `AI_IMAGES_ENABLED`, `AI_USD_PER_NEURON`: runtime defaults
 
    Publishing (see `apps/web/.env.example` for the full list):
    - `PUBLISH_STORE`: `local` (default) builds into `.local-sites`; `cloudflare` uploads to R2 and KV

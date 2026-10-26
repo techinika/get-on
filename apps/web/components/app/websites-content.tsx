@@ -125,8 +125,9 @@ export function WebsitesContent({
           <UsageCell
             icon={<Sparkles size={20} strokeWidth={1.75} aria-hidden />}
             label="AI credits left"
-            value={`${aiCredits} of ${aiCredits}`}
+            value={`${aiCredits}`}
             ratio={0}
+            href="/dashboard/ai"
             className="min-[768px]:pl-6"
           />
         </div>
@@ -226,12 +227,14 @@ function UsageCell({
   label,
   value,
   ratio,
+  href,
   className,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   ratio: number;
+  href?: string;
   className?: string;
 }) {
   return (
@@ -243,7 +246,15 @@ function UsageCell({
         {icon}
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm text-text-muted">{label}</p>
+        <p className="text-sm text-text-muted">
+          {href ? (
+            <Link href={href} className="hover:text-text hover:underline">
+              {label}
+            </Link>
+          ) : (
+            label
+          )}
+        </p>
         <p className="text-stat-number text-text">{value}</p>
         {ratio > 0 ? (
           <Progress

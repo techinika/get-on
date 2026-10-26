@@ -15,6 +15,7 @@ const GO_TO: QuickFindItem[] = [
   { id: "go-domains", title: "Domains", href: "/dashboard/domains", icon: "link" },
   { id: "go-connect-domain", title: "Connect a domain", href: "/dashboard/domains", icon: "link" },
   { id: "go-team", title: "Team", href: "/dashboard/team", icon: "link" },
+  { id: "go-ai", title: "AI credits", href: "/dashboard/ai", icon: "link" },
   { id: "go-plan", title: "Plan and billing", href: "/dashboard/plan", icon: "link" },
   { id: "go-account", title: "Account", href: "/dashboard/account", icon: "link" },
   { id: "go-demo", title: "Request a demo", href: "/request-demo", icon: "link" },
@@ -79,6 +80,20 @@ export async function GET(request: Request) {
           title: "Check my domain",
           detail: "Check the connection records",
           href: `/dashboard/projects/${projectId}/settings/address`,
+          icon: "link",
+        },
+        {
+          id: "project-writing",
+          title: "Writing style",
+          detail: "How AI sounds when it writes for you",
+          href: `/dashboard/projects/${projectId}/settings/writing`,
+          icon: "link",
+        },
+        {
+          id: "project-ai-history",
+          title: "AI history",
+          detail: "What AI wrote and what it cost",
+          href: `/dashboard/projects/${projectId}/settings/ai-history`,
           icon: "link",
         },
         {

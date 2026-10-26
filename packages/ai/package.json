@@ -1,0 +1,30 @@
+{
+  "name": "@get-on/ai",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./credits": "./src/credits/index.ts",
+    "./errors": "./src/errors.ts",
+    "./eval": "./src/eval.ts",
+    "./prompts": "./src/prompts/composer.ts",
+    "./registry": "./src/registry/models.ts",
+    "./tasks": "./src/tasks/registry.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.7"
+  }
+}
