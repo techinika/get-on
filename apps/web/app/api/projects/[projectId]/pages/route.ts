@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { hasPageCapacity, PAGE_COLUMNS, requireProject } from "./_lib";
 import { invalidateQuickFind, touchProject } from "@/lib/project-activity";
+import { logActivity } from "@/lib/activity";
+import { can } from "@/lib/permissions";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -23,7 +25,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!guard.ok) return guard.response;
   const ctx = guard.ctx;
 
-  if (ctx.current.team.role === "viewer") {
+  if (!can(ctx.current.team.role, "page.edit")) {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
   }
 
@@ -72,6 +74,7 @@ export async function POST(request: Request, { params }: Params) {
       position: (maxRow?.position ?? -1) + 1,
       is_homepage: false,
       blocks: [],
+      updated_by: ctx.current.user.id,
     })
     .select(PAGE_COLUMNS)
     .single();
@@ -81,6 +84,13 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   await touchProject(ctx.supabase, projectId);
+  await logActivity({
+    projectId,
+    actorUserId: ctx.current.user.id,
+    event: "page_created",
+    summary: `${ctx.current.user.email ?? "Someone"} added the page ${page.title}`,
+    meta: { pageId: page.id },
+  });
   invalidateQuickFind(ctx.current.team.teamId);
 
   return NextResponse.json({ page }, { status: 201 });

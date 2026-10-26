@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { can } from "@/lib/permissions";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { planLimits } from "@/lib/plans";
@@ -70,7 +71,7 @@ export default async function SettingsPage({ params }: Params) {
         limit={plan.customDomainsPerSite}
         planName={plan.name}
         canManage={
-          current?.team.role === "owner" || current?.team.role === "admin"
+          current ? can(current.team.role, "site.domains") : false
         }
         redirectFreeAddress={redirectFreeAddress}
       />

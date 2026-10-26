@@ -3,7 +3,7 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { TemplateGallery } from "@/components/templates/template-gallery";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentTeam } from "@/lib/team";
+import { getCurrentTeam, planLimits } from "@/lib/team";
 import { templatesForPlan } from "@/lib/templates/catalog";
 
 export default async function TemplatesPage() {
@@ -18,6 +18,7 @@ export default async function TemplatesPage() {
     .order("created_at", { ascending: true });
 
   const templates = templatesForPlan(current.team.planId);
+  const plan = planLimits(current.team.planId);
 
   return (
     <AppPage width="wide">
@@ -30,6 +31,7 @@ export default async function TemplatesPage() {
         items={templates}
         mode="dashboard"
         projects={projects ?? []}
+        maxPages={plan.maxPagesPerSite}
       />
     </AppPage>
   );

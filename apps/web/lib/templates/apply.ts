@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 
 type SupabaseLike = SupabaseClient;
 
-export type ApplyMode = "full" | "design" | "pages";
+export type ApplyMode = "full" | "design" | "pages" | "add";
 
 export type ApplyTemplateArgs = {
   supabase: SupabaseLike;
@@ -132,6 +132,28 @@ async function writeSnapshot(
   return snapshot;
 }
 
+function replaceStringDeep(value: unknown, from: string, to: string): unknown {
+  if (typeof value === "string") return value === from ? to : value;
+  if (Array.isArray(value)) return value.map((item) => replaceStringDeep(item, from, to));
+  if (!value || typeof value !== "object") return value;
+  const out: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value)) {
+    out[key] = replaceStringDeep(child, from, to);
+  }
+  return out;
+}
+
+export function uniquePagePath(path: string, taken: Set<string>): string {
+  const base = path.startsWith("/") ? path : `/${path}`;
+  const clean = base.length > 1 ? base.replace(/\/+$/, "") : "/";
+  if (clean !== "/" && !taken.has(clean.toLowerCase())) return clean;
+  const stem = clean === "/" ? "/page" : clean;
+  if (!taken.has(stem.toLowerCase())) return stem;
+  let suffix = 2;
+  while (taken.has(`${stem}-${suffix}`.toLowerCase())) suffix += 1;
+  return `${stem}-${suffix}`;
+}
+
 export async function applyTemplateToProject({
   supabase,
   projectId,
@@ -142,7 +164,16 @@ export async function applyTemplateToProject({
   appliedBy = null,
 }: ApplyTemplateArgs): Promise<
   | { ok: true; homePageId: string; pageCount: number; mode: ApplyMode }
-  | { ok: false; error: "NOT_FOUND" | "THEME_FAILED" | "PAGES_FAILED" | "SETTINGS_FAILED" }
+  | {
+      ok: false;
+      error:
+        | "NOT_FOUND"
+        | "THEME_FAILED"
+        | "PAGES_FAILED"
+        | "SETTINGS_FAILED"
+        | "NOTHING_TO_ADD"
+        | "PAGE_LIMIT";
+    }
 > {
   const pkg = requireSystemTemplate(slug);
 
@@ -165,12 +196,31 @@ export async function applyTemplateToProject({
 
   const materialized = materializeTemplate(pkg, {
     profile: profileOf(project),
-    maxPages,
+    maxPages: mode === "add" ? null : maxPages,
   });
   const home = materialized.pages.find((page) => page.isHome) ?? materialized.pages[0]!;
 
+  let existingPages: Array<{ id: string; path: string; position: number; is_homepage: boolean }> = [];
+  let addedPages = materialized.pages;
+  let existingHomeId: string | null = null;
+  if (mode === "add") {
+    const { data, error } = await supabase
+      .from("pages")
+      .select("id, path, position, is_homepage")
+      .eq("project_id", project.id)
+      .order("position", { ascending: true });
+    if (error) return { ok: false, error: "PAGES_FAILED" };
+    existingPages = (data ?? []) as typeof existingPages;
+    existingHomeId = existingPages.find((page) => page.is_homepage)?.id ?? null;
+    addedPages = materialized.pages.filter((page) => !page.isHome);
+    if (addedPages.length === 0) return { ok: false, error: "NOTHING_TO_ADD" };
+    if (maxPages !== null && existingPages.length + addedPages.length > maxPages) {
+      return { ok: false, error: "PAGE_LIMIT" };
+    }
+  }
+
   const snapshot =
-    mode === "full"
+    mode === "full" || mode === "add"
       ? await writeSnapshot(supabase, project, slug, previousTheme)
       : null;
 
@@ -185,7 +235,42 @@ export async function applyTemplateToProject({
     if (themeError) return { ok: false, error: "THEME_FAILED" };
   }
 
-  if (mode !== "design") {
+  if (mode === "add") {
+    const taken = new Set(existingPages.map((page) => page.path.toLowerCase()));
+    const startPosition = existingPages.reduce((max, page) => Math.max(max, page.position), -1) + 1;
+    const templateHomeId = home.id;
+    const rows = addedPages.map((page, index) => {
+      const path = uniquePagePath(page.path, taken);
+      taken.add(path.toLowerCase());
+      const blocks =
+        existingHomeId && templateHomeId !== existingHomeId
+          ? replaceStringDeep(page.blocks, templateHomeId, existingHomeId)
+          : page.blocks;
+      return {
+        id: page.id,
+        project_id: project.id,
+        title: page.title,
+        path,
+        position: startPosition + index,
+        is_homepage: false,
+        blocks,
+        show_in_menu: page.showInMenu,
+        seo_title: page.seoTitle || null,
+        seo_description: page.seoDescription || null,
+        is_hidden: false,
+        hide_from_search: false,
+      };
+    });
+
+    const { error: pageError } = await supabase.from("pages").insert(rows);
+    if (pageError) return { ok: false, error: "PAGES_FAILED" };
+
+    await enableContactIfNeeded(
+      supabase,
+      project.id,
+      addedPages.flatMap((page) => page.blocks),
+    );
+  } else if (mode !== "design") {
     const { error: deleteError } = await supabase
       .from("pages")
       .delete()
@@ -210,7 +295,11 @@ export async function applyTemplateToProject({
     const { error: pageError } = await supabase.from("pages").insert(rows);
     if (pageError) return { ok: false, error: "PAGES_FAILED" };
 
-    await enableContactIfNeeded(supabase, project.id, home.blocks);
+    await enableContactIfNeeded(
+      supabase,
+      project.id,
+      materialized.pages.flatMap((page) => page.blocks),
+    );
   }
 
   const settings = asRecord(project.settings);
@@ -234,7 +323,9 @@ export async function applyTemplateToProject({
 
   void appliedBy;
 
-  return { ok: true, homePageId: home.id, pageCount: materialized.pages.length, mode };
+  const homePageId = mode === "add" ? existingHomeId ?? home.id : home.id;
+  const pageCount = mode === "add" ? addedPages.length : materialized.pages.length;
+  return { ok: true, homePageId, pageCount, mode };
 }
 
 export async function restoreTemplateSnapshot({

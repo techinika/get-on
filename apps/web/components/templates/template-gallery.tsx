@@ -35,6 +35,8 @@ type Props = {
   projectName?: string;
   aiEnabled?: boolean;
   aiCredits?: number;
+  maxPages?: number | null;
+  currentPageCount?: number;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -56,6 +58,8 @@ export function TemplateGallery({
   projectName,
   aiEnabled = false,
   aiCredits,
+  maxPages = null,
+  currentPageCount,
 }: Props) {
   const [category, setCategory] = React.useState("all");
   const [pending, setPending] = React.useState<GalleryTemplate | null>(null);
@@ -66,6 +70,7 @@ export function TemplateGallery({
   const [phase, setPhase] = React.useState<"idle" | "design" | "text">("idle");
   const [aiText, setAiText] = React.useState(false);
   const [aiNotes, setAiNotes] = React.useState("");
+  const [pageMode, setPageMode] = React.useState<"replace" | "add">("replace");
   const router = useRouter();
   const { toast } = useToast();
 
@@ -81,13 +86,38 @@ export function TemplateGallery({
     setPending(null);
     setAiText(false);
     setAiNotes("");
+    setPageMode("replace");
   }
+
+  function openPending(item: GalleryTemplate) {
+    setPageMode("replace");
+    setPending(item);
+  }
+
+  function openApplying(item: GalleryTemplate) {
+    setPageMode("replace");
+    setApplying(item);
+  }
+
+  const addPageCount = pending ? Math.max(0, pending.pageCount - 1) : 0;
+  const addWouldExceed =
+    pageMode === "add" &&
+    maxPages !== null &&
+    typeof currentPageCount === "number" &&
+    currentPageCount + addPageCount > maxPages;
+  const pagesUsedLabel =
+    maxPages === null
+      ? null
+      : typeof currentPageCount === "number"
+        ? `This website uses ${currentPageCount} of ${maxPages} pages on your plan.`
+        : `Your plan allows up to ${maxPages} pages on each website.`;
 
   async function apply() {
     if (!pending || !projectId) return;
     setWorking(true);
     setPhase("design");
-    const result = await applyTemplateAction(projectId, pending.slug, "full");
+    const mode = pageMode === "add" ? "add" : "full";
+    const result = await applyTemplateAction(projectId, pending.slug, mode);
     if (!result.ok) {
       setWorking(false);
       setPhase("idle");
@@ -96,7 +126,7 @@ export function TemplateGallery({
       return;
     }
 
-    if (aiText) {
+    if (aiText && pageMode === "replace") {
       setPhase("text");
       const aiResult = await fillTemplateTextAction(projectId, aiNotes);
       setWorking(false);
@@ -127,22 +157,35 @@ export function TemplateGallery({
     setWorking(false);
     setPhase("idle");
     setPending(null);
-    toast(`Your website now uses the ${pending.name} design. You can change anything you like.`, "success");
+    toast(
+      pageMode === "add"
+        ? `The ${pending.name} pages were added to your website. You can change anything you like.`
+        : `Your website now uses the ${pending.name} design. You can change anything you like.`,
+      "success",
+    );
     router.refresh();
   }
 
   async function applyToExisting() {
     if (!applying || !targetProjectId) return;
     setWorking(true);
-    const result = await applyTemplateAction(targetProjectId, applying.slug, "full");
+    const mode = pageMode === "add" ? "add" : "full";
+    const result = await applyTemplateAction(targetProjectId, applying.slug, mode);
     setWorking(false);
     if (!result.ok) {
       toast(result.message, "error");
       return;
     }
     const name = applying.name;
+    const wasAdd = pageMode === "add";
     setApplying(null);
-    toast(`The ${name} design is now on that website. You can change anything you like.`, "success");
+    setPageMode("replace");
+    toast(
+      wasAdd
+        ? `The ${name} pages were added to that website. You can change anything you like.`
+        : `The ${name} design is now on that website. You can change anything you like.`,
+      "success",
+    );
     router.push(`/dashboard/projects/${targetProjectId}`);
   }
 
@@ -229,7 +272,7 @@ export function TemplateGallery({
                   </Link>
                   {mode === "project" ? (
                     item.available ? (
-                      <Button variant={inUse ? "secondary" : "primary"} size="md" onClick={() => setPending(item)}>
+                      <Button variant={inUse ? "secondary" : "primary"} size="md" onClick={() => openPending(item)}>
                         {inUse ? "Use again" : "Use this design"}
                         {!inUse ? <ArrowRight size={18} strokeWidth={1.75} aria-hidden /> : null}
                       </Button>
@@ -248,7 +291,7 @@ export function TemplateGallery({
                         <ArrowRight size={18} strokeWidth={1.75} aria-hidden />
                       </Link>
                       {mode === "dashboard" && projects.length > 0 ? (
-                        <Button variant="secondary" size="md" onClick={() => setApplying(item)}>
+                        <Button variant="secondary" size="md" onClick={() => openApplying(item)}>
                           Use on existing website
                         </Button>
                       ) : null}
@@ -287,7 +330,7 @@ export function TemplateGallery({
               disabled={working}
               type="button"
             >
-              Cancel
+              Back
             </Button>
             <Button
               variant="primary"
@@ -295,19 +338,79 @@ export function TemplateGallery({
               onClick={apply}
               loading={working}
               loadingLabel={phase === "text" ? "Writing your words..." : "Applying design..."}
+              disabled={addWouldExceed}
               type="button"
             >
-              {phase === "text" ? "Writing your words..." : "Use this design"}
+              {phase === "text" ? "Writing your words..." : "Continue"}
             </Button>
           </>
         }
       >
-        <p className="text-base leading-6 text-text-muted">
-          Your pages and text will be replaced with this design. The colours and fonts will
-          change too. Your current pages are saved for 30 days, so you can undo this.
-        </p>
+        <fieldset className="space-y-3">
+          <legend className="text-sm font-semibold text-text">What should happen to your pages?</legend>
+          <label className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-card border p-4",
+            pageMode === "replace" ? "border-primary bg-primary-soft" : "border-border bg-surface",
+          )}>
+            <input
+              type="radio"
+              name="template-page-mode"
+              value="replace"
+              checked={pageMode === "replace"}
+              onChange={() => setPageMode("replace")}
+              disabled={working}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Replace all pages</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Start fresh with this design. Your current pages and text are saved for 30 days, so you can undo this.
+              </span>
+            </span>
+          </label>
+          <label className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-card border p-4",
+            pageMode === "add" ? "border-primary bg-primary-soft" : "border-border bg-surface",
+          )}>
+            <input
+              type="radio"
+              name="template-page-mode"
+              value="add"
+              checked={pageMode === "add"}
+              onChange={() => setPageMode("add")}
+              disabled={working}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Add pages to my website</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Keep your home page and add the other {addPageCount} pages from this design. Colours and fonts still change.
+              </span>
+            </span>
+          </label>
+        </fieldset>
 
-        {aiEnabled ? (
+        {pagesUsedLabel ? (
+          <p className={cn("mt-3 text-sm", addWouldExceed ? "text-danger-text" : "text-text-muted")}>
+            {pagesUsedLabel}{" "}
+            {addWouldExceed ? (
+              <>
+                This would go over the limit.{" "}
+                <Link href="/dashboard/plan" className="font-semibold underline">
+                  See plans
+                </Link>
+              </>
+            ) : null}
+          </p>
+        ) : null}
+
+        {pageMode === "replace" ? (
+          <p className="mt-3 text-sm text-text-muted">
+            Replacing saves a safety copy first. Applying a template never publishes your website.
+          </p>
+        ) : null}
+
+        {aiEnabled && pageMode === "replace" ? (
           <div className="mt-5 rounded-card border border-border bg-surface-muted p-4">
             <Switch
               checked={aiText}
@@ -358,7 +461,7 @@ export function TemplateGallery({
         footer={
           <>
             <Button variant="secondary" size="md" onClick={() => setApplying(null)}>
-              Cancel
+              Back
             </Button>
             <Button
               variant="primary"
@@ -367,15 +470,63 @@ export function TemplateGallery({
               loading={working}
               disabled={!targetProjectId}
             >
-              Use this design
+              Continue
             </Button>
           </>
         }
       >
         <p className="text-sm leading-6 text-text-muted">
-          The {applying?.name ?? ""} design will replace the pages and design of the website you
-          choose. Its current pages are saved for 30 days, so you can undo this.
+          Choose what should happen to the pages of the website you choose. Its current pages are
+          saved for 30 days, so you can undo this.
         </p>
+        <fieldset className="mt-4 space-y-3">
+          <legend className="text-sm font-semibold text-text">What should happen to its pages?</legend>
+          <label className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-card border p-4",
+            pageMode === "replace" ? "border-primary bg-primary-soft" : "border-border bg-surface",
+          )}>
+            <input
+              type="radio"
+              name="template-existing-page-mode"
+              value="replace"
+              checked={pageMode === "replace"}
+              onChange={() => setPageMode("replace")}
+              disabled={working}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Replace all pages</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Start fresh with the {applying?.name ?? ""} design.
+              </span>
+            </span>
+          </label>
+          <label className={cn(
+            "flex cursor-pointer items-start gap-3 rounded-card border p-4",
+            pageMode === "add" ? "border-primary bg-primary-soft" : "border-border bg-surface",
+          )}>
+            <input
+              type="radio"
+              name="template-existing-page-mode"
+              value="add"
+              checked={pageMode === "add"}
+              onChange={() => setPageMode("add")}
+              disabled={working}
+              className="mt-1"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-text">Add pages</span>
+              <span className="mt-0.5 block text-sm text-text-muted">
+                Keep its home page and add the other pages from this design.
+              </span>
+            </span>
+          </label>
+        </fieldset>
+        {maxPages !== null ? (
+          <p className="mt-3 text-sm text-text-muted">
+            Your plan allows up to {maxPages} pages on each website.
+          </p>
+        ) : null}
         <label htmlFor="template-project" className="mt-5 block text-sm font-semibold text-text">
           Website
         </label>

@@ -7,7 +7,9 @@ export async function POST(request: Request) {
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
 
-  const redirectTo = new URL("/dashboard", request.url);
+  const next = String(formData.get("next") ?? "");
+  const safeNext = next.startsWith("/") && !next.startsWith("//") ? next : "/dashboard";
+  const redirectTo = new URL(safeNext, request.url);
   const response = NextResponse.redirect(redirectTo, 303);
 
   const supabase = await createRouteClient(response);
@@ -15,7 +17,7 @@ export async function POST(request: Request) {
 
   if (error) {
     return NextResponse.redirect(
-      new URL(`/login?error=${encodeURIComponent(toFriendlyAuthError(error.message))}`, request.url),
+      new URL(`/login?error=${encodeURIComponent(toFriendlyAuthError(error.message))}${next ? `&next=${encodeURIComponent(next)}` : ""}`, request.url),
       303,
     );
   }

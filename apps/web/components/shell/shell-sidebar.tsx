@@ -149,6 +149,7 @@ export type ShellSidebarProps = {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   isAdmin?: boolean;
+  role?: "owner" | "admin" | "editor" | "viewer";
 };
 
 export function ShellSidebar({
@@ -159,6 +160,7 @@ export function ShellSidebar({
   collapsed,
   onToggleCollapsed,
   isAdmin = false,
+  role = "viewer",
 }: ShellSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
@@ -174,8 +176,11 @@ export function ShellSidebar({
   ];
   const teamGroupEntries: NavEntry[] = [
     { key: "members", label: "Members", icon: Users, href: "/dashboard/team" },
+    ...(role === "owner" || role === "admin"
+      ? [{ key: "activity", label: "Activity", icon: History, href: "/dashboard/team/activity" }]
+      : []),
+    { key: "invite", label: "Invite and earn", icon: Gift, href: "/dashboard/invite" },
     { key: "plan", label: "Plan and billing", icon: CreditCard, href: "/dashboard/plan" },
-    { key: "invite", label: "Invite and earn", icon: Gift, soon: true },
   ];
   const youEntries: NavEntry[] = [
     { key: "account", label: "Account", icon: UserCircle, href: "/dashboard/account" },
@@ -504,6 +509,32 @@ export function ShellSidebar({
                 <Globe size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
                 <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
                   Domains
+                </span>
+              </Link>
+              <Link
+                href="/admin/teams"
+                title={collapsed ? "Admin teams" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <Users size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Teams
+                </span>
+              </Link>
+              <Link
+                href="/admin/referrals"
+                title={collapsed ? "Admin referrals" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <Gift size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Referrals
                 </span>
               </Link>
               <Link

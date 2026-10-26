@@ -166,3 +166,78 @@ function escapeHtml(value: string) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+
+export function teamInviteEmail(opts: {
+  inviterName: string;
+  teamName: string;
+  role: 'admin' | 'editor' | 'viewer';
+  message?: string | null;
+  acceptUrl: string;
+  expiresAt: string;
+  abilities: string[];
+}) {
+  const inviter = sanitizeLine(opts.inviterName).slice(0, 80) || 'A teammate';
+  const team = sanitizeLine(opts.teamName).slice(0, 80) || 'a team';
+  const role = opts.role === 'admin' ? 'Admin' : opts.role === 'editor' ? 'Editor' : 'Viewer';
+  const article = role === 'Admin' ? 'an' : 'a';
+  const subject = `${inviter} invited you to join ${team} on Get-On`;
+  const abilities = opts.abilities.slice(0, 3).map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+  const note = opts.message
+    ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#F6F0E6;border-radius:12px;margin:16px 0;"><tr><td style="padding:12px 16px;font-style:italic;">${escapeHtml(opts.message)}</td></tr></table>`
+    : '';
+  const body = `
+    <p style="margin:0 0 16px 0;">${escapeHtml(inviter)} invited you to join <strong>${escapeHtml(team)}</strong> as ${article} <strong>${role}</strong>.</p>
+    ${note}
+    <p style="margin:16px 0 8px 0;">As ${article} ${role} you can:</p>
+    <ul style="margin:0 0 16px 20px;padding:0;">${abilities}</ul>
+    ${button(opts.acceptUrl, 'Accept invitation')}
+    <p style="margin:24px 0 0 0;font-size:13px;color:#6B6158;">This invitation ends on ${escapeHtml(opts.expiresAt)}. If you do not know ${escapeHtml(inviter)}, you can ignore this email.</p>
+  `;
+  const html = emailLayout({ title: subject, body });
+  const text = [
+    `${inviter} invited you to join ${team} as ${article} ${role}.`,
+    opts.message ? `\n"${opts.message}"` : '',
+    '',
+    `As ${article} ${role} you can:`,
+    ...opts.abilities.slice(0, 3).map((line) => `- ${line}`),
+    '',
+    `Accept invitation: ${opts.acceptUrl}`,
+    '',
+    `This invitation ends on ${opts.expiresAt}. If you do not know ${inviter}, you can ignore this email.`,
+  ].filter(Boolean).join('\n');
+  return { subject, html, text };
+}
+
+export function teamNoticeEmail(opts: {
+  title: string;
+  intro: string;
+  details?: Array<{ label: string; value: string }>;
+  actionUrl?: string;
+  actionLabel?: string;
+  footer?: string;
+}) {
+  const title = sanitizeLine(opts.title).slice(0, 120) || 'Team update';
+  const intro = sanitizeLine(opts.intro).slice(0, 500);
+  const details = (opts.details ?? []).slice(0, 8);
+  const rows = details
+    .map(
+      (row) =>
+        `<tr><td style="padding:4px 12px 4px 0;color:#6B6158;font-size:14px;vertical-align:top;">${escapeHtml(row.label)}</td><td style="padding:4px 0;font-size:14px;">${escapeHtml(row.value)}</td></tr>`,
+    )
+    .join('');
+  const body = `
+    <p style="margin:0 0 16px 0;">${escapeHtml(intro)}</p>
+    ${rows ? `<table style="border-collapse:collapse;margin:8px 0 16px 0;">${rows}</table>` : ''}
+    ${opts.actionUrl ? button(opts.actionUrl, opts.actionLabel ?? 'Open Get-On') : ''}
+    ${opts.footer ? `<p style="margin:24px 0 0 0;font-size:13px;color:#6B6158;">${escapeHtml(opts.footer)}</p>` : ''}
+  `;
+  const html = emailLayout({ title, body });
+  const text = [
+    intro,
+    '',
+    ...details.map((row) => `${row.label}: ${row.value}`),
+    opts.actionUrl ? `\n${opts.actionLabel ?? 'Open Get-On'}: ${opts.actionUrl}` : '',
+    opts.footer ? `\n${opts.footer}` : '',
+  ].filter(Boolean).join('\n');
+  return { subject: title, html, text };
+}

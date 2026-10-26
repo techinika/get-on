@@ -1,4 +1,5 @@
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { logTeamActivity } from "@/lib/activity/log";
 
 export async function logActivity(params: {
   projectId: string;
@@ -8,15 +9,22 @@ export async function logActivity(params: {
   meta?: Record<string, unknown>;
 }) {
   try {
-    const supabase = await createClient();
-    await supabase.from("project_activity").insert({
-      project_id: params.projectId,
-      actor_user_id: params.actorUserId ?? null,
+    const admin = createAdminClient();
+    const { data: project } = await admin
+      .from("projects")
+      .select("id, name, team_id")
+      .eq("id", params.projectId)
+      .maybeSingle();
+    if (!project) return;
+    await logTeamActivity({
+      teamId: project.team_id,
+      actor: { userId: params.actorUserId ?? null },
       event: params.event,
       summary: params.summary,
-      meta: params.meta ?? {},
+      project: { id: project.id, name: project.name },
+      meta: params.meta,
     });
   } catch {
-    // ignore
+    // Activity logging must never block the user's action.
   }
 }

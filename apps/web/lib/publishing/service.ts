@@ -21,6 +21,9 @@ import {
   type RedirectRow,
 } from "./live-pointer";
 import { createPublishStore } from "./store";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { markReferralPublished } from "@/lib/referral-rewards";
+import { logTeamActivity } from "@/lib/activity/log";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -313,7 +316,21 @@ export async function publishProject(
       .update({ status: "published" })
       .eq("id", project.id);
 
+    try {
+      await markReferralPublished(createAdminClient(), ctx.user.id, project.id);
+    } catch (referralError) {
+      console.error("[publish] referral update failed", referralError);
+    }
+
     invalidateQuickFind(ctx.team.teamId);
+    await logTeamActivity({
+      teamId: ctx.team.teamId,
+      actor: { userId: ctx.user.id },
+      event: "website_published",
+      summary: `${project.name} was published`,
+      project: { id: project.id, name: project.name },
+      meta: { pages: pagesCount, publishId },
+    }).catch(() => undefined);
 
     return {
       publishId,
@@ -376,6 +393,13 @@ export async function unpublishProject(ctx: PublishContext): Promise<void> {
     .update({ status: "draft" })
     .eq("id", ctx.project.id);
   invalidateQuickFind(ctx.team.teamId);
+  await logTeamActivity({
+    teamId: ctx.team.teamId,
+    actor: { userId: ctx.user.id },
+    event: "website_unpublished",
+    summary: `${loaded.project.name} was taken offline`,
+    project: { id: loaded.project.id, name: loaded.project.name },
+  }).catch(() => undefined);
 }
 
 export type RestoreResult = { publishId: string; url: string };
@@ -438,6 +462,14 @@ export async function restorePublish(
     .update({ status: "published" })
     .eq("id", ctx.project.id);
   invalidateQuickFind(ctx.team.teamId);
+  await logTeamActivity({
+    teamId: ctx.team.teamId,
+    actor: { userId: ctx.user.id },
+    event: "website_rolled_back",
+    summary: `${loaded.project.name} was rolled back to an earlier version`,
+    project: { id: loaded.project.id, name: loaded.project.name },
+    meta: { publishId: target.id },
+  }).catch(() => undefined);
 
   return {
     publishId: String(target.id),

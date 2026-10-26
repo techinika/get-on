@@ -23,11 +23,20 @@ type TeamRow = {
   is_personal: boolean;
 };
 
+export type ShellDeletedProject = {
+  id: string;
+  name: string;
+  subdomain: string;
+  deletedAt: string;
+  purgeAfter: string | null;
+};
+
 export type ShellData = {
   user: ShellUser;
   teams: ShellTeam[];
   currentTeam: ShellTeam;
   projects: ShellProject[];
+  deletedProjects: ShellDeletedProject[];
   usage: ShellUsage;
 };
 
@@ -49,6 +58,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       .from("team_members")
       .select("team_id, role")
       .eq("user_id", user.id)
+      .eq("status", "active")
       .order("team_id", { ascending: true }),
   ]);
 
@@ -96,18 +106,28 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   const [{ data: projects }, { count: memberCount }] = await Promise.all([
     supabase
       .from("projects")
-      .select("id, name, subdomain, primary_host, status, content_revision, created_at, updated_at, deleted_at")
+      .select("id, name, subdomain, primary_host, status, content_revision, created_at, updated_at, deleted_at, purge_after")
       .eq("team_id", currentTeam.id)
       .order("created_at", { ascending: false }),
     supabase
       .from("team_members")
       .select("user_id", { count: "exact", head: true })
-      .eq("team_id", currentTeam.id),
+      .eq("team_id", currentTeam.id)
+      .eq("status", "active"),
   ]);
 
   const visibleProjects = (projects ?? []).filter(
     (project: { deleted_at?: string | null }) => !project.deleted_at,
   );
+  const deletedProjects: ShellDeletedProject[] = (projects ?? [])
+    .filter((project: { deleted_at?: string | null }) => Boolean(project.deleted_at))
+    .map((project: { id: string; name: string; subdomain: string; deleted_at: string; purge_after?: string | null }) => ({
+      id: project.id,
+      name: project.name,
+      subdomain: project.subdomain,
+      deletedAt: project.deleted_at,
+      purgeAfter: project.purge_after ?? null,
+    }));
 
   const projectIds = visibleProjects.map((project) => project.id);
   let contactProjects = new Set<string>();
@@ -208,6 +228,7 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     teams,
     currentTeam,
     projects: shellProjects,
+    deletedProjects,
     usage: {
       websites: shellProjects.length,
       members: memberCount ?? 0,

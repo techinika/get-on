@@ -129,6 +129,7 @@ export async function loadAccess(
     .select("role")
     .eq("team_id", teamId)
     .eq("user_id", userId)
+    .eq("status", "active")
     .maybeSingle();
   if (
     !member ||

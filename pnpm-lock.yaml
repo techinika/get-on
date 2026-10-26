@@ -203,6 +203,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: ^3.2.2
         version: 3.2.2(react@19.3.0)
+      '@get-on/activity':
+        specifier: workspace:*
+        version: link:../../packages/activity
       '@get-on/ai':
         specifier: workspace:*
         version: link:../../packages/ai
@@ -212,6 +215,9 @@ importers:
       '@get-on/email':
         specifier: workspace:*
         version: link:../../packages/email
+      '@get-on/permissions':
+        specifier: workspace:*
+        version: link:../../packages/permissions
       '@get-on/plugins':
         specifier: workspace:*
         version: link:../../packages/plugins
@@ -328,6 +334,8 @@ importers:
         specifier: ^3.2.4
         version: 3.2.7(@types/node@20.19.43)(jiti@2.7.0)(jsdom@27.4.0(supports-color@7.2.0))(lightningcss@1.32.0)(supports-color@7.2.0)(tsx@4.23.15)
 
+  packages/activity: {}
+
   packages/ai:
     dependencies:
       zod:
@@ -375,6 +383,8 @@ importers:
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
+
+  packages/permissions: {}
 
   packages/plugins:
     dependencies:

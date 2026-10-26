@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { can } from "@/lib/permissions";
 import { getCurrentTeam, planLimits } from "@/lib/team";
 import { readPublishConfig, siteAddress } from "@/lib/publishing/config";
 import { DOMAIN_COLUMNS, HOSTNAME_COLUMNS, asDomain, asHostname } from "@/lib/domains/rows";
@@ -148,7 +149,7 @@ export default async function DomainDetailPage({ params, searchParams }: Props) 
       caa={caa}
       dnsChecks={dnsChecks}
       websites={websites.map(({ id, name }) => ({ id, name }))}
-      canManage={current.team.role === "owner" || current.team.role === "admin"}
+      canManage={can(current.team.role, "site.domains")}
       tab={tab === "settings" || tab === "activity" ? tab : "overview"}
     />
   );

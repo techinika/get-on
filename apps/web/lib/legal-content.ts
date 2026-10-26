@@ -118,6 +118,28 @@ const terms: LegalDocument = {
       ],
     },
     {
+      id: "invite-and-earn",
+      title: "Invite and earn",
+      blocks: [
+        {
+          kind: "p",
+          text: "You can invite other business owners to Get-On with your personal link. A friend counts when they create an account, confirm their email and publish a website. You cannot invite yourself, and accounts on temporary email services do not count.",
+        },
+        {
+          kind: "p",
+          text: "Rewards appear in your account and must be claimed before you use them. AI credits are added when you claim them. Other rewards are saved for you until we apply them. We keep a record of every reward we give you and every reward you claim.",
+        },
+        {
+          kind: "p",
+          text: "Reward amounts, monthly limits and the friends needed for each reward can change. The current values are shown on the Invite and earn page. We may hold, cancel or take back rewards for fake accounts, duplicate accounts, spam or other abuse.",
+        },
+        {
+          kind: "p",
+          text: "[[DECISION: whether referral rewards have a cash value, expiry date, tax treatment, and which law governs the programme]]",
+        },
+      ],
+    },
+    {
       id: "your-content",
       title: "Your website and your content",
       blocks: [
@@ -359,6 +381,7 @@ const privacy: LegalDocument = {
           kind: "ul",
           items: [
             "Security logs, including hashed IP addresses, so we can spot abuse.",
+            "When you use an invitation link, a hashed form of your email address, IP address and browser details, so we can check that a referral is genuine.",
             "Details you send us when you ask for a demo.",
             "Messages you send to our support team.",
           ],

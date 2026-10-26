@@ -19,6 +19,8 @@ const MESSAGES: Record<string, string> = {
   PAGES_FAILED: "We could not update the pages. Please try again.",
   SETTINGS_FAILED: "The pages changed, but we could not save the design details.",
   NO_SNAPSHOT: "There is nothing to undo.",
+  NOTHING_TO_ADD: "This template has no extra pages to add. Try replacing the pages instead.",
+  PAGE_LIMIT: "This template needs more pages than your plan allows. Delete a page or upgrade your plan.",
   FORBIDDEN: "You do not have permission to change this website.",
 };
 

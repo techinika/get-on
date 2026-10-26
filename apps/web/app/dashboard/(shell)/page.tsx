@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getShellData } from "@/lib/dashboard";
 import { planLimits } from "@/lib/team";
 import { WebsitesContent } from "@/components/app/websites-content";
+import { RecentlyDeleted } from "@/components/app/recently-deleted";
+import { can } from "@/lib/permissions";
 
 export default async function DashboardPage() {
   const data = await getShellData();
@@ -12,6 +14,7 @@ export default async function DashboardPage() {
   const plan = planLimits(data.currentTeam.planId);
 
   return (
+    <>
     <WebsitesContent
       teamName={data.currentTeam.name}
       planName={plan.name}
@@ -31,5 +34,13 @@ export default async function DashboardPage() {
         primaryHost: project.primaryHost ?? null,
       }))}
     />
+    <div className="mx-auto w-full max-w-[1280px] px-4 pb-10 sm:px-6 lg:px-8">
+      <RecentlyDeleted
+        websites={data.deletedProjects}
+        canRestore={can(data.currentTeam.role as "owner" | "admin" | "editor" | "viewer", "site.restore")}
+        canPurge={can(data.currentTeam.role as "owner" | "admin" | "editor" | "viewer", "site.purge")}
+      />
+    </div>
+    </>
   );
 }

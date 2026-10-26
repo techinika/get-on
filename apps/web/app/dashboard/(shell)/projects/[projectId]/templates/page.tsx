@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { TemplateGallery } from "@/components/templates/template-gallery";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentTeam } from "@/lib/team";
+import { getCurrentTeam, planLimits } from "@/lib/team";
 import { loadAiSettings, loadTeamBalance } from "@/lib/ai/settings";
 import { snapshotOf, templateOriginOf } from "@/lib/templates/apply";
 import { templatesForPlan } from "@/lib/templates/catalog";
@@ -30,6 +30,11 @@ export default async function ProjectTemplatesPage({ params }: Params) {
   if (!project) notFound();
 
   const templates = templatesForPlan(current.team.planId);
+  const plan = planLimits(current.team.planId);
+  const { count: pageCount } = await supabase
+    .from("pages")
+    .select("id", { count: "exact", head: true })
+    .eq("project_id", project.id);
   const origin = templateOriginOf(project.settings);
   const snapshot = snapshotOf(project.settings);
   const admin = createAdminClient();
@@ -58,6 +63,8 @@ export default async function ProjectTemplatesPage({ params }: Params) {
         canRestore={Boolean(snapshot)}
         aiEnabled={aiSettings.enabled}
         aiCredits={aiBalance.total}
+        maxPages={plan.maxPagesPerSite}
+        currentPageCount={pageCount ?? 0}
       />
     </AppPage>
   );

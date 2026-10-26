@@ -21,6 +21,14 @@ Template workspaces are hidden projects of kind `template_workspace`.
 ## Apply algorithm
 See implementation in `packages/templates/plan-application.ts` and `apps/web/lib/templates/apply.ts`.
 
+Modes:
+- `full` replaces the theme and every page, after saving a 30-day snapshot.
+- `add` keeps the current home page, adds the template's other pages, and applies the template theme. It also saves a snapshot first. Existing paths are kept and a number is added to a clash (`/about` becomes `/about-2`). Links to the template home point at the current home page.
+- `design` changes only the theme.
+- `pages` replaces pages and keeps the current theme.
+
+Add mode never goes over the plan page limit. If the website does not have room, apply stops with `PAGE_LIMIT` and the UI links to plans.
+
 ## Sample detection
 See `packages/templates/sample.ts`.
 

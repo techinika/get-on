@@ -15,6 +15,8 @@ See also  for the templates system.
 See also  for the templates system.
 
 # Get-On UI Specification v1 - Dashboard app
+
+See `docs/ui-spec-team.md` for the Team page, project Activity, Recently deleted, template apply Step 1 and Invite and earn. It replaces the matching sections in this document.
 See `docs/ui-spec-plugins.md` for the plugin system.
 
 For all `/dashboard` screens except the editor, the wizard and the preview, this document overrides `docs/ui-spec.md`.
