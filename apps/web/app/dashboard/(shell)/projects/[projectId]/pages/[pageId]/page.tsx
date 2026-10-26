@@ -9,6 +9,8 @@ import { migrateContent } from "@get-on/blocks";
 import { parseTheme } from "@/lib/publishing/build-input";
 import { getCurrentTeam } from "@/lib/team";
 import { AiSectionComposer } from "./ai-section-composer";
+import { PageTextEditor, type PageTextField } from "./page-text-editor";
+import { collectTemplateSlots, type PageRow } from "@/lib/ai/template-slots";
 
 type Params = { params: Promise<{ projectId: string; pageId: string }> };
 
@@ -118,7 +120,38 @@ export default async function PageEditorPage({ params }: Params) {
 
         {current &&
         ["owner", "admin", "editor"].includes(current.team.role) ? (
-          <AiSectionComposer projectId={projectId} pageId={pageId} />
+          <>
+            <PageTextEditor
+              projectId={projectId}
+              pageId={pageId}
+              fields={(() => {
+                const blockTypeById = new Map<string, string>();
+                const blocks = Array.isArray(content.blocks) ? content.blocks : [];
+                for (const block of blocks) {
+                  if (block && typeof block === "object" && "id" in block) {
+                    blockTypeById.set(String((block as { id: string }).id), String((block as { type?: string }).type ?? "Block"));
+                  }
+                }
+                const rows: PageRow[] = [{ id: page.id, blocks: page.blocks }];
+                const plan = collectTemplateSlots(rows, { includeEmpty: true });
+                const fields: PageTextField[] = [];
+                for (const slot of plan.slots) {
+                  const ref = plan.refs.get(slot.id);
+                  if (!ref) continue;
+                  const blockType = blockTypeById.get(ref.blockId) ?? "Block";
+                  const pathKey = String(ref.path[ref.path.length - 1] ?? "text");
+                  fields.push({
+                    id: slot.id,
+                    text: slot.text,
+                    label: `${blockType} · ${pathKey}`,
+                    maxLength: ref.maxLength,
+                  });
+                }
+                return fields;
+              })()}
+            />
+            <AiSectionComposer projectId={projectId} pageId={pageId} />
+          </>
         ) : null}
 
         <Card className="p-6">
