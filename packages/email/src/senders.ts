@@ -32,8 +32,9 @@ export class SesSender implements EmailSender {
   }
 
   async send(message: EmailMessage): Promise<EmailSendResult> {
+    const fromAddress = safeHeader(message.from || this.teamEmail, 254);
     const command = new SendEmailCommand({
-      FromEmailAddress: `"${safeFromName(message.fromName)}" <${this.teamEmail}>`,
+      FromEmailAddress: `"${safeFromName(message.fromName)}" <${fromAddress}>`,
       Destination: { ToAddresses: [safeHeader(message.to, 254)] },
       ReplyToAddresses: message.replyTo ? [safeHeader(message.replyTo, 254)] : undefined,
       Content: {

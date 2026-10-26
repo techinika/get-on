@@ -693,12 +693,11 @@ export class DomainService {
       );
       if (error || hasChanges !== false) return;
 
-      const { data: team } = await this.supabase
-        .from("teams")
-        .select("plan_id")
-        .eq("id", project.team_id)
-        .maybeSingle();
-      if (!team?.plan_id || !domain?.created_by) return;
+      const { data: access } = await this.supabase.rpc("billing_resolve_team", {
+        p_team: project.team_id,
+      });
+      const planId = (access as { plan_id?: string } | null)?.plan_id;
+      if (!planId || !domain?.created_by) return;
 
       await this.publish({
         supabase: this.supabase as unknown as Parameters<
@@ -707,7 +706,7 @@ export class DomainService {
         user: { id: String(domain.created_by) },
         team: {
           teamId: String(project.team_id),
-          planId: String(team.plan_id),
+          planId: String(planId),
         },
         project: {
           id: String(project.id),

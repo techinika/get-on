@@ -16,9 +16,9 @@ insert into public.plans (
 )
 values
   ('free', 'Free', 0, 1, 1, 1, 1, 0, 30, 100, 100, false, 0, true),
-  ('basic', 'Basic', 7.99, 3, 10, 1, 5, 100, 100, 500, 500, true, 1, false),
-  ('pro', 'Pro', 13.99, 10, 50, 5, 15, 400, 300, 2048, 2000, true, 3, false),
-  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1500, 1000, 10240, 10000, true, 10, false)
+  ('basic', 'Basic', 7.99, 2, 5, 1, 2, 100, 100, 1024, 1000, true, 1, false),
+  ('pro', 'Pro', 13.99, 5, null, 5, 5, 400, 300, 5120, 5000, true, 3, false),
+  ('enterprise', 'Enterprise', 59.99, null, null, null, null, 1500, 1000, 25600, 25000, true, 10, false)
 on conflict (id) do update
 set
   name = excluded.name,

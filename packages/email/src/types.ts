@@ -10,6 +10,8 @@ export interface EmailMessage {
   replyTo?: string;
   fromName?: string;
   kind: string;
+  /** Optional sender address. Defaults to TEAM_EMAIL. */
+  from?: string;
   relatedType?: string;
   relatedId?: string;
 }

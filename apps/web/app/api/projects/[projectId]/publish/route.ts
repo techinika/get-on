@@ -12,6 +12,7 @@ const STATUS: Record<string, number> = {
   SUSPENDED: 409,
   UNDER_REVIEW: 409,
   PUBLISH_RATE_LIMITED: 429,
+  PLAN_INACTIVE: 402,
   PUBLISH_NOT_CONFIGURED: 503,
   PUBLISH_FAILED: 500,
   UPLOAD_FAILED: 502,
@@ -27,6 +28,10 @@ export async function POST(_request: Request, { params }: Params) {
 
   if (ctx.current.team.role === "viewer") {
     return NextResponse.json({ error: "UNKNOWN" }, { status: 403 });
+  }
+
+  if (ctx.current.team.billingStatus === "lapsed") {
+    return NextResponse.json({ error: "PLAN_INACTIVE" }, { status: 402 });
   }
 
   try {

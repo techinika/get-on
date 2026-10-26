@@ -298,6 +298,18 @@ class FakeSupabase {
       }
       return { data: null, error: null };
     }
+    if (name === "billing_resolve_team") {
+      const team = (this.rows.teams ?? []).find((row) => row.id === args.p_team);
+      return {
+        data: {
+          plan_id: team?.plan_id ?? "free",
+          status: "active",
+          source: "paid",
+          debt_cents: 0,
+        },
+        error: null,
+      };
+    }
     if (name === "finish_domain_removal") {
       const domain = domains.find((row) => row.id === args.p_domain_id)!;
       domain.status = "removed";

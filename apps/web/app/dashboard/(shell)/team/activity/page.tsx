@@ -36,6 +36,7 @@ const CATEGORY_CHIPS: Array<{ key: string; label: string; categories: string[] |
   { key: "backup", label: "Backups", categories: ["backup"] },
   { key: "ai", label: "AI", categories: ["ai"] },
   { key: "people", label: "People", categories: ["member", "invitation", "team", "referral"] },
+  { key: "billing", label: "Billing", categories: ["billing"] },
   { key: "security", label: "Security", categories: ["security"] },
 ];
 

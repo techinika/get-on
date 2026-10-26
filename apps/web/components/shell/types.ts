@@ -15,6 +15,7 @@ export type ShellTeam = {
   planId: PlanId;
   role: ShellRole;
   isPersonal: boolean;
+  billingStatus?: "active" | "grace" | "lapsed" | "free";
 };
 
 export type ShellProject = {

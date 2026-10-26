@@ -15,6 +15,7 @@ const jobs = [
   "scripts/jobs/referrals-qualify.ts",
   "scripts/jobs/team-reconcile.ts",
   "scripts/jobs/redirects-resync.ts",
+  "scripts/jobs/billing.ts",
 ];
 
 let failed = 0;

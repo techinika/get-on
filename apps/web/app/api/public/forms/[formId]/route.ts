@@ -99,14 +99,14 @@ export async function POST(
     return json(404);
   }
 
-  const [{ data: install }, { data: team }, { data: live }] = await Promise.all([
+  const [{ data: install }, { data: access }, { data: live }] = await Promise.all([
     admin
       .from("plugin_installs")
       .select("state")
       .eq("project_id", project.id)
       .eq("plugin_id", "contact")
       .maybeSingle(),
-    admin.from("teams").select("plan_id").eq("id", project.team_id).maybeSingle(),
+    admin.rpc("billing_resolve_team", { p_team: project.team_id }),
     admin
       .from("publishes")
       .select("forms")
@@ -144,7 +144,7 @@ export async function POST(
     return json(200, { ok: true });
   }
 
-  const planId = (team?.plan_id ?? "free") as PlanId;
+  const planId = (((access ?? {}) as { plan_id?: string }).plan_id ?? "free") as PlanId;
   const ipHash = hashIp(ip);
 
   const secretValue = process.env.FORM_TOKEN_SECRET ?? "";

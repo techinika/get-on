@@ -7,6 +7,7 @@ export type CurrentTeam = {
   teamName: string;
   planId: PlanId;
   role: ShellRole;
+  billingStatus?: "active" | "grace" | "lapsed" | "free";
 };
 
 /**
@@ -26,6 +27,7 @@ export async function getCurrentTeam(): Promise<
       teamName: data.currentTeam.name,
       planId: data.currentTeam.planId,
       role: data.currentTeam.role,
+      billingStatus: data.currentTeam.billingStatus,
     },
   };
 }

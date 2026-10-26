@@ -681,13 +681,14 @@ export async function moveProjectToTeam(
       .eq("team_id", targetTeamId)
       .eq("user_id", current.user.id)
       .maybeSingle(),
-    supabase.from("teams").select("id, plan_id").eq("id", targetTeamId).maybeSingle(),
+    supabase.rpc("billing_resolve_team", { p_team: targetTeamId }),
   ]);
   if (!targetTeam || !membership || !can(membership.role as "owner" | "admin" | "editor" | "viewer", "site.create")) {
     return { ok: false, error: "You can only move a website to a team you own or manage." };
   }
 
-  const plan = PLAN_BY_ID[(targetTeam.plan_id as PlanId) ?? "free"] ?? PLAN_BY_ID.free;
+  const planId = (((targetTeam ?? {}) as { plan_id?: string }).plan_id ?? "free") as PlanId;
+  const plan = PLAN_BY_ID[planId] ?? PLAN_BY_ID.free;
   const { count } = await supabase
     .from("projects")
     .select("id", { count: "exact", head: true })

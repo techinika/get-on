@@ -49,12 +49,11 @@ async function teamPlanId(
   admin: ReturnType<typeof createAdminClient>,
   teamId: string,
 ): Promise<string> {
-  const { data } = await admin
-    .from("teams")
-    .select("plan_id")
-    .eq("id", teamId)
-    .maybeSingle();
-  return String(data?.plan_id ?? "free");
+  const { data, error } = await admin.rpc("billing_resolve_team", {
+    p_team: teamId,
+  });
+  if (error) return "free";
+  return String((data as { plan_id?: string } | null)?.plan_id ?? "free");
 }
 
 async function latestSuccessfulPublish(
@@ -214,11 +213,7 @@ export async function approveSite(siteId: string): Promise<AdminActionResult> {
   const project = await projectRow(admin, siteId);
   if (!project) return { ok: false, code: "NOT_FOUND" };
 
-  const { data: team } = await admin
-    .from("teams")
-    .select("id, plan_id")
-    .eq("id", project.team_id)
-    .maybeSingle();
+  const planId = await teamPlanId(admin, project.team_id);
 
   await admin
     .from("projects")
@@ -236,7 +231,7 @@ export async function approveSite(siteId: string): Promise<AdminActionResult> {
     user: { id: adminUser.id },
     team: {
       teamId: project.team_id,
-      planId: String(team?.plan_id ?? "free"),
+      planId,
     },
     project: {
       id: project.id,

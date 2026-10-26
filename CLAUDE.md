@@ -93,6 +93,19 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Plain language in normal UI: never show token, prompt, model, neuron, schema, JSON or LLM.
 - See `docs/ai.md`, `docs/ai-prompts.md`, `docs/credits.md`, `docs/skill-packs.md`, `docs/ai-spike.md` and `docs/ui-spec-ai.md`.
 
+## Billing and entitlements
+- Prepaid terms only: 1, 6, 12, 24, 36, 48 and 60 months. We never charge automatically.
+- Plan prices are USD: Basic 7.99, Pro 13.99, Enterprise 59.99 per month. All prices are calculated on the server from `plans`; a browser price is only a display.
+- Pesapal API 3.0 is behind `PaymentProvider`. `PAYMENT_PROVIDER=fake` is the development and test default; production must use `pesapal` and fail closed when credentials are missing.
+- Callback and IPN parameters are never trusted. Every status comes from `GetTransactionStatus`, with matching merchant reference, currency and amount, before an invoice is marked paid.
+- Invoices, payments and `billing_ledger` are append-only. Paid invoices are immutable. Invoice numbers are gapless.
+- No auto-renewal. A renewal reminder links to a screen where the owner creates an invoice. The first term starts on payment; a renewal stacks on active paid time, and after a gap it starts when payment is confirmed. The gap is debt, never access.
+- Skipped months become debt, not access. Payments settle the oldest debt first. Debt is shown before checkout and never deletes data.
+- `teams.plan_id` is a cache of the effective plan. `billing_resolve_team` is the source of truth; `billing_refresh_team` is service-role only.
+- Billing email uses `billing@contact.get-on.tech`; every other platform email stays `team@get-on.tech`. All billing replies go to `team@get-on.tech`.
+- Permissions: `billing.invoices` (owner/admin), `billing.pay` (owner), `billing.notices` (owner/admin), plus `plan.view`/`plan.manage`.
+- See `docs/pesapal-spike.md`, `docs/entitlements.md`, `docs/ui-spec-billing.md`, `docs/credits.md` and `docs/legal.md`.
+
 ## See also
 - docs/settings.md
 - docs/ui-spec-settings.md
