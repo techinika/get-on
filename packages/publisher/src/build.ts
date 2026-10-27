@@ -1,9 +1,7 @@
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { createRequire } from "node:module";
 import { gzipSync } from "node:zlib";
 import sharp from "sharp";
-import { buildCss } from "./css";
+import { RENDERER_CSS, RENDERER_CSS_VERSION } from "@get-on/renderer";
+import { assertStyledCss, assertStyledHtml, buildCss } from "./css";
 import { prepareFonts } from "./fonts";
 import { renderHtml, renderNotFoundHtml, renderFormStatusHtml, type NavItem } from "./html";
 import { prepareImages, type PreparedImage } from "./images";
@@ -20,20 +18,12 @@ export { pageSeo } from "./seo";
 const CSS_BUDGET_BYTES = 14 * 1024;
 const PAGE_BUDGET_BYTES = 20 * 1024;
 
-/** Reads the stylesheet of the renderer from the package. */
+/**
+ * The stylesheet of the renderer. It is embedded in the renderer package, so
+ * server bundlers cannot leave it behind when they trace the publish route.
+ */
 export function readRendererCss(): string {
-  try {
-    const require = createRequire(import.meta.url);
-    const packageJson = require.resolve("@get-on/renderer/package.json");
-    const cssPath = path.join(
-      path.dirname(packageJson),
-      "styles",
-      "renderer.css",
-    );
-    return readFileSync(cssPath, "utf8");
-  } catch {
-    return "";
-  }
+  return RENDERER_CSS;
 }
 
 function textFile(body: string): BuiltFile {
@@ -100,6 +90,7 @@ export async function buildSite(
     rendererCss,
     fonts: fonts.fonts,
   });
+  assertStyledCss(css);
 
   const cssGzip = gzipSize(new TextEncoder().encode(css));
   if (cssGzip > CSS_BUDGET_BYTES) {
@@ -174,6 +165,7 @@ export async function buildSite(
       contactEnabled: formsEnabled,
       pagePath: page.slug === "" ? "/" : `/${slugify(page.slug)}`,
     });
+    assertStyledHtml(html);
     const file = textFile(html);
     files[pagePath(page.slug)] = file;
 
@@ -206,34 +198,39 @@ export async function buildSite(
       contactEnabled: formsEnabled,
       pagePath: "/",
     });
+    assertStyledHtml(html);
     files["index.html"] = textFile(html);
   }
 
-  files["404.html"] = textFile(
-    renderNotFoundHtml({ settings: input.settings, css, logoUrl: logo.url }),
-  );
+  const notFoundHtml = renderNotFoundHtml({
+    settings: input.settings,
+    css,
+    logoUrl: logo.url,
+  });
+  assertStyledHtml(notFoundHtml);
+  files["404.html"] = textFile(notFoundHtml);
 
   if (formsEnabled) {
-    files["_forms/sent/index.html"] = textFile(
-      renderFormStatusHtml({
-        settings: input.settings,
-        css,
-        logoUrl: logo.url,
-        heading: "Message sent",
-        text: "Thank you. We will get back to you as soon as we can.",
-        problem: false,
-      }),
-    );
-    files["_forms/problem/index.html"] = textFile(
-      renderFormStatusHtml({
-        settings: input.settings,
-        css,
-        logoUrl: logo.url,
-        heading: "Message not sent",
-        text: "{{GS_PROBLEM_TEXT}}",
-        problem: true,
-      }),
-    );
+    const sentHtml = renderFormStatusHtml({
+      settings: input.settings,
+      css,
+      logoUrl: logo.url,
+      heading: "Message sent",
+      text: "Thank you. We will get back to you as soon as we can.",
+      problem: false,
+    });
+    const problemHtml = renderFormStatusHtml({
+      settings: input.settings,
+      css,
+      logoUrl: logo.url,
+      heading: "Message not sent",
+      text: "{{GS_PROBLEM_TEXT}}",
+      problem: true,
+    });
+    assertStyledHtml(sentHtml);
+    assertStyledHtml(problemHtml);
+    files["_forms/sent/index.html"] = textFile(sentHtml);
+    files["_forms/problem/index.html"] = textFile(problemHtml);
   }
 
   files["sitemap.xml"] = xmlFile(buildSitemap(baseUrl, visiblePages));
@@ -246,7 +243,17 @@ export async function buildSite(
     Object.values(files).reduce((sum, file) => sum + file.size, 0) +
     Object.values(shared).reduce((sum, file) => sum + file.size, 0);
 
-  return { files, shared, warnings, totalBytes, largestPageBytes, forms };
+  return {
+    files,
+    shared,
+    warnings,
+    totalBytes,
+    largestPageBytes,
+    forms,
+    rendererVersion: RENDERER_CSS_VERSION,
+    cssHash: hashBytes(new TextEncoder().encode(css), 16),
+    cssBytes: Buffer.byteLength(css),
+  };
 }
 
 /**

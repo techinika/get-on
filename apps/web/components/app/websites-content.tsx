@@ -273,6 +273,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
   const router = useRouter();
   const { toast } = useToast();
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const deleteInputRef = React.useRef<HTMLInputElement>(null);
   const [confirmText, setConfirmText] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
@@ -420,6 +421,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
         open={deleteOpen}
         onClose={() => setDeleteOpen(false)}
         title={`Delete ${website.name}?`}
+        initialFocusRef={deleteInputRef}
         icon={
           <span className="flex h-12 w-12 items-center justify-center rounded-full bg-danger-soft">
             <TriangleAlert size={24} strokeWidth={1.75} aria-hidden className="text-danger" />
@@ -449,6 +451,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
           <Label htmlFor="delete-confirm">Type {website.name} to confirm</Label>
           <Input
             id="delete-confirm"
+            ref={deleteInputRef}
             className="mt-1.5"
             value={confirmText}
             onChange={(event) => setConfirmText(event.target.value)}

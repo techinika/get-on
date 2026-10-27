@@ -1,4 +1,4 @@
-import { buildSite } from "@get-on/publisher";
+import { assertStyledHtml, buildSite } from "@get-on/publisher";
 import { createClient } from "@/lib/supabase/server";
 import { invalidateQuickFind } from "@/lib/project-activity";
 import {
@@ -56,6 +56,43 @@ export type PublishResult = {
   pagesCount: number;
   sizeBytes: number;
 };
+
+const PROBE_TIMEOUT_MS = 8_000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Checks that the address visitors use really serves a styled page. */
+async function probeLiveSiteOnce(url: string): Promise<void> {
+  const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}__gs_probe=${Date.now()}`, {
+    headers: { "cache-control": "no-cache" },
+    // A free address that redirects to the custom main address is already
+    // serving the pointer. Following it would make a custom DNS problem look
+    // like a failed publish.
+    redirect: "manual",
+    signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+  });
+  if (response.status >= 300 && response.status < 400) return;
+  if (!response.ok) throw new Error(`LIVE_PROBE_STATUS_${response.status}`);
+  const html = await response.text();
+  assertStyledHtml(html);
+}
+
+/** KV and DNS can take a few seconds to see a new pointer. */
+async function probeLiveSite(url: string, attempts = 4): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await probeLiveSiteOnce(url);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await sleep(700 * 2 ** (attempt - 1));
+    }
+  }
+  throw lastError;
+}
 
 type LoadedSite = {
   project: SourceProject & {
@@ -278,6 +315,15 @@ export async function publishProject(
         size_bytes: result.totalBytes,
         forms: result.forms,
         plugins: activePlugins,
+        renderer_version: result.rendererVersion,
+        css_hash: result.cssHash,
+        css_bytes: result.cssBytes,
+        build_meta: {
+          rendererVersion: result.rendererVersion,
+          cssHash: result.cssHash,
+          cssBytes: result.cssBytes,
+          warnings: result.warnings,
+        },
       })
       .eq("id", publishId);
     if (readyError) throw new PublishError("PUBLISH_FAILED", publishId);
@@ -285,10 +331,11 @@ export async function publishProject(
     await store.writeVersion(project.id, publishId, result.files);
 
     const hostname = siteHostname(config, project.subdomain);
-    await store.writePointer(hostname, {
+    const previous = await store.getPointer(hostname).catch(() => null);
+    const pointer = {
       siteId: project.id,
       publishId,
-      state: "live",
+      state: "live" as const,
       builtAt: builtAt.toISOString(),
       plan: ctx.team.planId,
       pause: pauseFromSettings(settings?.maintenance),
@@ -296,7 +343,61 @@ export async function publishProject(
       primaryHost: project.primary_host ?? null,
       freeHost: hostname,
       redirectToPrimary: project.redirect_free_address,
-    });
+    };
+    await store.writePointer(hostname, pointer);
+
+    if (config.kind === "cloudflare") {
+      try {
+        // The free address is the one we control. A custom main address may
+        // still be waiting for DNS or proxy setup, so a failure there must not
+        // roll back an otherwise good publish.
+        await probeLiveSite(primaryAddress(config, project.subdomain, null));
+        if (project.primary_host) {
+          await probeLiveSite(
+            primaryAddress(config, project.subdomain, project.primary_host),
+            2,
+          ).catch((error) => {
+            console.warn("[publish] custom address probe failed", error);
+          });
+        }
+      } catch (probeError) {
+        console.error("[publish] live style probe failed", probeError);
+        if (previous) {
+          await store.writePointer(hostname, previous).catch((rollbackError) => {
+            console.error("[publish] pointer rollback failed", rollbackError);
+          });
+        } else {
+          await store
+            .writePointer(hostname, { ...pointer, state: "unpublished" })
+            .catch((rollbackError) => {
+              console.error("[publish] pointer rollback failed", rollbackError);
+            });
+        }
+        throw new PublishError("LIVE_PROBE_FAILED", publishId);
+      }
+    }
+
+    // Keep each custom address self-contained for Workers running an older
+    // build. New Workers read site:{siteId}, but the old ones read host:{host}
+    // directly, so the copy must be refreshed on every successful publish.
+    const { data: customHosts } = await ctx.supabase
+      .from("domain_hostnames")
+      .select("hostname")
+      .eq("project_id", project.id)
+      .in("status", ["active", "live"]);
+    for (const row of customHosts ?? []) {
+      const customHost = String(row.hostname ?? "").trim().toLowerCase();
+      if (!customHost || customHost === hostname) continue;
+      const existing = await store.getPointer(customHost).catch(() => null);
+      await store
+        .writeHostPointer(customHost, project.id, {
+          planLapsed: existing?.planLapsed === true,
+          supportPaused: existing?.supportPaused === true,
+        })
+        .catch((error) => {
+          console.error(`[publish] could not update ${customHost}`, error);
+        });
+    }
 
     const now = new Date().toISOString();
     await ctx.supabase
@@ -475,4 +576,35 @@ export async function restorePublish(
     publishId: String(target.id),
     url: primaryAddress(config, loaded.project.subdomain, loaded.project.primary_host),
   };
+}
+
+/**
+ * Rebuilds a live website with the current renderer stylesheet, but only when
+ * the live version still matches the draft. This is used by the admin console
+ * and by the scheduled rebuild job, so a stale stylesheet can be replaced
+ * without silently publishing unfinished changes.
+ */
+export async function rebuildPublishedSite(
+  ctx: PublishContext,
+): Promise<PublishResult> {
+  const loaded = await loadSite(ctx.supabase, ctx.project.id);
+  if (!loaded) throw new PublishError("PROJECT_NOT_FOUND");
+
+  const { data: live, error } = await ctx.supabase
+    .from("publishes")
+    .select("id, content_revision, renderer_version")
+    .eq("project_id", ctx.project.id)
+    .eq("status", "live")
+    .maybeSingle();
+  if (error) throw new PublishError("UNKNOWN");
+  if (!live) throw new PublishError("NO_LIVE_VERSION");
+  if (Number(live.content_revision) !== loaded.project.content_revision) {
+    throw new PublishError("HAS_UNPUBLISHED_CHANGES");
+  }
+
+  return publishProject({
+    ...ctx,
+    force: true,
+    bypassRateLimit: true,
+  });
 }

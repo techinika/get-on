@@ -19,7 +19,7 @@ describe("prompt composer", () => {
     expect(result.messages[0]?.role).toBe("system");
     expect(result.messages[0]?.content).toContain(PLATFORM_RULES);
     expect(result.messages[0]?.content).toContain("Write one short headline.");
-    expect(result.manifest.platformRules).toBe("platform-rules@1");
+    expect(result.manifest.platformRules).toBe("platform-rules@2");
   });
 
   it("wraps and escapes untrusted data", () => {

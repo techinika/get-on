@@ -1,12 +1,15 @@
-import { createBlock, createId, type Theme } from "@get-on/blocks";
+import { createBlock, createId, type Theme, type ThemeDesign, type ThemeFooter, type ThemeHeader } from "@get-on/blocks";
 import type { Block, TemplatePage } from "./types";
 
 export function b(type: string, props: Record<string, unknown> = {}, sec?: Record<string, unknown>): Block {
   const created = createBlock(type);
+  const { includeIf, slotMeta, ...section } = sec ?? {};
   return {
     ...created,
     props: { ...(created.props ?? {}), ...props },
-    ...(sec ? { sec: { ...(created.sec ?? {}), ...sec } } : {}),
+    ...(Object.keys(section).length > 0 ? { sec: { ...(created.sec ?? {}), ...section } } : {}),
+    ...(includeIf ? { includeIf } : {}),
+    ...(slotMeta ? { slotMeta } : {}),
   };
 }
 
@@ -56,7 +59,17 @@ export function theme(input: {
   corners?: Theme["corners"];
   density?: Theme["density"];
   buttonShape?: NonNullable<Theme["buttons"]>["shape"];
+  buttonSize?: NonNullable<Theme["buttons"]>["size"];
+  buttonStyle?: NonNullable<Theme["buttons"]>["style"];
+  buttonUppercase?: boolean;
+  buttonShadow?: boolean;
   cardStyle?: NonNullable<Theme["cards"]>["style"];
+  scale?: NonNullable<Theme["fonts"]>["scale"];
+  headingWeight?: number;
+  bodyWeight?: number;
+  design?: ThemeDesign;
+  header?: ThemeHeader;
+  footer?: ThemeFooter;
   cardinal?: boolean;
 }): Theme {
   return {
@@ -69,21 +82,24 @@ export function theme(input: {
       soft: input.soft,
     },
     fonts: {
-      heading: { id: input.heading, weight: 700 },
-      body: { id: input.body, weight: 400 },
-      scale: "comfortable",
+      heading: { id: input.heading, weight: input.headingWeight ?? 700 },
+      body: { id: input.body, weight: input.bodyWeight ?? 400 },
+      scale: input.scale ?? "comfortable",
     },
     buttons: {
       shape: input.buttonShape ?? "soft",
-      style: "solid",
-      size: "normal",
-      uppercase: false,
-      shadow: false,
+      style: input.buttonStyle ?? "solid",
+      size: input.buttonSize ?? "normal",
+      uppercase: input.buttonUppercase ?? false,
+      shadow: input.buttonShadow ?? false,
     },
     cards: { style: input.cardStyle ?? "outlined" },
     corners: input.corners ?? "soft",
     density: input.density ?? "comfortable",
     colorMode: "light",
+    ...(input.design ? { design: input.design } : {}),
+    ...(input.header ? { header: input.header } : {}),
+    ...(input.footer ? { footer: input.footer } : {}),
   };
 }
 

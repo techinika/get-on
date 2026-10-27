@@ -1,3 +1,5 @@
+Read with `docs/template-designs.md` for the ten template designs and real-data rules, and `docs/design-system.md` for the renderer contract.
+
 # Templates
 
 ## Rules (invariants)

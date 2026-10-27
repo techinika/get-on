@@ -29,7 +29,13 @@ export function DeleteForm({ projectId }: { projectId: string }) {
 
   return (
     <AppCard className="max-w-[760px] p-6">
-      <form action={onSubmit} className="flex flex-col gap-4">
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault();
+          void onSubmit(new FormData(event.currentTarget));
+        }}
+      >
         <div>
           <h2 className="text-[17px] font-semibold text-danger-text">Delete this website</h2>
           <p className="mt-1 text-[14px] text-text-muted">This takes your website offline. You can get it back for 14 days.</p>
@@ -41,7 +47,16 @@ export function DeleteForm({ projectId }: { projectId: string }) {
         </ul>
         <div className="flex flex-col gap-2">
           <Label htmlFor="confirm">Type the web address to confirm</Label>
-          <Input id="confirm" name="confirm" value={value} onChange={(e) => setValue(e.target.value)} />
+          <Input
+            id="confirm"
+            name="confirm"
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
+          />
         </div>
         <label className="flex items-center gap-2 text-[15px] text-text">
           <input type="checkbox" checked={checked} onChange={(e) => setChecked(e.target.checked)} />

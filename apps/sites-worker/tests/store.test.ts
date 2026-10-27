@@ -234,6 +234,23 @@ describe("v2 pointers", () => {
     });
   });
 
+  it("prefers the site pointer over a stale full copy in a hybrid mapping", async () => {
+    const kv = fakeKv({
+      "host:www.example.com": {
+        ...pointer,
+        v: 2,
+        publishId: "pub-old",
+        siteId: "site-1",
+      },
+      "site:site-1": { ...pointer, publishId: "pub-new" },
+    });
+    const store = createCloudflareStore({ kv, bucket: fakeBucket() });
+
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      publishId: "pub-new",
+    });
+  });
+
   it("refuses a mapping that points at a missing site", async () => {
     const kv = fakeKv({ "host:www.example.com": { v: 2, siteId: "site-1" } });
     const store = createCloudflareStore({ kv, bucket: fakeBucket() });

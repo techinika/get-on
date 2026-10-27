@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -37,6 +37,37 @@ describe("node store host pointers", () => {
     await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
       siteId: "site-1",
       primaryHost: "www.example.com",
+    });
+  });
+
+  it("keeps a full pointer copy in the custom host mapping", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "get-on-store-"));
+    await writeNodePointer(rootDir, pointer.freeHost!, pointer);
+    await writeNodeHostPointer(rootDir, "www.example.com", pointer.siteId);
+
+    const raw = await readFile(
+      path.join(rootDir, "pointers", "hosts", "www.example.com.json"),
+      "utf8",
+    );
+    expect(JSON.parse(raw)).toMatchObject({
+      ...pointer,
+      v: 2,
+      siteId: pointer.siteId,
+    });
+  });
+
+  it("prefers the site pointer over a stale full copy in the host mapping", async () => {
+    rootDir = await mkdtemp(path.join(tmpdir(), "get-on-store-"));
+    await writeNodePointer(rootDir, pointer.freeHost!, pointer);
+    await writeNodeHostPointer(rootDir, "www.example.com", pointer.siteId);
+    await writeNodePointer(rootDir, pointer.freeHost!, {
+      ...pointer,
+      publishId: "pub-2",
+    });
+
+    const store = createNodeStore(rootDir);
+    await expect(store.getPointer("www.example.com")).resolves.toMatchObject({
+      publishId: "pub-2",
     });
   });
 

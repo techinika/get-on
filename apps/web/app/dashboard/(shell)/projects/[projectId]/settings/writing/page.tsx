@@ -1,8 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { SettingsPageHeader } from "@/components/settings/settings-page-header";
+import { parseDesignPrefs, type DesignPrefs } from "@/lib/ai/design-prefs";
 import { TONES } from "./tone-options";
 import { WritingStyleForm } from "./writing-style-form";
+import { DesignReportCard, type DesignReportSummary } from "./design-report-card";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -18,27 +20,48 @@ export default async function WritingStyleSettingsPage({ params }: Params) {
   const { projectId } = await params;
   const current = await getCurrentTeam();
 
+  let designReport: DesignReportSummary | null = null;
   let initial: {
     tones: string[];
     audience: string;
     wordsToUse: string[];
     wordsToAvoid: string[];
     facts: Array<{ label: string; value: string }>;
+    designPrefs: DesignPrefs;
   } = {
     tones: [],
     audience: "",
     wordsToUse: [],
     wordsToAvoid: [],
     facts: [],
+    designPrefs: parseDesignPrefs({}),
   };
 
   if (current) {
     const supabase = await createClient();
-    const { data: settings } = await supabase
-      .from("project_settings")
-      .select("brand_voice, business_facts")
-      .eq("project_id", projectId)
-      .maybeSingle();
+    const [{ data: settings }, { data: report }] = await Promise.all([
+      supabase
+        .from("project_settings")
+        .select("brand_voice, business_facts, design_prefs")
+        .eq("project_id", projectId)
+        .maybeSingle(),
+      supabase
+        .from("ai_design_reports")
+        .select("accuracy, unmet, unsupported, created_at")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (report) {
+      designReport = {
+        accuracy: Number(report.accuracy ?? 0),
+        unmet: Array.isArray(report.unmet) ? report.unmet : [],
+        unsupported: Array.isArray(report.unsupported) ? report.unsupported : [],
+        createdAt: String(report.created_at ?? ""),
+      };
+    }
 
     const brandVoice =
       settings?.brand_voice && typeof settings.brand_voice === "object"
@@ -61,6 +84,7 @@ export default async function WritingStyleSettingsPage({ params }: Params) {
       wordsToUse: stringList(brandVoice.wordsToUse),
       wordsToAvoid: stringList(brandVoice.wordsToAvoid),
       facts,
+      designPrefs: parseDesignPrefs(settings?.design_prefs),
     };
   }
 
@@ -71,7 +95,10 @@ export default async function WritingStyleSettingsPage({ params }: Params) {
         description="Tell AI how to sound and what is true about your business."
         timing="right"
       />
-      <WritingStyleForm projectId={projectId} initial={initial} />
+      <div className="flex flex-col gap-4">
+        <WritingStyleForm projectId={projectId} initial={initial} />
+        {designReport ? <DesignReportCard report={designReport} /> : null}
+      </div>
     </div>
   );
 }

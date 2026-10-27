@@ -134,13 +134,46 @@ export class FakeAiProvider implements AiProvider {
       };
     }
 
+    const designValue =
+      input.schemaName.startsWith("design_")
+        ? {
+            requirements: [],
+            palette: {},
+            fonts: {},
+            layout: {},
+            sections: { include: [], exclude: [] },
+            pages: { include: [], exclude: [] },
+            tone: [],
+            copy: { mention: [], avoidWords: [], useWords: [] },
+            unsupported: [],
+            clarifications: [],
+            confidence: 0.5,
+          }
+        : null;
+    const slotIds =
+      input.schemaName === "template_fill" ||
+      input.schemaName === "site_generation"
+        ? Array.from(inputText(input).matchAll(/"id"\s*:\s*"([^"]+)"/g))
+            .map((match) => match[1]!)
+            .filter((id, index, all) => all.indexOf(id) === index)
+            .slice(0, 80)
+        : [];
+    const slotValue = slotIds.length
+      ? {
+          slots: slotIds.map((id) => ({
+            id,
+            text: `A clear, friendly line for this business (${seed}).`,
+          })),
+        }
+      : null;
+
     const value =
       this.script.structuredValue ??
       (this.script.mode === "schema_violation"
         ? { unexpected: true, seed }
         : this.script.mode === "partial"
           ? { partial: true, seed }
-          : { ok: true, seed });
+          : designValue ?? slotValue ?? { ok: true, seed });
 
     return {
       value,

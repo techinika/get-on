@@ -18,6 +18,7 @@ const STATUS: Record<string, number> = {
   UPLOAD_FAILED: 502,
   UPLOAD_VERIFY_FAILED: 502,
   POINTER_WRITE_FAILED: 502,
+  LIVE_PROBE_FAILED: 502,
 };
 
 export async function POST(_request: Request, { params }: Params) {

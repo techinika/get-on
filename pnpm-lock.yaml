@@ -341,6 +341,12 @@ importers:
 
   packages/ai:
     dependencies:
+      '@get-on/blocks':
+        specifier: workspace:*
+        version: link:../blocks
+      '@get-on/templates':
+        specifier: workspace:*
+        version: link:../templates
       zod:
         specifier: ^3.24.1
         version: 3.25.76

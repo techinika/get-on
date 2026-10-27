@@ -43,6 +43,39 @@ describe("fake provider", () => {
     expect(refusal.value).toMatchObject({ refusal: { reason: expect.any(String) } });
   });
 
+  it("returns a usable design interpretation for design schemas", async () => {
+    const result = await new FakeAiProvider().generateStructured({
+      ...textInput,
+      schemaName: "design_restyle",
+    });
+    expect(result.value).toMatchObject({
+      requirements: [],
+      palette: {},
+      fonts: {},
+      layout: {},
+      sections: { include: [], exclude: [] },
+      pages: { include: [], exclude: [] },
+      unsupported: [],
+      confidence: 0.5,
+    });
+  });
+
+  it("returns usable slot text for template and site generation", async () => {
+    const result = await new FakeAiProvider().generateStructured({
+      modelId: "test-model",
+      schemaName: "site_generation",
+      messages: [
+        {
+          role: "user" as const,
+          content: JSON.stringify({ slots: [{ id: "hero:heading", text: "Sample" }] }),
+        },
+      ],
+    });
+    expect(result.value).toMatchObject({
+      slots: [{ id: "hero:heading", text: expect.any(String) }],
+    });
+  });
+
   it("returns safe and unsafe moderation results", async () => {
     const safe = await new FakeAiProvider().moderate({
       modelId: "guard",

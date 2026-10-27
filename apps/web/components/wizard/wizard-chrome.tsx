@@ -3,8 +3,6 @@
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "@/components/logo";
-import { TOTAL_STEPS } from "./types";
-
 export function WizardTopBar({ onExit }: { onExit: () => void }) {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border bg-surface px-4 sm:px-6">
@@ -19,14 +17,20 @@ export function WizardTopBar({ onExit }: { onExit: () => void }) {
   );
 }
 
-export function WizardProgress({ step }: { step: number }) {
-  const percent = Math.round((step / TOTAL_STEPS) * 100);
+export function WizardProgress({
+  step,
+  totalSteps,
+}: {
+  step: number;
+  totalSteps: number;
+}) {
+  const percent = Math.round((step / totalSteps) * 100);
   return (
     <div
       role="progressbar"
       aria-label="Setup progress"
       aria-valuemin={1}
-      aria-valuemax={TOTAL_STEPS}
+      aria-valuemax={totalSteps}
       aria-valuenow={step}
       className="h-1 w-full shrink-0 bg-border"
     >

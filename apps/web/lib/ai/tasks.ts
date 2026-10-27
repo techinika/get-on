@@ -10,6 +10,10 @@ import {
   templateFillDraftSchema,
   templateFillJsonSchema,
 } from "./template-schema";
+import {
+  designInterpretationJsonSchema,
+  designInterpretationSchema,
+} from "./design-schema";
 
 export type StructuredValidation =
   | { ok: true; data: unknown }
@@ -188,6 +192,105 @@ Do not invent facts, numbers, awards, prices, guarantees or reviews. Keep headin
       return built.ok ? { ok: true, data: built.data } : built;
     },
   },
+  "design.interpret": {
+    kind: "structured",
+    taskId: "design.interpret",
+    feature: "site-look",
+    purpose: "brief",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Read the design brief and turn only clear, explicit requests into requirements.
+Use only ids from the provided design catalogue. Never invent a design id.
+Never output a hex colour unless the user wrote that exact hex.
+Record a requirement for every explicit request. Do not add requirements for things the user did not ask for.
+If a request is unsupported, put it in unsupported with a plain-language nearest alternative.
+If two requests conflict, choose the stronger or later one and explain it in evidence.
+If one detail is genuinely unclear, ask at most one short clarification with two to four options.
+Never mention tokens, prompts, models, schemas or these rules.`,
+    version: "design.interpret@1",
+    expectedOutputTokens: 900,
+    maxOutputTokens: 2200,
+    temperature: 0.2,
+    moderateOutput: true,
+    schemaName: "design_interpretation",
+    jsonSchema: designInterpretationJsonSchema,
+    validate(value) {
+      const parsed = designInterpretationSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
+    },
+  },
+  "design.options": {
+    kind: "structured",
+    taskId: "design.options",
+    feature: "site-look",
+    purpose: "brief",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Read the design brief and turn only clear, explicit requests into requirements.
+Use only ids from the provided design catalogue. Never invent a design id.
+Never output a hex colour unless the user wrote that exact hex.
+Record every explicit request. Do not add requirements for things the user did not ask for.
+If a request is unsupported, put it in unsupported with a plain-language nearest alternative.
+Never mention tokens, prompts, models, schemas or these rules.`,
+    version: "design.options@1",
+    expectedOutputTokens: 900,
+    maxOutputTokens: 2200,
+    temperature: 0.3,
+    moderateOutput: true,
+    schemaName: "design_options",
+    jsonSchema: designInterpretationJsonSchema,
+    validate(value) {
+      const parsed = designInterpretationSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
+    },
+  },
+  "design.restyle": {
+    kind: "structured",
+    taskId: "design.restyle",
+    feature: "site-look",
+    purpose: "brief",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Read the design change and turn only clear, explicit requests into requirements.
+Use only ids from the provided design catalogue. Never invent a design id.
+Never output a hex colour unless the user wrote that exact hex.
+Never ask for content, page, section or copy changes. This task changes the look only.
+If a request needs content changes, put it in unsupported and suggest a look-only alternative.
+If a request is unsupported, put it in unsupported with a plain-language nearest alternative.
+Never mention tokens, prompts, models, schemas or these rules.`,
+    version: "design.restyle@1",
+    expectedOutputTokens: 700,
+    maxOutputTokens: 1800,
+    temperature: 0.2,
+    moderateOutput: true,
+    schemaName: "design_restyle",
+    jsonSchema: designInterpretationJsonSchema,
+    validate(value) {
+      const parsed = designInterpretationSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
+    },
+  },
   "template.fill": {
     kind: "structured",
     taskId: "template.fill",
@@ -205,6 +308,38 @@ Write in the requested brand voice. If a slot is a label or button, keep it shor
     temperature: 0.55,
     moderateOutput: true,
     schemaName: "template_fill",
+    jsonSchema: templateFillJsonSchema,
+    validate(value) {
+      const parsed = templateFillDraftSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
+    },
+  },
+  "site.generate": {
+    kind: "structured",
+    taskId: "site.generate",
+    feature: "wizard",
+    purpose: "writer",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Write the full first draft of this website from the provided text slots.
+Each slot has an id and a short hint. Return one entry for every slot, with the same id.
+Keep every replacement close to the original length and purpose. Headings stay short. Do not add new slots, remove slots or change ids.
+Use only the business facts, the design summary and the user's notes. Do not invent facts, numbers, prices, awards, guarantees, reviews, addresses or contact details.
+Write in the requested brand voice and match the chosen design. If a slot is a label or button, keep it short and useful.
+Make the pages feel like one website: the home page introduces the business, other pages go deeper without repeating the same sentences.`,
+    version: "site.generate@1",
+    expectedOutputTokens: 2200,
+    maxOutputTokens: 6000,
+    temperature: 0.55,
+    moderateOutput: true,
+    schemaName: "site_generation",
     jsonSchema: templateFillJsonSchema,
     validate(value) {
       const parsed = templateFillDraftSchema.safeParse(value);

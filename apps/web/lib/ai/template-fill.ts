@@ -1,4 +1,4 @@
-import type { AiErrorCode } from "@get-on/ai";
+import type { AiErrorCode, AiTaskId } from "@get-on/ai";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { runTask } from "./pipeline";
@@ -16,6 +16,9 @@ export type TemplateFillActionResult =
 export async function fillTemplateTextWithAi(input: {
   projectId: string;
   notes?: string;
+  taskId?: Extract<AiTaskId, "template.fill" | "site.generate">;
+  compact?: boolean;
+  context?: string;
 }): Promise<TemplateFillActionResult> {
   const current = await getCurrentTeam();
   if (!current) {
@@ -35,6 +38,14 @@ export async function fillTemplateTextWithAi(input: {
       ok: false,
       code: "AI_TOO_LONG",
       message: "That is too long. Keep your notes under 2,000 characters.",
+    };
+  }
+  const context = (input.context ?? "").trim();
+  if (context.length > 4000) {
+    return {
+      ok: false,
+      code: "AI_TOO_LONG",
+      message: "That design description is too long for AI to use at once.",
     };
   }
 
@@ -70,7 +81,10 @@ export async function fillTemplateTextWithAi(input: {
     };
   }
 
-  const existingText = JSON.stringify({ slots: plan.slots });
+  const slots = input.compact
+    ? plan.slots.map((slot) => ({ id: slot.id, text: slot.text.slice(0, 80) }))
+    : plan.slots;
+  const existingText = JSON.stringify({ slots });
   if (existingText.length > 20000) {
     return {
       ok: false,
@@ -79,13 +93,17 @@ export async function fillTemplateTextWithAi(input: {
     };
   }
 
-  const result = await runTask("template.fill", {
+  const result = await runTask(input.taskId ?? "template.fill", {
     teamId: current.team.teamId,
     userId: current.user.id,
     projectId: input.projectId,
-    userInput:
+    userInput: [
+      context,
       notes ||
-      "Rewrite the sample template text so it fits this business. Use the business facts and writing style.",
+        "Rewrite the sample template text so it fits this business. Use the business facts and writing style.",
+    ]
+      .filter(Boolean)
+      .join("\n\n"),
     existingText,
   });
   if (!result.ok) return result;

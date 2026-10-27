@@ -35,9 +35,9 @@ export function validateTemplatePackage(value: unknown): {
     issues.push({ path: "compositions", message: "A template needs at least one design." });
     return { ok: false, issues };
   }
-  const seenKeys = new Set<string>();
-  const seenPaths = new Set<string>();
   for (const [compositionIndex, composition] of pkg.compositions.entries()) {
+    const seenKeys = new Set<string>();
+    const seenPaths = new Set<string>();
     if (!composition.theme) {
       issues.push({ path: `compositions[${compositionIndex}].theme`, message: "Choose colours and fonts." });
     }

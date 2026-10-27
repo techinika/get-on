@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server.edge";
 import React from "react";
-import { SiteRoot, SiteHeader, SiteFooter, RenderPage } from "@get-on/renderer";
+import {
+  RENDERER_CSS_VERSION,
+  SiteRoot,
+  SiteHeader,
+  SiteFooter,
+  RenderPage,
+} from "@get-on/renderer";
 import { localBusinessJsonLd, pageSeo, webPageJsonLd } from "./seo";
 import type { PublishPage, SiteSettings } from "./types";
 
@@ -56,6 +62,11 @@ export function renderHtml(options: HtmlOptions): string {
     logoUrl: options.logoUrl ?? null,
     nav: options.nav.map(({ label, href }) => ({ label, href })),
     watermark,
+    theme: settings.theme,
+    tagline: settings.tagline,
+    businessType: settings.businessType,
+    phone: settings.phone,
+    ctaHref: options.nav.find((item) => item.href === "/contact")?.href ?? null,
   });
 
   const footer = React.createElement(SiteFooter, {
@@ -63,8 +74,12 @@ export function renderHtml(options: HtmlOptions): string {
     phone: settings.phone ?? undefined,
     email: settings.email ?? undefined,
     address: settings.address ?? undefined,
+    hours: settings.hours,
     nav: options.nav.map(({ label, href }) => ({ label, href })),
     showWatermark: watermark,
+    theme: settings.theme,
+    tagline: settings.tagline,
+    socialLinks: settings.socialLinks,
   });
 
   const content = React.createElement(
@@ -81,6 +96,12 @@ export function renderHtml(options: HtmlOptions): string {
         mode: "live",
         contactEnabled: options.contactEnabled !== false,
         pagePath: options.pagePath,
+        theme: settings.theme,
+        hours: settings.hours,
+        address: settings.address,
+        phone: settings.phone,
+        email: settings.email,
+        socialLinks: settings.socialLinks,
       },
     }) as React.ReactNode,
   );
@@ -132,7 +153,7 @@ const bingVerification = settings.verification?.bing
     : "";
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -144,7 +165,7 @@ const bingVerification = settings.verification?.bing
 <meta property="og:url" content="${escapeHtml(seo.canonical)}">
 <meta name="twitter:card" content="summary_large_image">${twitterSite}
 <meta name="twitter:title" content="${escapeHtml(seo.title)}">${twitterDescriptionTag}${ogImage}${robotsTag}
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 <script type="application/ld+json">${jsonLdString(jsonLd)}</script>
 </head>
 <body>
@@ -194,20 +215,22 @@ export function renderFormStatusHtml(options: {
         React.createElement(SiteFooter, {
           businessName: settings.businessName,
           showWatermark: watermark,
+          theme: settings.theme,
+          tagline: settings.tagline,
         }),
       ),
     ),
   );
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(options.heading)} | ${escapeHtml(settings.businessName)}</title>
 <meta name="robots" content="noindex,nofollow">
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 </head>
 <body>
 ${body}
@@ -256,20 +279,24 @@ export function renderNotFoundHtml(options: {
         phone: settings.phone ?? undefined,
         email: settings.email ?? undefined,
         address: settings.address ?? undefined,
+        hours: settings.hours,
         showWatermark: watermark,
+        theme: settings.theme,
+        tagline: settings.tagline,
+        socialLinks: settings.socialLinks,
       }),
     ),
   );
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(title)} | ${escapeHtml(settings.businessName)}</title>
 <meta name="robots" content="noindex,nofollow">
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 </head>
 <body>
 ${body}

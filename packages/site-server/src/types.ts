@@ -39,7 +39,7 @@ export type SitePointer = {
  * The small mapping stored at `host:{hostname}`. The full site pointer lives
  * at `site:{siteId}`, so adding an address never copies the whole pointer.
  */
-export type SiteHostPointer = {
+export type SiteHostPointer = Partial<Omit<SitePointer, "siteId">> & {
   v: 2;
   siteId: string;
   /** The plan no longer includes this address, so only this host pauses. */

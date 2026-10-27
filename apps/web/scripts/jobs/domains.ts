@@ -9,6 +9,7 @@ import {
   requireCloudflareConfig,
 } from "../../lib/publishing/config";
 import { createPublishStore } from "../../lib/publishing/store";
+import { parseHost } from "@get-on/site-server";
 import type { ProviderHealth } from "../../lib/domains/types";
 
 type Mode =
@@ -233,13 +234,29 @@ async function migratePointers(): Promise<JobOutcome> {
     }
   }
 
+  const rootDomain =
+    config.kind === "local" ? config.localRootDomain : config.rootDomain;
+
   let migrated = 0;
   let failed = 0;
   for (const hostname of hostnames) {
     try {
       const pointer = await store.getPointer(hostname);
       if (!pointer) continue;
-      await store.writePointer(hostname, pointer);
+      const parsed = parseHost(hostname, rootDomain);
+      const isFreeHost = parsed.ok && !parsed.custom;
+      if (isFreeHost) {
+        // Older Workers read the free host directly, so keep it self-contained.
+        await store.writePointer(hostname, pointer);
+      } else {
+        // Custom addresses must point at the site pointer, otherwise a later
+        // publish would update `site:` while this host kept an old publishId.
+        await store.writeSitePointer(pointer);
+        await store.writeHostPointer(hostname, pointer.siteId, {
+          planLapsed: pointer.planLapsed,
+          supportPaused: pointer.supportPaused,
+        });
+      }
       migrated += 1;
     } catch (error) {
       failed += 1;

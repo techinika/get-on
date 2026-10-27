@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { TONES } from "./tone-options";
+import type { DesignPrefs } from "@/lib/ai/design-prefs";
+import { LookAndFeel } from "./look-and-feel";
 import { saveWritingStyle } from "./actions";
 
 type Fact = { label: string; value: string };
@@ -19,6 +21,7 @@ type Initial = {
   wordsToUse: string[];
   wordsToAvoid: string[];
   facts: Fact[];
+  designPrefs: DesignPrefs;
 };
 
 function TagField({
@@ -272,6 +275,8 @@ export function WritingStyleForm({
           </Button>
         ) : null}
       </AppCard>
+
+      <LookAndFeel projectId={projectId} initial={initial.designPrefs} />
 
       <AppCard className="p-6">
         <div className="flex flex-col gap-4">

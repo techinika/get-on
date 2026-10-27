@@ -39,6 +39,7 @@ export type PublishDialogProps = {
   homepageReady: boolean;
   detailsReady: boolean;
   contactFormPluginOff: boolean;
+  sampleContentCount?: number;
   blockedReason: "review" | "suspended" | null;
   onPublished: () => void;
 };
@@ -56,6 +57,7 @@ export function PublishDialog({
   homepageReady,
   detailsReady,
   contactFormPluginOff,
+  sampleContentCount = 0,
   blockedReason,
   onPublished,
 }: PublishDialogProps) {
@@ -187,7 +189,7 @@ export function PublishDialog({
             until the new one is ready.
           </p>
 
-          {blockers.length > 0 || contactFormPluginOff ? (
+          {blockers.length > 0 || contactFormPluginOff || sampleContentCount > 0 ? (
             <div className="rounded-info bg-warning-soft p-4 text-sm leading-5 text-warning-text">
               {blockers.map((line) => (
                 <p key={line}>{line}</p>
@@ -201,6 +203,20 @@ export function PublishDialog({
                     className="font-semibold underline"
                   >
                     Turn it on
+                  </Link>
+                </p>
+              ) : null}
+              {sampleContentCount > 0 ? (
+                <p>
+                  {sampleContentCount} section{sampleContentCount === 1 ? "" : "s"} still use
+                  sample words, such as reviews, prices, team or projects. Replace them before
+                  you share the address.{" "}
+                  <Link
+                    href={`/dashboard/projects/${projectId}/pages`}
+                    onClick={onClose}
+                    className="font-semibold underline"
+                  >
+                    Review pages
                   </Link>
                 </p>
               ) : null}
@@ -223,6 +239,14 @@ export function PublishDialog({
               hint={detailsReady ? undefined : "You can still publish without these."}
               warning
             />
+            {sampleContentCount > 0 ? (
+              <CheckRow
+                ok={false}
+                label={`${sampleContentCount} section${sampleContentCount === 1 ? "" : "s"} with sample words`}
+                hint="You can still publish, but visitors will see them."
+                warning
+              />
+            ) : null}
             {contactFormPluginOff ? (
               <CheckRow
                 ok={false}

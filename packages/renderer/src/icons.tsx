@@ -1,16 +1,24 @@
 import React from "react";
 import {
   Award,
+  BookOpen,
   Calendar,
   Camera,
   Clock,
   Coffee,
+  Droplet,
   Gift,
   GraduationCap,
+  Hammer,
   Heart,
+  Home,
   Leaf,
   Mail,
   MapPin,
+  Megaphone,
+  MessageCircle,
+  Paintbrush,
+  PenTool,
   Phone,
   Scissors,
   ShieldCheck,
@@ -24,6 +32,7 @@ import {
   Users,
   Utensils,
   Wrench,
+  Zap,
 } from "lucide-react";
 import type { IconName } from "@get-on/blocks";
 
@@ -55,6 +64,15 @@ const ICONS: Record<
   calendar: Calendar,
   smile: Smile,
   coffee: Coffee,
+  "book-open": BookOpen,
+  "message-circle": MessageCircle,
+  megaphone: Megaphone,
+  paintbrush: Paintbrush,
+  "pen-tool": PenTool,
+  hammer: Hammer,
+  home: Home,
+  droplet: Droplet,
+  zap: Zap,
 };
 
 /** An inline icon. It is drawn as SVG so the page needs no extra files. */

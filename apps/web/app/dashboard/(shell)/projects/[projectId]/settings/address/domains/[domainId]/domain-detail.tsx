@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -150,6 +150,7 @@ export function DomainDetail({
   const [moveTarget, setMoveTarget] = useState("");
   const [removeOpen, setRemoveOpen] = useState(false);
   const [confirmName, setConfirmName] = useState("");
+  const confirmNameRef = useRef<HTMLInputElement>(null);
   const [redirect, setRedirect] = useState(redirectFreeAddress);
   const [savingRedirect, setSavingRedirect] = useState(false);
   const [autoPublish, setAutoPublish] = useState(initialAutoPublish);
@@ -1044,6 +1045,7 @@ export function DomainDetail({
         open={removeOpen}
         onClose={() => { setRemoveOpen(false); setConfirmName(""); }}
         title={`Remove ${domain.registrable} from Get-On?`}
+        initialFocusRef={confirmNameRef}
         icon={
           <span className="flex h-12 w-12 items-center justify-center rounded-card bg-danger-soft text-danger-text">
             <Trash2 className="h-6 w-6" aria-hidden />
@@ -1083,6 +1085,7 @@ export function DomainDetail({
         </label>
         <Input
           id="confirm-domain"
+          ref={confirmNameRef}
           value={confirmName}
           onChange={(event) => setConfirmName(event.target.value)}
           className="mt-2"

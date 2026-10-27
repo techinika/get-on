@@ -43,6 +43,58 @@ export type ThemeColors = {
 export type FontChoice = { id: string; weight: number };
 
 /** Theme v2. Legacy v1 fields stay optional so old rows and tests still work. */
+export type HeadingCase = 'normal' | 'upper';
+export type HeadingTracking = 'tight' | 'normal' | 'wide';
+export type DisplayScale = 'normal' | 'dramatic';
+export type Rhythm = 'even' | 'alternate' | 'tinted' | 'bold';
+export type ImageStyle = 'rounded' | 'sharp' | 'arch' | 'offset' | 'circle';
+export type EyebrowStyle = 'chip' | 'caps' | 'line' | 'none';
+export type LinkStyle = 'underline' | 'arrow' | 'plain';
+export type RuleStyle = 'none' | 'hairline' | 'bold';
+export type HeaderStyle = 'classic' | 'centered' | 'overlay' | 'split' | 'minimal';
+export type FooterLayout = 'simple' | 'columns' | 'centered' | 'bigbrand';
+
+export type ThemeDesign = {
+  headingCase?: HeadingCase;
+  headingTracking?: HeadingTracking;
+  display?: DisplayScale;
+  rhythm?: Rhythm;
+  imageStyle?: ImageStyle;
+  eyebrowStyle?: EyebrowStyle;
+  linkStyle?: LinkStyle;
+  rules?: RuleStyle;
+  wordmark?: {
+    font?: 'heading' | 'body';
+    weight?: number;
+    case?: 'normal' | 'upper' | 'small';
+    tracking?: number;
+    size?: number;
+    sub?: 'none' | 'type';
+  };
+};
+
+export type ThemeHeader = {
+  style?: HeaderStyle;
+  sticky?: boolean;
+  border?: boolean;
+  background?: 'plain' | 'soft' | 'brand';
+  cta?: { enabled?: boolean; label?: string; link?: LinkTarget; style?: 'solid' | 'outline' };
+  extraLinks?: { label: string; link: LinkTarget }[];
+  announcement?: { enabled?: boolean; text?: string; link?: LinkTarget; bg?: 'brand' | 'accent' | 'dark' | 'custom'; color?: string };
+};
+
+export type ThemeFooter = {
+  layout?: FooterLayout;
+  about?: string;
+  columns?: { title: string; links: { label: string; link: LinkTarget }[] }[];
+  showSocial?: boolean;
+  showContact?: boolean;
+  showHours?: boolean;
+  copyright?: string;
+  background?: 'soft' | 'plain' | 'brand' | 'dark';
+};
+
+/** Theme v2. Legacy v1 fields stay optional so old rows and tests still work. */
 export type Theme = {
   version?: 2;
   colors?: ThemeColors;
@@ -63,6 +115,9 @@ export type Theme = {
   corners: Corners;
   density?: 'compact' | 'comfortable' | 'airy';
   colorMode?: ColorMode;
+  design?: ThemeDesign;
+  header?: ThemeHeader;
+  footer?: ThemeFooter;
   /** Legacy v1 fields. */
   palette?: Palette;
   fontPair?: FontPairId;
@@ -154,7 +209,7 @@ export type HeaderConfig = {
 };
 
 export type FooterConfig = {
-  layout: 'simple' | 'columns' | 'centered';
+  layout: 'simple' | 'columns' | 'centered' | 'bigbrand';
   about: string;
   columns: { title: string; links: { label: string; link: LinkTarget }[] }[];
   showSocial: boolean;

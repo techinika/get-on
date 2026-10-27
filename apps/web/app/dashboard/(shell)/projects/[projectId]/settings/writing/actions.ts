@@ -6,6 +6,7 @@ import { getCurrentTeam } from "@/lib/team";
 import { logActivity } from "@/lib/activity";
 import { can } from "@/lib/permissions";
 import { parseWritingStyle } from "./style";
+import { parseDesignPrefsForm } from "@/lib/ai/design-prefs";
 
 export type WritingStyleResult = { ok: true } | { ok: false; error: string };
 
@@ -44,6 +45,7 @@ export async function saveWritingStyle(
 
   const { tones, audience, wordsToUse, wordsToAvoid, businessFacts } =
     parseWritingStyle(formData);
+  const designPrefs = parseDesignPrefsForm(formData);
 
   const supabase = await createClient();
   const project = await findProject(supabase, projectId, current.team.teamId);
@@ -74,6 +76,7 @@ export async function saveWritingStyle(
       project_id: projectId,
       brand_voice: brandVoice,
       business_facts: businessFacts,
+      design_prefs: designPrefs,
     },
     { onConflict: "project_id" },
   );

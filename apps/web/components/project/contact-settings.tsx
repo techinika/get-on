@@ -81,6 +81,7 @@ export function ContactSettings({
   const [deleting, setDeleting] = React.useState(false);
   const [deleteWord, setDeleteWord] = React.useState("");
   const [deleteOpen, setDeleteOpen] = React.useState(false);
+  const deleteWordRef = React.useRef<HTMLInputElement>(null);
   const [resendAt, setResendAt] = React.useState<Record<string, number>>({});
   const [now, setNow] = React.useState(() => Date.now());
   const free = planId === "free";
@@ -470,6 +471,7 @@ export function ContactSettings({
         open={deleteOpen}
         onClose={() => (deleting ? undefined : setDeleteOpen(false))}
         title="Delete all messages?"
+        initialFocusRef={deleteWordRef}
         icon={
           <span className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-danger-soft text-danger-text">
             <Trash2 size={24} strokeWidth={1.75} aria-hidden />
@@ -502,6 +504,7 @@ export function ContactSettings({
         </Label>
         <Input
           id="delete-word"
+          ref={deleteWordRef}
           className="mt-1.5"
           value={deleteWord}
           onChange={(event) => setDeleteWord(event.target.value)}

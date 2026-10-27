@@ -41,7 +41,9 @@
     "job:ai": "tsx scripts/jobs/ai.ts",
     "job:ai-monthly": "tsx scripts/jobs/ai.ts monthly",
     "job:ai-expire": "tsx scripts/jobs/ai.ts expire",
-    "job:ai-payloads": "tsx scripts/jobs/ai.ts payloads"
+    "job:ai-payloads": "tsx scripts/jobs/ai.ts payloads",
+    "job:rebuild-published": "tsx scripts/jobs/rebuild-published.ts",
+    "art:templates": "tsx scripts/generate-template-art.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

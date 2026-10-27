@@ -54,6 +54,14 @@ export default async function PageEditorPage({ params }: Params) {
   const contact = projectSettings.contact as
     | { phone?: string; email?: string; address?: string }
     | undefined;
+  const socialLinks = Array.isArray(projectSettings.socialLinks)
+    ? (projectSettings.socialLinks as { network?: string; url?: string }[])
+        .filter((link) => typeof link?.url === "string" && typeof link?.network === "string")
+        .map((link) => ({ network: String(link.network), url: String(link.url) }))
+    : undefined;
+  const hours = typeof projectSettings.hours === "string" ? projectSettings.hours : undefined;
+  const businessType = typeof projectSettings.businessType === "string" ? projectSettings.businessType : undefined;
+  const tagline = typeof projectSettings.tagline === "string" ? projectSettings.tagline : undefined;
 
   const header = (
     <SiteHeader
@@ -61,6 +69,10 @@ export default async function PageEditorPage({ params }: Params) {
       logoUrl={null}
       nav={[]}
       watermark={false}
+      theme={theme}
+      tagline={tagline}
+      businessType={businessType}
+      phone={typeof contact?.phone === "string" ? contact.phone : undefined}
     />
   );
   const footer = (
@@ -69,8 +81,12 @@ export default async function PageEditorPage({ params }: Params) {
       phone={typeof contact?.phone === "string" ? contact.phone : undefined}
       email={typeof contact?.email === "string" ? contact.email : undefined}
       address={typeof contact?.address === "string" ? contact.address : undefined}
+      hours={hours}
       nav={[]}
       showWatermark={false}
+      theme={theme}
+      tagline={tagline}
+      socialLinks={socialLinks}
     />
   );
 
@@ -111,7 +127,16 @@ export default async function PageEditorPage({ params }: Params) {
                   content={content}
                   header={header}
                   footer={footer}
-                  ctx={{ mode: "editor", contactEnabled: false }}
+                  ctx={{
+                    mode: "editor",
+                    contactEnabled: false,
+                    theme,
+                    hours,
+                    address: typeof contact?.address === "string" ? contact.address : undefined,
+                    phone: typeof contact?.phone === "string" ? contact.phone : undefined,
+                    email: typeof contact?.email === "string" ? contact.email : undefined,
+                    socialLinks,
+                  }}
                 />
               </SiteRoot>
             </div>

@@ -1,3 +1,5 @@
+import { EMPTY_DESIGN_PREFS, type DesignPrefs } from "@/lib/ai/design-prefs";
+
 export type AddressStatusState =
   | { status: "idle" }
   | { status: "checking" }
@@ -22,9 +24,13 @@ export type WizardState = {
   includeContactForm: boolean;
   logoData: string | null;
   logoError: string | null;
+  designPrefs: DesignPrefs;
+  designBrief: string;
+  designLookIndex: number | null;
+  designLookName: string | null;
 };
 
-export const TOTAL_STEPS = 6;
+export const TOTAL_STEPS = 7;
 
 export const DEFAULT_STATE: WizardState = {
   step: 1,
@@ -41,6 +47,10 @@ export const DEFAULT_STATE: WizardState = {
   includeContactForm: true,
   logoData: null,
   logoError: null,
+  designPrefs: EMPTY_DESIGN_PREFS,
+  designBrief: "",
+  designLookIndex: null,
+  designLookName: null,
 };
 
 export const STEP_META: ReadonlyArray<{
@@ -67,6 +77,11 @@ export const STEP_META: ReadonlyArray<{
     title: "How would you like to start?",
     sub: "You can change everything later.",
     skippable: false,
+  },
+  {
+    title: "How should your website look?",
+    sub: "Describe it in your own words, or pick from the options. You can skip anything.",
+    skippable: true,
   },
   {
     title: "How can customers reach you?",

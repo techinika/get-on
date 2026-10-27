@@ -14,10 +14,16 @@ export function SiteRoot({
 }) {
   const tokens = themeTokens(theme);
   const style: React.CSSProperties = tokens as React.CSSProperties;
+  const design = theme.design ?? {};
   return (
     <div
       className="gs-root"
       data-color-mode="light"
+      data-rhythm={design.rhythm ?? "even"}
+      data-image-style={design.imageStyle ?? "rounded"}
+      data-eyebrow={design.eyebrowStyle ?? "chip"}
+      data-links={design.linkStyle ?? "underline"}
+      data-rules={design.rules ?? "none"}
       style={{ colorScheme: "light", ...style }}
     >
       {children}

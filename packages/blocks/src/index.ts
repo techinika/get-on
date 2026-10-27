@@ -11,3 +11,5 @@ export * from './social';
 export * from './product-links';
 export * from './fonts';
 export * from './legacy';
+export * from './design-catalogue';
+export * from './layout-lint';

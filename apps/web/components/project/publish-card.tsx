@@ -32,6 +32,7 @@ export type PublishCardProps = {
   homepageReady: boolean;
   detailsReady: boolean;
   contactFormPluginOff: boolean;
+  sampleContentCount?: number;
   lastPublishedAt: string | null;
   /** Hide the "Version history" links when the card already sits on that page. */
   showHistoryLink?: boolean;
@@ -48,6 +49,7 @@ export function PublishCard({
   homepageReady,
   detailsReady,
   contactFormPluginOff,
+  sampleContentCount = 0,
   lastPublishedAt,
   showHistoryLink = true,
   className,
@@ -213,6 +215,7 @@ export function PublishCard({
           homepageReady={homepageReady}
           detailsReady={detailsReady}
           contactFormPluginOff={contactFormPluginOff}
+          sampleContentCount={sampleContentCount}
           blockedReason={state === "review" ? "review" : state === "suspended" ? "suspended" : null}
           onPublished={() => router.refresh()}
         />

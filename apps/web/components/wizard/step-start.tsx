@@ -22,7 +22,7 @@ const START_OPTIONS: ReadonlyArray<{
   {
     value: "ai",
     label: "Create it for me with AI",
-    description: "Answer a few questions and we write your first page.",
+    description: "Answer a few questions and we build your first website.",
     Icon: Sparkles,
     comingSoon: false,
   },

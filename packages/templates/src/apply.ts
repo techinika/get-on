@@ -1,9 +1,16 @@
 import { randomUUID } from "node:crypto";
 import { migrateContent } from "@get-on/blocks";
 import type { Block, Composition, SampleProfile, TemplatePackage } from "./types";
+import {
+  applyVisibility,
+  resolveDeep,
+  scanSampleLeaks,
+  variableValues,
+} from "./variables";
 
 export type MaterializedPage = {
   id: string;
+  key: string;
   title: string;
   path: string;
   position: number;
@@ -30,49 +37,53 @@ export type MaterializeOptions = {
   compositionId?: string;
 };
 
-const TOKEN_KEYS = [
-  "businessName",
-  "tagline",
-  "description",
-  "phone",
-  "email",
-  "address",
-  "hoursNote",
-] as const;
-
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-function replaceString(value: string, tokens: Record<string, string>): string {
-  let out = value;
-  for (const [key, replacement] of Object.entries(tokens)) {
-    out = out.split(`{{${key}}}`).join(replacement);
-  }
-  return out;
-}
-
-function replaceDeep(value: unknown, tokens: Record<string, string>): unknown {
-  if (typeof value === "string") return replaceString(value, tokens);
-  if (Array.isArray(value)) return value.map((item) => replaceDeep(item, tokens));
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value)) out[key] = replaceDeep(child, tokens);
-    return out;
-  }
-  return value;
-}
-
+/** @deprecated Use variableValues(). Kept for old template packages. */
 export function profileTokens(profile: SampleProfile): Record<string, string> {
-  const tokens: Record<string, string> = {};
-  for (const key of TOKEN_KEYS) tokens[key] = String(profile[key] ?? "");
-  return tokens;
+  return variableValues(profile);
 }
 
 function freshBlock(block: Block): Block {
   const copy = clone(block);
   copy.id = randomUUID().replace(/-/g, "").slice(0, 20);
   return copy;
+}
+
+const SAMPLE_ONLY_TYPES = new Set([
+  "testimonials",
+  "stats",
+  "team",
+  "pricing",
+  "menu",
+  "products",
+  "projects",
+  "logos",
+]);
+const SAMPLE_MARKER_RE = /\b(sample|placeholder|lorem ipsum)\b/i;
+
+function hasSampleMarker(value: unknown): boolean {
+  if (typeof value === "string") return SAMPLE_MARKER_RE.test(value);
+  if (Array.isArray(value)) return value.some(hasSampleMarker);
+  if (value && typeof value === "object") return Object.values(value).some(hasSampleMarker);
+  return false;
+}
+
+/**
+ * Marks sections that still contain template sample content. The marker lives
+ * on the block so the editor and publish check can warn without guessing from
+ * the visible words later.
+ */
+function markSampleOnly(block: Block): Block {
+  if (
+    SAMPLE_ONLY_TYPES.has(String(block.type)) ||
+    hasSampleMarker(block.props)
+  ) {
+    return { ...block, sampleOnly: true };
+  }
+  return block;
 }
 
 function fixPageLinks(value: unknown, homeId: string): unknown {
@@ -109,38 +120,75 @@ export function materializeTemplate(
     pkg.compositions.find((item) => item.id === options.compositionId) ?? pkg.compositions[0];
   if (!composition) throw new Error("TEMPLATE_HAS_NO_COMPOSITION");
 
-  const profile: SampleProfile = { ...pkg.sampleProfile, ...options.profile };
-  const tokens = profileTokens(profile);
+  const blank: SampleProfile = {
+    businessName: "",
+    tagline: "",
+    description: "",
+    phone: "",
+    email: "",
+    address: "",
+    hoursNote: "",
+    social: [],
+  };
+  const profile: SampleProfile = {
+    ...(options.profile ? blank : pkg.sampleProfile),
+    ...options.profile,
+  };
+  const values = variableValues(profile);
+  const missing = new Set<string>();
   const sourcePages = limitPages(composition.pages, options.maxPages);
   const pageIdByKey = new Map<string, string>();
   for (const page of sourcePages) pageIdByKey.set(page.key, randomUUID());
   const homeId = pageIdByKey.get(sourcePages.find((page) => page.isHome)?.key ?? sourcePages[0]!.key)!;
 
-  for (const [key, id] of pageIdByKey) tokens[`${key}PageId`] = id;
+  for (const [key, id] of pageIdByKey) values[`${key}PageId`] = id;
 
   const pages: MaterializedPage[] = sourcePages.map((page, index) => {
-    const content = migrateContent(replaceDeep(page.blocks, tokens));
-    const blocks = content.blocks.map((block: Block) =>
-      fixPageLinks(freshBlock(block), homeId) as Block,
+    const resolved = applyVisibility(
+      resolveDeep(page.blocks, values, missing),
+      profile,
+      missing,
     );
+    const content = migrateContent(resolved);
+    const blocks = content.blocks
+      .filter((block): block is Block => Boolean(block))
+      .map((block: Block) =>
+        markSampleOnly(fixPageLinks(freshBlock(block), homeId) as Block),
+      );
+    const leaks = scanSampleLeaks(blocks, pkg.sampleProfile);
+    if (leaks.length > 0) {
+      throw new Error(
+        `TEMPLATE_SAMPLE_LEAK:${pkg.meta.slug}:${page.key}:${leaks.map((leak) => leak.value).join(",")}`,
+      );
+    }
+    const title = String(resolveDeep(page.title, values, missing));
+    const seoTitle = String(resolveDeep(page.seo.title, values, missing));
+    const seoDescription = String(resolveDeep(page.seo.description, values, missing));
     return {
       id: pageIdByKey.get(page.key)!,
-      title: page.title,
+      key: page.key,
+      title,
       path: page.path,
       position: index,
       isHome: page.isHome,
       showInMenu: page.showInMenu,
-      menuLabel: page.menuLabel ?? page.title,
-      seoTitle: page.seo.title,
-      seoDescription: page.seo.description,
+      menuLabel: page.menuLabel ?? title,
+      seoTitle,
+      seoDescription,
       blocks,
     };
   });
 
+  const theme = applyVisibility(
+    resolveDeep(composition.theme, values, missing),
+    profile,
+    missing,
+  ) as Composition["theme"];
+
   return {
     slug: pkg.meta.slug,
     name: pkg.meta.name,
-    theme: clone(composition.theme),
+    theme: clone(theme),
     pages,
     compositionId: composition.id,
   };
