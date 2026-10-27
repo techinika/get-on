@@ -40,6 +40,16 @@ describe("AI text task definitions", () => {
     });
   });
 
+  it("has a full site generation task", () => {
+    const task = structuredTask("site.generate");
+    expect(task?.schemaName).toBe("site_generation");
+    expect(STRUCTURED_TASKS["site.generate"]?.version).toBe("site.generate@1");
+    expect(task?.validate({ slots: [{ id: "hero:heading", text: "New heading" }] })).toEqual({
+      ok: true,
+      data: { slots: [{ id: "hero:heading", text: "New heading" }] },
+    });
+  });
+
   it("uses a vision model for picture descriptions", () => {
     const task = visionTask("alt.describe");
     expect(task?.requirement.needsVision).toBe(true);

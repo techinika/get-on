@@ -59,6 +59,8 @@ export function StepReview({
   businessType,
   startChoice,
   includeContactForm,
+  designLookName,
+  designBrief,
   submitError,
   limitReached,
   onEditStep,
@@ -68,6 +70,8 @@ export function StepReview({
   businessType: string;
   startChoice: StartChoice;
   includeContactForm: boolean;
+  designLookName: string | null;
+  designBrief: string;
   submitError: string | null;
   limitReached: boolean;
   onEditStep: (step: number) => void;
@@ -144,14 +148,24 @@ export function StepReview({
             editLabel="starting point"
           >
             {startChoice === "ai"
-              ? "AI writes my first page"
+              ? "AI writes my pages"
               : startChoice === "template"
                 ? "A ready-made design"
                 : "A blank page"}
           </SummaryRow>
+          {startChoice === "ai" ? (
+            <SummaryRow
+              label="Look"
+              onEdit={() => onEditStep(5)}
+              editLabel="website look"
+            >
+              {designLookName ??
+                (designBrief.trim() ? "Your description" : "We will pick one")}
+            </SummaryRow>
+          ) : null}
           <SummaryRow
             label="Contact form"
-            onEdit={() => onEditStep(5)}
+            onEdit={() => onEditStep(6)}
             editLabel="contact form"
           >
             {includeContactForm ? "On" : "Off"}

@@ -4,10 +4,13 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { addressFromName, normalizeAddress, validateAddress } from "@/lib/address";
 import { friendlyError } from "@/lib/errors";
+import { parseDesignPrefs } from "@/lib/ai/design-prefs";
 import { StepAbout } from "./step-about";
 import { StepBusinessName } from "./step-business-name";
 import { StepBusinessType } from "./step-business-type";
 import { StepContact } from "./step-contact";
+import { StepDesign } from "./step-design";
+import type { DesignLookPreview } from "./design-actions";
 import { StepReview } from "./step-review";
 import { StepStart, type TemplateChoice } from "./step-start";
 import {
@@ -79,6 +82,20 @@ function restoredState(): WizardState | null {
           : DEFAULT_STATE.includeContactForm,
       templateSlug:
         typeof parsed.templateSlug === "string" ? parsed.templateSlug : null,
+      designPrefs: parseDesignPrefs(parsed.designPrefs),
+      designBrief:
+        typeof parsed.designBrief === "string"
+          ? parsed.designBrief.slice(0, 400)
+          : DEFAULT_STATE.designBrief,
+      designLookIndex:
+        typeof parsed.designLookIndex === "number" &&
+        Number.isFinite(parsed.designLookIndex)
+          ? parsed.designLookIndex
+          : null,
+      designLookName:
+        typeof parsed.designLookName === "string"
+          ? parsed.designLookName.slice(0, 80)
+          : null,
       addressStatus: DEFAULT_STATE.addressStatus,
     };
   } catch {
@@ -105,6 +122,7 @@ export function Wizard({
   const [submitting, setSubmitting] = React.useState(false);
   const [submitError, setSubmitError] = React.useState<string | null>(null);
   const [limitReached, setLimitReached] = React.useState(false);
+  const [designLooks, setDesignLooks] = React.useState<DesignLookPreview[]>([]);
   const headingRef = React.useRef<HTMLHeadingElement>(null);
   const prevStepRef = React.useRef<number | null>(null);
 
@@ -118,11 +136,18 @@ export function Wizard({
   React.useEffect(() => {
     const restored = restoredState();
     const next = restored ?? DEFAULT_STATE;
+    const safeStep =
+      next.step === 5 && next.startChoice !== "ai" ? 4 : next.step;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time sync from sessionStorage
     setState(
       initialTemplateSlug
-        ? { ...next, startChoice: "template", templateSlug: initialTemplateSlug }
-        : next,
+        ? {
+            ...next,
+            step: safeStep,
+            startChoice: "template",
+            templateSlug: initialTemplateSlug,
+          }
+        : { ...next, step: safeStep },
     );
     setHydrated(true);
   }, [initialTemplateSlug]);
@@ -192,6 +217,18 @@ export function Wizard({
     }
   }
 
+  const hasDesignStep = state.startChoice === "ai";
+  const visibleSteps = hasDesignStep
+    ? [1, 2, 3, 4, 5, 6, 7]
+    : [1, 2, 3, 4, 6, 7];
+  const displayStep = Math.max(1, visibleSteps.indexOf(state.step) + 1);
+  const displayTotal = visibleSteps.length;
+
+  const nextStep = (step: number) =>
+    step === 4 && !hasDesignStep ? 6 : step + 1;
+  const previousStep = (step: number) =>
+    step === 6 && !hasDesignStep ? 4 : step - 1;
+
   const setStep = (step: number) => {
     setSubmitError(null);
     setState((prev) => ({ ...prev, step: clampStep(step) }));
@@ -202,20 +239,20 @@ export function Wizard({
       ? state.name.trim().length > 0 && addressStatus.status === "available"
       : state.step === 2
         ? state.businessType.trim().length > 0
-        : state.step === 6
+        : state.step === 7
           ? !limitReached
           : true;
 
   const handleContinue = () => {
     if (!canContinue) return;
-    if (state.step === TOTAL_STEPS) {
+    if (state.step === 7) {
       void createProject();
       return;
     }
-    setStep(state.step + 1);
+    setStep(nextStep(state.step));
   };
 
-  const handleSkip = () => setStep(state.step + 1);
+  const handleSkip = () => setStep(nextStep(state.step));
 
   const saveAndExit = () => {
     try {
@@ -255,6 +292,13 @@ export function Wizard({
             address: state.contact.address.trim(),
           },
           includeContactForm: state.includeContactForm,
+          ...(state.startChoice === "ai"
+            ? {
+                designPrefs: state.designPrefs,
+                designBrief: state.designBrief,
+                designLookIndex: state.designLookIndex,
+              }
+            : {}),
           ...(state.logoData ? { logoData: state.logoData } : {}),
         }),
       });
@@ -315,12 +359,12 @@ export function Wizard({
   return (
     <div className="flex min-h-screen flex-col bg-bg">
       <WizardTopBar onExit={saveAndExit} />
-      <WizardProgress step={state.step} />
+      <WizardProgress step={displayStep} totalSteps={displayTotal} />
 
       <main className="mx-auto w-full max-w-[560px] px-6 pb-24 pt-8 md:pb-16 md:pt-16">
         <div key={state.step} className="animate-step-in">
           <p className="text-sm text-text-muted">
-            Step {state.step} of {TOTAL_STEPS}
+            Step {displayStep} of {displayTotal}
           </p>
           <h1 ref={headingRef} tabIndex={-1} className="mt-2 text-h1">
             {meta.title}
@@ -388,6 +432,28 @@ export function Wizard({
             ) : null}
 
             {state.step === 5 ? (
+              <StepDesign
+                name={state.name.trim()}
+                businessType={state.businessType}
+                about={state.about}
+                prefs={state.designPrefs}
+                brief={state.designBrief}
+                looks={designLooks}
+                selectedIndex={state.designLookIndex}
+                onPrefsChange={(designPrefs) =>
+                  setState((prev) => ({ ...prev, designPrefs }))
+                }
+                onBriefChange={(designBrief) =>
+                  setState((prev) => ({ ...prev, designBrief }))
+                }
+                onLooksChange={setDesignLooks}
+                onSelectLook={(designLookIndex, designLookName) =>
+                  setState((prev) => ({ ...prev, designLookIndex, designLookName }))
+                }
+              />
+            ) : null}
+
+            {state.step === 6 ? (
               <StepContact
                 contact={state.contact}
                 onContactChange={(contact) => setState((prev) => ({ ...prev, contact }))}
@@ -402,13 +468,15 @@ export function Wizard({
               />
             ) : null}
 
-            {state.step === 6 ? (
+            {state.step === 7 ? (
               <StepReview
                 name={state.name.trim()}
                 address={effectiveAddress}
                 businessType={state.businessType}
                 startChoice={state.startChoice}
                 includeContactForm={state.includeContactForm}
+                designLookName={state.designLookName}
+                designBrief={state.designBrief}
                 submitError={submitError}
                 limitReached={limitReached}
                 onEditStep={setStep}
@@ -431,10 +499,10 @@ export function Wizard({
 
         <WizardActions
           showBack={state.step > 1 && !limitReached && !submitting}
-          onBack={() => setStep(state.step - 1)}
+          onBack={() => setStep(previousStep(state.step))}
           onContinue={handleContinue}
           continueDisabled={!canContinue}
-          continueLabel={state.step === TOTAL_STEPS ? "Create my website" : "Continue"}
+          continueLabel={state.step === 7 ? "Create my website" : "Continue"}
           continueLoading={submitting}
           continueLoadingLabel={
             state.startChoice === "ai"

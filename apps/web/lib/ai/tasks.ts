@@ -322,6 +322,38 @@ Write in the requested brand voice. If a slot is a label or button, keep it shor
       return { ok: true, data: parsed.data };
     },
   },
+  "site.generate": {
+    kind: "structured",
+    taskId: "site.generate",
+    feature: "wizard",
+    purpose: "writer",
+    requirement: { needsJson: true },
+    rules: `Return JSON only. Write the full first draft of this website from the provided text slots.
+Each slot has an id and a short hint. Return one entry for every slot, with the same id.
+Keep every replacement close to the original length and purpose. Headings stay short. Do not add new slots, remove slots or change ids.
+Use only the business facts, the design summary and the user's notes. Do not invent facts, numbers, prices, awards, guarantees, reviews, addresses or contact details.
+Write in the requested brand voice and match the chosen design. If a slot is a label or button, keep it short and useful.
+Make the pages feel like one website: the home page introduces the business, other pages go deeper without repeating the same sentences.`,
+    version: "site.generate@1",
+    expectedOutputTokens: 2200,
+    maxOutputTokens: 6000,
+    temperature: 0.55,
+    moderateOutput: true,
+    schemaName: "site_generation",
+    jsonSchema: templateFillJsonSchema,
+    validate(value) {
+      const parsed = templateFillDraftSchema.safeParse(value);
+      if (!parsed.success) {
+        return {
+          ok: false,
+          issues: parsed.error.issues
+            .slice(0, 8)
+            .map((item) => `${item.path.join(".")}: ${item.message}`),
+        };
+      }
+      return { ok: true, data: parsed.data };
+    },
+  },
   "section.generate": {
     kind: "structured",
     taskId: "section.generate",

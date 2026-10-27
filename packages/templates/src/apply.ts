@@ -10,6 +10,7 @@ import {
 
 export type MaterializedPage = {
   id: string;
+  key: string;
   title: string;
   path: string;
   position: number;
@@ -165,6 +166,7 @@ export function materializeTemplate(
     const seoDescription = String(resolveDeep(page.seo.description, values, missing));
     return {
       id: pageIdByKey.get(page.key)!,
+      key: page.key,
       title,
       path: page.path,
       position: index,
