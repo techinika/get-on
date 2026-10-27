@@ -32,7 +32,7 @@ const FREE: PlanLimits = {
   exportsPerDay: 3,
   siteZipAllowed: false,
   siteZipPerDay: 0,
-  trackedLinksMax: 0,
+  trackedLinksMax: 3,
   support: "standard",
   watermark: true,
 };
@@ -59,9 +59,9 @@ const BASIC: PlanLimits = {
     storageMb: 1024,
   },
   exportsPerDay: 5,
-  siteZipAllowed: false,
-  siteZipPerDay: 0,
-  trackedLinksMax: 5,
+  siteZipAllowed: true,
+  siteZipPerDay: 3,
+  trackedLinksMax: 20,
   support: "standard",
   watermark: false,
 };
@@ -89,8 +89,8 @@ const PRO: PlanLimits = {
   },
   exportsPerDay: 10,
   siteZipAllowed: true,
-  siteZipPerDay: 3,
-  trackedLinksMax: 50,
+  siteZipPerDay: 10,
+  trackedLinksMax: 100,
   support: "priority",
   watermark: false,
 };
@@ -118,8 +118,8 @@ const ENTERPRISE: PlanLimits = {
   },
   exportsPerDay: 20,
   siteZipAllowed: true,
-  siteZipPerDay: 20,
-  trackedLinksMax: 500,
+  siteZipPerDay: 30,
+  trackedLinksMax: 1000,
   support: "highest",
   watermark: false,
 };
