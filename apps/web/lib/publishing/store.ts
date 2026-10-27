@@ -9,6 +9,7 @@ import {
   sitePath,
   writeNodeHostPointer,
   writeNodePointer,
+  writeNodeSitePointer,
 } from "@get-on/site-server/node";
 import type { SitePointer } from "@get-on/site-server";
 import type { PublishConfig } from "./config";
@@ -28,6 +29,8 @@ export type PublishStore = {
   writeShared(files: Record<string, BuiltFile>): Promise<void>;
   /** The live pointer for a host name, or null when there is none. */
   getPointer(hostname: string): Promise<SitePointer | null>;
+  /** Writes only the full site pointer, without touching any host name. */
+  writeSitePointer(pointer: SitePointer): Promise<void>;
   /** Writes the free-address pointer and the site pointer it points at. */
   writePointer(hostname: string, pointer: SitePointer): Promise<void>;
   /** Points a custom address at a website without copying the full pointer. */
@@ -138,6 +141,35 @@ function cloudflareStore(config: PublishConfig): PublishStore {
     return new Uint8Array(await response.arrayBuffer());
   }
 
+  async function readValue(key: string): Promise<unknown> {
+    const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
+      kvNamespaceId,
+    )}/values/${encodeURIComponent(key)}`;
+    const response = await fetch(url, { headers });
+    if (response.status === 404) return null;
+    if (!response.ok) return null;
+    try {
+      return JSON.parse(await response.text()) as unknown;
+    } catch {
+      return null;
+    }
+  }
+
+  async function putValue(key: string, value: unknown): Promise<void> {
+    const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
+      kvNamespaceId,
+    )}/values/${encodeURIComponent(key)}`;
+    const response = await fetch(url, {
+      method: "PUT",
+      headers: {
+        ...headers,
+        "Content-Type": "application/octet-stream",
+      },
+      body: JSON.stringify(value),
+    });
+    await readCloudflareResponse(response, "POINTER_WRITE_FAILED");
+  }
+
   return {
     kind: "cloudflare",
     async writeVersion(siteId, publishId, files) {
@@ -165,24 +197,32 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       );
     },
     async getPointer(hostname) {
-      const read = async (key: string): Promise<unknown> => {
-        const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
-          kvNamespaceId,
-        )}/values/${encodeURIComponent(key)}`;
-        const response = await fetch(url, { headers });
-        if (response.status === 404) return null;
-        if (!response.ok) {
-          console.error(`[publish] could not read ${key}: ${response.status}`);
-          return null;
+      const value = await readValue(`host:${hostname}`);
+      // Prefer the v2 mapping. The same value may also carry a full pointer
+      // copy so an older Worker can read it directly, but the copy can be
+      // stale after the next publish.
+      if (
+        value &&
+        typeof value === "object" &&
+        (value as { v?: unknown }).v === 2 &&
+        typeof (value as { siteId?: unknown }).siteId === "string"
+      ) {
+        const mapping = value as unknown as {
+          siteId: string;
+          planLapsed?: boolean;
+          supportPaused?: boolean;
+        };
+        const site = await readValue(`site:${mapping.siteId}`);
+        if (!site || typeof site !== "object") return null;
+        const pointer = site as SitePointer;
+        if (pointer.siteId !== mapping.siteId || !pointer.publishId) return null;
+        if (mapping.supportPaused === true) {
+          return { ...pointer, supportPaused: true };
         }
-        try {
-          return JSON.parse(await response.text()) as unknown;
-        } catch {
-          return null;
-        }
-      };
-
-      const value = await read(`host:${hostname}`);
+        return mapping.planLapsed === true
+          ? { ...pointer, planLapsed: true }
+          : pointer;
+      }
       if (
         value &&
         typeof value === "object" &&
@@ -191,70 +231,28 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       ) {
         return value as SitePointer;
       }
-      if (
-        !value ||
-        typeof value !== "object" ||
-        !("v" in value) ||
-        (value as { v?: unknown }).v !== 2 ||
-        typeof (value as { siteId?: unknown }).siteId !== "string"
-      ) {
-        return null;
-      }
-      const mapping = value as unknown as {
-        siteId: string;
-        planLapsed?: boolean;
-        supportPaused?: boolean;
-      };
-      const site = await read(`site:${mapping.siteId}`);
-      if (!site || typeof site !== "object") return null;
-      const pointer = site as SitePointer;
-      if (pointer.siteId !== mapping.siteId || !pointer.publishId) return null;
-      if (mapping.supportPaused === true) {
-        return { ...pointer, supportPaused: true };
-      }
-      return mapping.planLapsed === true
-        ? { ...pointer, planLapsed: true }
-        : pointer;
+      return null;
+    },
+    async writeSitePointer(pointer) {
+      await putValue(`site:${pointer.siteId}`, pointer);
     },
     async writePointer(hostname, pointer) {
-      const put = async (key: string, value: unknown): Promise<void> => {
-        const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
-          kvNamespaceId,
-        )}/values/${encodeURIComponent(key)}`;
-        const response = await fetch(url, {
-          method: "PUT",
-          headers: {
-            ...headers,
-            "Content-Type": "application/octet-stream",
-          },
-          body: JSON.stringify(value),
-        });
-        await readCloudflareResponse(response, "POINTER_WRITE_FAILED");
-      };
-
-      await put(`site:${pointer.siteId}`, pointer);
+      await putValue(`site:${pointer.siteId}`, pointer);
       // Keep the full pointer at the free host too. Older Workers read this
       // key directly, and it makes the KV value self-contained for debugging.
-      await put(`host:${hostname}`, pointer);
+      await putValue(`host:${hostname}`, pointer);
     },
     async writeHostPointer(hostname, siteId, options) {
-      const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
-        kvNamespaceId,
-      )}/values/${encodeURIComponent(`host:${hostname}`)}`;
-      const response = await fetch(url, {
-        method: "PUT",
-        headers: {
-          ...headers,
-          "Content-Type": "application/octet-stream",
-        },
-        body: JSON.stringify({
-          v: 2,
-          siteId,
-          ...(options?.planLapsed ? { planLapsed: true } : {}),
-          ...(options?.supportPaused ? { supportPaused: true } : {}),
-        }),
+      const site = await readValue(`site:${siteId}`);
+      const full =
+        site && typeof site === "object" ? (site as Record<string, unknown>) : {};
+      await putValue(`host:${hostname}`, {
+        ...full,
+        v: 2,
+        siteId,
+        ...(options?.planLapsed ? { planLapsed: true } : {}),
+        ...(options?.supportPaused ? { supportPaused: true } : {}),
       });
-      await readCloudflareResponse(response, "POINTER_WRITE_FAILED");
     },
     async deleteHostPointer(hostname) {
       const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
@@ -303,6 +301,9 @@ function localStore(config: PublishConfig): PublishStore {
     },
     async getPointer(hostname) {
       return reader.getPointer(hostname);
+    },
+    async writeSitePointer(pointer) {
+      await writeNodeSitePointer(config.localDir, pointer);
     },
     async writePointer(hostname, pointer) {
       await writeNodePointer(config.localDir, hostname, pointer);

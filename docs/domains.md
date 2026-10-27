@@ -13,7 +13,7 @@ Get-On connects domains that customers already own. We do not host DNS, sell dom
 7. A domain is a registrable domain from the Public Suffix List. Each domain has at most two addresses: one main and one optional extra that redirects.
 8. Hostnames are globally unique among non-removed connections. A domain may be verified by multiple teams; an address connects to one website at a time.
 9. HSTS on customer hosts: `Strict-Transport-Security: max-age=31536000` without `includeSubDomains` or `preload`. Platform hosts keep the stricter header.
-10. KV pointer v2: `host:{hostname}` → `{ v:2, siteId, planLapsed?, supportPaused? }`; `site:{siteId}` → pointer with `primaryHost`, `redirectToPrimary`, etc. The reader accepts the old single-key pointer for one release. A per-host `planLapsed` flag pauses only that address, so the free address keeps working. `supportPaused` shows a neutral pause page while support investigates.
+10. KV pointer v2: `host:{hostname}` → `{ v:2, siteId, planLapsed?, supportPaused? }`; `site:{siteId}` → pointer with `primaryHost`, `redirectToPrimary`, etc. The reader accepts the old single-key pointer for one release. A per-host `planLapsed` flag pauses only that address, so the free address keeps working. `supportPaused` shows a neutral pause page while support investigates. Every host keeps a full pointer copy at `host:{hostname}` so an older Worker can serve it. Custom hosts also carry the v2 mapping, and a publish refreshes their full copy so `site:{siteId}` stays the source of truth without stale copies. `pnpm job:migrate-pointers` enforces that split.
 11. Heavy changes take the project lock; provider calls for one domain take a per-domain lock.
 12. Nothing publishes automatically except the explicit safe auto-publish when a domain goes live and there are no unpublished changes.
 13. Provider limits are configurable: global rate limiter/queue, pending-hostname cap, quota alerts at 80% and maximum. Prices live only in docs/admin copy. `pnpm job:domains-plan` reconciles plan lapses per website: it restores addresses that fit, pauses the oldest over the limit, clears or promotes the project's primary address, and leaves the free address working.
@@ -64,7 +64,7 @@ Transition data and exhaustive tests live in `apps/web/lib/domains/state.ts`.
 
 ## Serving
 
-The Worker resolves `host:{host}` first, then `site:{siteId}`. Unknown hosts get the platform not-found page. Custom hosts get the domain-not-connected or domain-paused page where applicable. Canonical redirects apply to GET/HEAD only and exclude `/_gs/health`. Forms work on custom hosts by resolving `domain_hostnames` before the free address.
+The Worker prefers the v2 mapping at `host:{host}`, then reads `site:{siteId}`; it falls back to the old full pointer for older data. Unknown hosts get the platform not-found page. Custom hosts get the domain-not-connected or domain-paused page where applicable. Canonical redirects apply to GET/HEAD only and exclude `/_gs/health`. Forms work on custom hosts by resolving `domain_hostnames` before the free address.
 
 ## Runbooks
 

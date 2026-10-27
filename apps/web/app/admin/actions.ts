@@ -102,13 +102,12 @@ export async function takeSiteOffline(
   const hostname = siteHostname(config, String(project.subdomain));
   const existing = await store.getPointer(hostname);
   await store.writePointer(hostname, {
+    ...(existing ?? {}),
     siteId: project.id,
     publishId: String(publish.id),
     state: "suspended",
     builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
     plan: await teamPlanId(admin, project.team_id),
-    ...(existing?.pause ? { pause: existing.pause } : {}),
-    ...(existing?.redirects?.length ? { redirects: existing.redirects } : {}),
   });
 
   await admin
@@ -152,13 +151,12 @@ export async function bringSiteOnline(siteId: string): Promise<AdminActionResult
   const hostname = siteHostname(config, String(project.subdomain));
   const existing = await store.getPointer(hostname);
   await store.writePointer(hostname, {
+    ...(existing ?? {}),
     siteId: project.id,
     publishId: String(publish.id),
     state: "live",
     builtAt: String(publish.live_at ?? publish.finished_at ?? publish.created_at),
     plan: await teamPlanId(admin, project.team_id),
-    ...(existing?.pause ? { pause: existing.pause } : {}),
-    ...(existing?.redirects?.length ? { redirects: existing.redirects } : {}),
   });
 
   const now = new Date().toISOString();

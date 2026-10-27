@@ -39,6 +39,12 @@ export type SampleProfile = {
   address: string;
   hoursNote: string;
   social: { network: string; url: string }[];
+  businessType?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  areaServed?: string;
+  ownerFirstName?: string;
 };
 
 export type TemplatePage = {

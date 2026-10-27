@@ -16,6 +16,7 @@ import { planLimits } from "@/lib/team";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
 import { friendlyError } from "@/lib/errors";
+import { countSampleBlocks } from "@get-on/blocks";
 
 type Params = {
   params: Promise<{ projectId: string }>;
@@ -134,6 +135,10 @@ export default async function OverviewPage({ params, searchParams }: Params) {
     0,
   );
   const hasContactForm = contactFormCount > 0;
+  const sampleContentCount = pageRows.reduce(
+    (total, page) => total + countSampleBlocks(page.blocks),
+    0,
+  );
 
   return (
     <AppPage width="default">
@@ -215,6 +220,7 @@ export default async function OverviewPage({ params, searchParams }: Params) {
             homepageReady={homepageReady}
             detailsReady={detailsDone}
             contactFormPluginOff={!contactEnabled && hasContactForm}
+            sampleContentCount={sampleContentCount}
             lastPublishedAt={livePublish?.live_at ?? livePublish?.created_at ?? null}
           />
 

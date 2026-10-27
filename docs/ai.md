@@ -1,3 +1,5 @@
+Read with `docs/ai-design.md` for the Design Spec, resolver, verifier, prompts and eval gates.
+
 # AI generation
 
 Status: foundation in progress. The provider adapter, credit maths, prompt composer, database schema, text, section, page, vision and image pipelines and the credit/payload jobs exist. The Pictures page can create a picture with AI (when images are enabled) and describe a picture with AI. The AI credits page, the admin AI settings/model/usage console, the wizard AI first-page flow, the page-editor AI section composer, the writing-style settings page and the AI history page are built. The template gallery can now apply a design and let AI rewrite the sample text. The rest of the AI UI, the admin Evals pages and the remaining generation tasks are still to be built. The evaluation runner library is in `packages/ai/src/eval.ts` and works with any provider, including the fake provider.

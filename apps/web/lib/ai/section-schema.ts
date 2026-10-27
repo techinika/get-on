@@ -136,7 +136,7 @@ export function blocksFromDraft(
           buttonLabel: "Get in touch",
           buttonLink: { type: "none" },
           highlights: [],
-          layout: "text-only",
+          layout: "centered",
           height: "auto",
           align: "center",
           background: "soft",

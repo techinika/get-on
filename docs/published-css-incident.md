@@ -41,8 +41,15 @@ the full pointer, so the free address could resolve to no site or an incomplete
 site. The two stores did not behave the same way.
 
 The Cloudflare store now writes the full pointer at the free host as well as
-`site:{siteId}`. Custom addresses still use the v2 mapping so adding a domain
-does not copy the whole pointer.
+`site:{siteId}`. Custom addresses also keep a full copy, refreshed on every
+publish, so an older Worker never serves the previous publish forever.
+
+### 3. Custom addresses kept the first publish forever
+
+A custom host got its full copy once, when the domain went live. Later
+publishes updated only `site:{siteId}` and the free host. New Workers read the
+site pointer, but an older Worker read the stale full copy at the custom host.
+The publish flow now refreshes every live custom host after a successful probe.
 
 ## The fix
 
@@ -55,8 +62,12 @@ does not copy the whole pointer.
 - The publish store checks the uploaded home page again before the pointer moves.
 - The publish record stores `renderer_version`, `css_hash`, `css_bytes` and
   `build_meta`.
-- Cloudflare publishes probe the live address and roll the pointer back when the
-  page is not styled. Local publishes skip the network probe.
+- Cloudflare publishes probe the free address with retries, accept an expected
+  redirect to the custom main address, probe the custom address without
+  blocking the publish, and roll the pointer back when the page is not styled.
+  Local publishes skip the network probe.
+- Every successful publish refreshes the full KV copy for each live custom
+  address.
 - Admin can rebuild a live website when the draft matches the live revision.
   `pnpm job:rebuild-published` does the same for stale live versions.
 
@@ -64,8 +75,8 @@ does not copy the whole pointer.
 
 - `pnpm --filter @get-on/publisher test` covers the manifest parity, the styled
   gate, the unstyled build rejection and the styled upload check.
-- `pnpm --filter web test` covers the unstyled upload rejection and the full
-  pointer written at the free host.
+- `pnpm --filter web test` covers the unstyled upload rejection, the full
+  pointer at the free host and the full custom-host copy.
 - `pnpm build` succeeds, and `d0764557851e8bc9` plus `.gs-header` are present in
   `apps/web/.next/server/chunks`, so the CSS is in the production bundle.
 - A local seeded publish returns `<style data-gs="1" data-renderer-version="d0764557851e8bc9">`.

@@ -59,16 +59,39 @@ export type PublishResult = {
 
 const PROBE_TIMEOUT_MS = 8_000;
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 /** Checks that the address visitors use really serves a styled page. */
-async function probeLiveSite(url: string): Promise<void> {
+async function probeLiveSiteOnce(url: string): Promise<void> {
   const response = await fetch(`${url}${url.includes("?") ? "&" : "?"}__gs_probe=${Date.now()}`, {
     headers: { "cache-control": "no-cache" },
-    redirect: "follow",
+    // A free address that redirects to the custom main address is already
+    // serving the pointer. Following it would make a custom DNS problem look
+    // like a failed publish.
+    redirect: "manual",
     signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
   });
+  if (response.status >= 300 && response.status < 400) return;
   if (!response.ok) throw new Error(`LIVE_PROBE_STATUS_${response.status}`);
   const html = await response.text();
   assertStyledHtml(html);
+}
+
+/** KV and DNS can take a few seconds to see a new pointer. */
+async function probeLiveSite(url: string, attempts = 4): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      await probeLiveSiteOnce(url);
+      return;
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) await sleep(700 * 2 ** (attempt - 1));
+    }
+  }
+  throw lastError;
 }
 
 type LoadedSite = {
@@ -325,9 +348,18 @@ export async function publishProject(
 
     if (config.kind === "cloudflare") {
       try {
-        await probeLiveSite(
-          primaryAddress(config, project.subdomain, project.primary_host),
-        );
+        // The free address is the one we control. A custom main address may
+        // still be waiting for DNS or proxy setup, so a failure there must not
+        // roll back an otherwise good publish.
+        await probeLiveSite(primaryAddress(config, project.subdomain, null));
+        if (project.primary_host) {
+          await probeLiveSite(
+            primaryAddress(config, project.subdomain, project.primary_host),
+            2,
+          ).catch((error) => {
+            console.warn("[publish] custom address probe failed", error);
+          });
+        }
       } catch (probeError) {
         console.error("[publish] live style probe failed", probeError);
         if (previous) {
@@ -343,6 +375,28 @@ export async function publishProject(
         }
         throw new PublishError("LIVE_PROBE_FAILED", publishId);
       }
+    }
+
+    // Keep each custom address self-contained for Workers running an older
+    // build. New Workers read site:{siteId}, but the old ones read host:{host}
+    // directly, so the copy must be refreshed on every successful publish.
+    const { data: customHosts } = await ctx.supabase
+      .from("domain_hostnames")
+      .select("hostname")
+      .eq("project_id", project.id)
+      .in("status", ["active", "live"]);
+    for (const row of customHosts ?? []) {
+      const customHost = String(row.hostname ?? "").trim().toLowerCase();
+      if (!customHost || customHost === hostname) continue;
+      const existing = await store.getPointer(customHost).catch(() => null);
+      await store
+        .writeHostPointer(customHost, project.id, {
+          planLapsed: existing?.planLapsed === true,
+          supportPaused: existing?.supportPaused === true,
+        })
+        .catch((error) => {
+          console.error(`[publish] could not update ${customHost}`, error);
+        });
     }
 
     const now = new Date().toISOString();

@@ -61,28 +61,12 @@ export function createNodeStore(rootDir: string): SiteStore {
   return {
     async getPointer(hostname: string): Promise<SitePointer | null> {
       try {
-        const raw = await readFile(pointerPath(rootDir, hostname), "utf8");
-        const parsed = JSON.parse(raw) as SitePointer;
-        if (
-          !parsed ||
-          typeof parsed !== "object" ||
-          !parsed.siteId ||
-          !parsed.publishId
-        ) {
-          return null;
-        }
-        return parsed;
-      } catch {
-        // Fall through to the v2 host mapping.
-      }
-
-      try {
         const raw = await readFile(hostPointerPath(rootDir, hostname), "utf8");
         const mapping = JSON.parse(raw) as {
           v?: number;
           siteId?: string;
           planLapsed?: boolean;
-        supportPaused?: boolean;
+          supportPaused?: boolean;
         };
         if (mapping.v !== 2 || typeof mapping.siteId !== "string") return null;
         const siteRaw = await readFile(
@@ -104,6 +88,22 @@ export function createNodeStore(rootDir: string): SiteStore {
         return mapping.planLapsed === true
           ? { ...pointer, planLapsed: true }
           : pointer;
+      } catch {
+        // Fall through to the older full-pointer file.
+      }
+
+      try {
+        const raw = await readFile(pointerPath(rootDir, hostname), "utf8");
+        const parsed = JSON.parse(raw) as SitePointer;
+        if (
+          !parsed ||
+          typeof parsed !== "object" ||
+          !parsed.siteId ||
+          !parsed.publishId
+        ) {
+          return null;
+        }
+        return parsed;
       } catch {
         return null;
       }
@@ -149,19 +149,28 @@ export async function writeNodeSitePointer(
   await writeFile(file, `${JSON.stringify(pointer, null, 2)}\n`, "utf8");
 }
 
-/** Points a custom address at a website without copying the full pointer. */
+/** Points a custom address at a website and keeps a full copy for older Workers. */
 export async function writeNodeHostPointer(
   rootDir: string,
   hostname: string,
   siteId: string,
   options?: { planLapsed?: boolean; supportPaused?: boolean },
 ): Promise<void> {
+  let full: Partial<SitePointer> = {};
+  try {
+    full = JSON.parse(
+      await readFile(sitePointerPath(rootDir, siteId), "utf8"),
+    ) as SitePointer;
+  } catch {
+    // The site pointer may not exist yet.
+  }
   const file = hostPointerPath(rootDir, hostname);
   await mkdir(path.dirname(file), { recursive: true });
   await writeFile(
     file,
     `${JSON.stringify(
       {
+        ...full,
         v: 2,
         siteId,
         ...(options?.planLapsed ? { planLapsed: true } : {}),

@@ -29,6 +29,9 @@ const TASK_LABELS: Record<string, string> = {
   "seo.write": "Wrote search text",
   "alt.describe": "Described a picture",
   "design.suggest": "Suggested a design",
+  "design.interpret": "Read your design brief",
+  "design.options": "Suggested design options",
+  "design.restyle": "Changed the look",
   "profile.write": "Wrote your business profile",
   "tips.fix": "Fixed a tip",
   "image.generate": "Created a picture",
@@ -53,7 +56,7 @@ const FILTERS = {
   text: { label: "Text", tasks: ["text.write", "text.improve", "list.expand", "profile.write", "tips.fix"] },
   seo: { label: "SEO", tasks: ["seo.write"] },
   pictures: { label: "Pictures", tasks: ["alt.describe", "image.generate"] },
-  design: { label: "Design", tasks: ["design.suggest"] },
+  design: { label: "Design", tasks: ["design.suggest", "design.interpret", "design.options", "design.restyle"] },
 } as const;
 
 type FilterKey = keyof typeof FILTERS;

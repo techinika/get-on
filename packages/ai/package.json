@@ -13,13 +13,25 @@
     "./prompts": "./src/prompts/composer.ts",
     "./registry": "./src/registry/models.ts",
     "./tasks": "./src/tasks/registry.ts",
-    "./types": "./src/types.ts"
+    "./types": "./src/types.ts",
+    "./design": "./src/design/spec.ts",
+    "./design/parse": "./src/design/parse.ts",
+    "./design/resolve": "./src/design/resolve.ts",
+    "./design/verify": "./src/design/verify.ts",
+    "./design/repair": "./src/design/repair.ts",
+    "./design/variation": "./src/design/variation.ts",
+    "./design/catalogue": "./src/design/catalogue.ts",
+    "./design/eval": "./src/design/eval.ts",
+    "./design/restyle": "./src/design/restyle.ts",
+    "./design/looks": "./src/design/looks.ts"
   },
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@get-on/templates": "workspace:*",
+    "@get-on/blocks": "workspace:*",
     "zod": "^3.24.1"
   },
   "devDependencies": {

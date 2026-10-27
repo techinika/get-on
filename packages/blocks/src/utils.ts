@@ -41,10 +41,34 @@ function withSection(block: any): any {
   };
 }
 
+const HERO_LAYOUTS: Record<string, string> = {
+  'text-only': 'minimal',
+  'image-right': 'split',
+  'image-left': 'split',
+  'image-background': 'fullbleed',
+};
+
 export function normalizeBlock(raw: any): any {
   if (!raw || typeof raw !== 'object') return createBlock('text');
-  let block: any = { id: raw.id || nanoid(), type: raw.type || 'text', props: raw.props || {}, ...(raw.sec ? { sec: raw.sec } : {}) };
+  let block: any = {
+    ...raw,
+    id: raw.id || nanoid(),
+    type: raw.type || 'text',
+    props: raw.props || {},
+    ...(raw.sec ? { sec: raw.sec } : {}),
+  };
 
+  if (block.type === 'hero' && block.props?.layout && HERO_LAYOUTS[block.props.layout]) {
+    const old = block.props.layout;
+    block = {
+      ...block,
+      props: {
+        ...block.props,
+        layout: old === 'text-only' ? (block.props.align === 'left' ? 'minimal' : 'centered') : HERO_LAYOUTS[old],
+        imageSide: old === 'image-left' ? 'left' : block.props.imageSide ?? 'right',
+      },
+    };
+  }
   if (block.type === 'contact-cta') {
     block = { ...block, type: 'cta' };
   }
@@ -92,6 +116,12 @@ export function validateContent(raw: any): { ok: boolean; content?: any; issues?
   const parsed = pageContentSchema.safeParse(migrated);
   if (parsed.success) return { ok: true, content: parsed.data };
   return { ok: false, content: migrated, issues: parsed.error.issues };
+}
+
+/** Counts top-level sections that still contain template sample content. */
+export function countSampleBlocks(content: any): number {
+  const blocks = Array.isArray(content) ? content : Array.isArray(content?.blocks) ? content.blocks : [];
+  return blocks.filter((block: any) => block?.sampleOnly === true).length;
 }
 
 export function countBlocks(content: any): number {

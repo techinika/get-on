@@ -93,6 +93,19 @@ export function themeTokens(theme: Theme) {
     comfortable: { pad: '48px', gap: '16px' },
     airy: { pad: '64px', gap: '20px' },
   }[density];
+  const design = theme.design ?? {};
+  const tracking = {
+    tight: '-0.03em',
+    normal: '-0.01em',
+    wide: '0.06em',
+  }[design.headingTracking ?? 'normal'];
+  const wordmark = design.wordmark ?? {};
+  const wordmarkSize = wordmark.size ?? 24;
+  const heroPad = {
+    compact: { sm: '56px', md: '80px', lg: '96px' },
+    comfortable: { sm: '72px', md: '104px', lg: '136px' },
+    airy: { sm: '96px', md: '136px', lg: '184px' },
+  }[density];
   return {
     ...tokens,
     '--s-font-heading': fonts.heading,
@@ -104,6 +117,19 @@ export function themeTokens(theme: Theme) {
     '--s-small': type.small,
     '--s-pad-y': spacing.pad,
     '--s-gap': spacing.gap,
+    '--s-display': 'clamp(44px, 9cqw, 88px)',
+    '--s-hero-pad-y': `clamp(${heroPad.sm}, 9cqw, ${heroPad.lg})`,
+    '--s-measure': '62ch',
+    '--s-gutter': 'clamp(20px, 4cqw, 48px)',
+    '--s-eyebrow-gap': '16px',
+    '--s-title-gap': '12px',
+    '--s-stack': '28px',
+    '--s-heading-case': design.headingCase === 'upper' ? 'uppercase' : 'none',
+    '--s-heading-tracking': tracking,
+    '--s-wordmark-size': `${wordmarkSize}px`,
+    '--s-wordmark-tracking': `${wordmark.tracking ?? -0.02}em`,
+    '--s-wordmark-weight': String(wordmark.weight ?? 700),
+    '--s-wordmark-case': wordmark.case === 'upper' ? 'uppercase' : wordmark.case === 'small' ? 'lowercase' : 'none',
     '--s-field-bg': 'var(--s-card)',
     '--s-field-text': 'var(--s-text)',
     '--s-field-border': `color-mix(in srgb, ${colors.text} 32%, ${colors.background})`,

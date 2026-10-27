@@ -19,6 +19,8 @@ export type DialogProps = {
   width?: "default" | "form";
   /** Progress dialogs cannot be closed with Escape or the backdrop. */
   dismissible?: boolean;
+  /** Focus this control when the dialog opens, instead of the close button. */
+  initialFocusRef?: React.RefObject<HTMLElement | null>;
   className?: string;
 };
 
@@ -31,27 +33,32 @@ export function Dialog({
   icon,
   width = "default",
   dismissible = true,
+  initialFocusRef,
   className,
 }: DialogProps) {
   const panelRef = React.useRef<HTMLDivElement>(null);
   const previouslyFocused = React.useRef<HTMLElement | null>(null);
   const onCloseRef = React.useRef(onClose);
+  const dismissibleRef = React.useRef(dismissible);
+  const initialFocusRefRef = React.useRef(initialFocusRef);
 
   React.useEffect(() => {
     onCloseRef.current = onClose;
-  }, [onClose]);
+    dismissibleRef.current = dismissible;
+    initialFocusRefRef.current = initialFocusRef;
+  }, [onClose, dismissible, initialFocusRef]);
 
   React.useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement | null;
     const panel = panelRef.current;
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE);
-    (first ?? panel)?.focus();
+    (initialFocusRefRef.current?.current ?? first ?? panel)?.focus();
 
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") {
         e.stopPropagation();
-        if (dismissible) onCloseRef.current();
+        if (dismissibleRef.current) onCloseRef.current();
         return;
       }
       if (e.key !== "Tab" || !panel) return;
@@ -78,7 +85,7 @@ export function Dialog({
       document.body.style.overflow = prevOverflow;
       previouslyFocused.current?.focus?.();
     };
-  }, [open, dismissible]);
+  }, [open]);
 
   if (!open) return null;
 

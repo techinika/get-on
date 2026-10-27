@@ -142,10 +142,17 @@ export async function POST(request: Request) {
     const materialized = materializeTemplate(pkg, {
       profile: {
         businessName: name,
+        tagline: typeof body.tagline === "string" ? body.tagline : "",
         description: about,
         phone: contact.phone ?? "",
         email: contact.email ?? "",
         address: contact.address ?? "",
+        hoursNote: typeof body.hours === "string" ? body.hours : "",
+        businessType: typeof body.businessType === "string" ? body.businessType : "",
+        city: typeof body.city === "string" ? body.city : "",
+        region: typeof body.region === "string" ? body.region : "",
+        country: typeof body.country === "string" ? body.country : "",
+        areaServed: typeof body.areaServed === "string" ? body.areaServed : "",
       },
       maxPages: plan.maxPagesPerSite,
     });

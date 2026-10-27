@@ -110,6 +110,8 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
                 businessName={contact.businessName}
                 nav={nav}
                 watermark={false}
+                theme={preview.theme}
+                tagline={contact.tagline}
               />
             }
             footer={
@@ -118,13 +120,23 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
                 phone={contact.phone}
                 email={contact.email}
                 address={contact.address}
+                hours={contact.hoursNote}
                 nav={nav}
                 showWatermark={false}
+                theme={preview.theme}
+                tagline={contact.tagline}
+                socialLinks={contact.social}
               />
             }
             ctx={{
               mode: "editor",
               contactEnabled: true,
+              theme: preview.theme,
+              hours: contact.hoursNote,
+              address: contact.address,
+              phone: contact.phone,
+              email: contact.email,
+              socialLinks: contact.social,
               getPageHref: (pageId) => {
                 const linked = preview.pages.find((candidate) => candidate.id === pageId);
                 return linked

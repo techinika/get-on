@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Template artwork preview</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 2rem; font-family: ui-sans-serif, system-ui, sans-serif; background: #f7f6f3; color: #1f1a17; }
+    h1 { font-size: 1.6rem; margin: 0 0 .4rem; }
+    .intro { margin: 0 0 2rem; max-width: 60ch; color: #5b554e; }
+    .template { margin: 0 0 3rem; }
+    .template h2 { font-size: 1.15rem; margin: 0; }
+    .template p { margin: .2rem 0 1rem; color: #6b645b; font-size: .9rem; }
+    .grid { display: grid; gap: 1rem; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    figure { margin: 0; background: #fff; border: 1px solid #e5e0d8; border-radius: 12px; overflow: hidden; }
+    figure.hero { grid-column: span 2; grid-row: span 2; }
+    figure.logo { grid-column: span 2; }
+    figure img { display: block; width: 100%; height: auto; aspect-ratio: 4 / 3; object-fit: cover; }
+    figure.hero img { aspect-ratio: 4 / 3; }
+    figure.logo img { aspect-ratio: 3 / 1; object-fit: contain; background: #faf9f6; }
+    figcaption { padding: .55rem .7rem; font-size: .75rem; color: #6b645b; border-top: 1px solid #eee9e1; }
+    @media (max-width: 760px) { body { padding: 1rem; } .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } figure.hero, figure.logo { grid-column: span 2; } }
+  </style>
+</head>
+<body>
+  <h1>Template artwork preview</h1>
+  <p class="intro">Generated from the shared art recipes. Every image is abstract, uses the template palette and contains no text. Run <code>pnpm --filter web art:templates</code> to rebuild.</p>
+
+      <section class="template">
+        <header><h2>Starter</h2><p>starter · A friendly, flexible website for any small business.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/starter/hero.webp" alt="Soft colour mesh in the website colours" loading="lazy"><figcaption>Hero · mesh-gradient</figcaption></figure>
+          <figure><img src="template-art/starter/section-1.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Section · blob-field</figcaption></figure>
+          <figure><img src="template-art/starter/section-2.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Section · geometric-tiles</figcaption></figure>
+          <figure><img src="template-art/starter/portrait.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Portrait · halftone</figcaption></figure>
+          <figure class="logo"><img src="template-art/starter/logo.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Logo · geometric-tiles</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Software company</h2><p>software-company · A clear, modern website for a software product.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/software-company/hero.webp" alt="Soft colour mesh in the website colours" loading="lazy"><figcaption>Hero · mesh-gradient</figcaption></figure>
+          <figure><img src="template-art/software-company/section-1.webp" alt="Flat isometric shapes in the website colours" loading="lazy"><figcaption>Section · isometric-blocks</figcaption></figure>
+          <figure><img src="template-art/software-company/section-2.webp" alt="Technical grid and panel shapes" loading="lazy"><figcaption>Section · terminal-grid</figcaption></figure>
+          <figure><img src="template-art/software-company/portrait.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Portrait · halftone</figcaption></figure>
+          <figure class="logo"><img src="template-art/software-company/logo.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Logo · geometric-tiles</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Law firm</h2><p>law-firm · A calm, trustworthy website for a law firm.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/law-firm/hero.webp" alt="Layered arches in the website colours" loading="lazy"><figcaption>Hero · arch-composition</figcaption></figure>
+          <figure><img src="template-art/law-firm/section-1.webp" alt="Soft gradient with a fine paper grain" loading="lazy"><figcaption>Section · grain-gradient</figcaption></figure>
+          <figure><img src="template-art/law-firm/section-2.webp" alt="Simple botanical line shapes" loading="lazy"><figcaption>Section · botanical-lines</figcaption></figure>
+          <figure><img src="template-art/law-firm/portrait.webp" alt="Soft gradient with a fine paper grain" loading="lazy"><figcaption>Portrait · grain-gradient</figcaption></figure>
+          <figure class="logo"><img src="template-art/law-firm/logo.webp" alt="Layered arches in the website colours" loading="lazy"><figcaption>Logo · arch-composition</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Restaurant</h2><p>restaurant · A warm website for a restaurant, cafe or food business.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/restaurant/hero.webp" alt="Soft gradient with a fine paper grain" loading="lazy"><figcaption>Hero · grain-gradient</figcaption></figure>
+          <figure><img src="template-art/restaurant/section-1.webp" alt="Simple product silhouettes on a warm background" loading="lazy"><figcaption>Section · still-life-shapes</figcaption></figure>
+          <figure><img src="template-art/restaurant/section-2.webp" alt="Simple botanical line shapes" loading="lazy"><figcaption>Section · botanical-lines</figcaption></figure>
+          <figure><img src="template-art/restaurant/portrait.webp" alt="Simple product silhouettes on a warm background" loading="lazy"><figcaption>Portrait · still-life-shapes</figcaption></figure>
+          <figure class="logo"><img src="template-art/restaurant/logo.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Logo · blob-field</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Developer portfolio</h2><p>developer-portfolio · A focused website for a developer or designer.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/developer-portfolio/hero.webp" alt="Technical grid and panel shapes" loading="lazy"><figcaption>Hero · terminal-grid</figcaption></figure>
+          <figure><img src="template-art/developer-portfolio/section-1.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Section · halftone</figcaption></figure>
+          <figure><img src="template-art/developer-portfolio/section-2.webp" alt="Flat isometric shapes in the website colours" loading="lazy"><figcaption>Section · isometric-blocks</figcaption></figure>
+          <figure><img src="template-art/developer-portfolio/portrait.webp" alt="Technical grid and panel shapes" loading="lazy"><figcaption>Portrait · terminal-grid</figcaption></figure>
+          <figure class="logo"><img src="template-art/developer-portfolio/logo.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Logo · geometric-tiles</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Salon and beauty</h2><p>salon-beauty · A soft, elegant website for a salon or beauty studio.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/salon-beauty/hero.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Hero · blob-field</figcaption></figure>
+          <figure><img src="template-art/salon-beauty/section-1.webp" alt="Layered arches in the website colours" loading="lazy"><figcaption>Section · arch-composition</figcaption></figure>
+          <figure><img src="template-art/salon-beauty/section-2.webp" alt="Simple botanical line shapes" loading="lazy"><figcaption>Section · botanical-lines</figcaption></figure>
+          <figure><img src="template-art/salon-beauty/portrait.webp" alt="Layered arches in the website colours" loading="lazy"><figcaption>Portrait · arch-composition</figcaption></figure>
+          <figure class="logo"><img src="template-art/salon-beauty/logo.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Logo · blob-field</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Boutique shop</h2><p>boutique-shop · A product-first website for a small shop.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/boutique-shop/hero.webp" alt="Simple product silhouettes on a warm background" loading="lazy"><figcaption>Hero · still-life-shapes</figcaption></figure>
+          <figure><img src="template-art/boutique-shop/section-1.webp" alt="Soft gradient with a fine paper grain" loading="lazy"><figcaption>Section · grain-gradient</figcaption></figure>
+          <figure><img src="template-art/boutique-shop/section-2.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Section · geometric-tiles</figcaption></figure>
+          <figure><img src="template-art/boutique-shop/portrait.webp" alt="Simple product silhouettes on a warm background" loading="lazy"><figcaption>Portrait · still-life-shapes</figcaption></figure>
+          <figure class="logo"><img src="template-art/boutique-shop/logo.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Logo · geometric-tiles</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Home services</h2><p>home-services · A bold, trustworthy website for local trades.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/home-services/hero.webp" alt="Flat isometric shapes in the website colours" loading="lazy"><figcaption>Hero · isometric-blocks</figcaption></figure>
+          <figure><img src="template-art/home-services/section-1.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Section · geometric-tiles</figcaption></figure>
+          <figure><img src="template-art/home-services/section-2.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Section · halftone</figcaption></figure>
+          <figure><img src="template-art/home-services/portrait.webp" alt="Flat isometric shapes in the website colours" loading="lazy"><figcaption>Portrait · isometric-blocks</figcaption></figure>
+          <figure class="logo"><img src="template-art/home-services/logo.webp" alt="Flat isometric shapes in the website colours" loading="lazy"><figcaption>Logo · isometric-blocks</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Community and church</h2><p>community-church · A warm, welcoming website for a community.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/community-church/hero.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Hero · blob-field</figcaption></figure>
+          <figure><img src="template-art/community-church/section-1.webp" alt="Simple botanical line shapes" loading="lazy"><figcaption>Section · botanical-lines</figcaption></figure>
+          <figure><img src="template-art/community-church/section-2.webp" alt="Soft gradient with a fine paper grain" loading="lazy"><figcaption>Section · grain-gradient</figcaption></figure>
+          <figure><img src="template-art/community-church/portrait.webp" alt="Soft organic shapes in the website colours" loading="lazy"><figcaption>Portrait · blob-field</figcaption></figure>
+          <figure class="logo"><img src="template-art/community-church/logo.webp" alt="Layered arches in the website colours" loading="lazy"><figcaption>Logo · arch-composition</figcaption></figure>
+        </div>
+      </section>
+
+      <section class="template">
+        <header><h2>Creative studio</h2><p>creative-studio · An editorial, high-contrast website for a studio.</p></header>
+        <div class="grid">
+          <figure class="hero"><img src="template-art/creative-studio/hero.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Hero · geometric-tiles</figcaption></figure>
+          <figure><img src="template-art/creative-studio/section-1.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Section · halftone</figcaption></figure>
+          <figure><img src="template-art/creative-studio/section-2.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Section · geometric-tiles</figcaption></figure>
+          <figure><img src="template-art/creative-studio/portrait.webp" alt="Dot pattern in the website colours" loading="lazy"><figcaption>Portrait · halftone</figcaption></figure>
+          <figure class="logo"><img src="template-art/creative-studio/logo.webp" alt="Geometric tiles in the website colours" loading="lazy"><figcaption>Logo · geometric-tiles</figcaption></figure>
+        </div>
+      </section>
+</body>
+</html>

@@ -59,15 +59,41 @@ function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : {};
 }
 
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
 function profileOf(project: ProjectRow) {
   const settings = asRecord(project.settings);
   const contact = asRecord(settings.contact);
+  const addressParts = asRecord(settings.address_parts);
+  const social = Array.isArray(settings.socialLinks)
+    ? (settings.socialLinks as Array<Record<string, unknown>>)
+        .map((item) => ({ network: stringValue(item.network), url: stringValue(item.url) }))
+        .filter((item) => item.url)
+    : [];
+  const formattedAddress = [
+    stringValue(addressParts.street),
+    stringValue(addressParts.city),
+    stringValue(addressParts.region),
+    stringValue(addressParts.postal),
+    stringValue(addressParts.country),
+  ].filter(Boolean).join(", ");
   return {
     businessName: project.name,
-    description: typeof settings.about === "string" ? settings.about : "",
-    phone: typeof contact.phone === "string" ? contact.phone : "",
-    email: typeof contact.email === "string" ? contact.email : "",
-    address: typeof contact.address === "string" ? contact.address : "",
+    tagline: stringValue(settings.tagline),
+    description: stringValue(settings.about),
+    phone: stringValue(contact.phone),
+    email: stringValue(contact.email),
+    address: stringValue(contact.address) || formattedAddress,
+    hoursNote: stringValue(settings.hours),
+    social,
+    businessType: stringValue(settings.businessType),
+    city: stringValue(addressParts.city),
+    region: stringValue(addressParts.region),
+    country: stringValue(addressParts.country),
+    areaServed: stringValue(settings.area_served ?? settings.areaServed),
+    logo: Boolean(settings.logoData),
   };
 }
 

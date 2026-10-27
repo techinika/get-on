@@ -56,3 +56,60 @@ describe("Cloudflare publish store", () => {
     expect(JSON.parse(site!.body)).toEqual(pointer);
   });
 });
+
+describe("Cloudflare site pointers", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("writes a full backwards-compatible pointer at a custom host", async () => {
+    const puts: Array<{ key: string; body: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        const key = decodeURIComponent(url.pathname.split("/values/")[1] ?? "");
+        if (!init?.method || init.method === "GET") {
+          expect(key).toBe(`site:${pointer.siteId}`);
+          return new Response(JSON.stringify(pointer), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        puts.push({ key, body: String(init?.body ?? "") });
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+
+    await createPublishStore(config).writeHostPointer("www.example.com", pointer.siteId);
+
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.key).toBe("host:www.example.com");
+    expect(JSON.parse(puts[0]!.body)).toMatchObject({ ...pointer, v: 2 });
+  });
+
+  it("writes only the site pointer when asked", async () => {
+    const puts: Array<{ key: string; body: string }> = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = new URL(String(input));
+        const key = decodeURIComponent(url.pathname.split("/values/")[1] ?? "");
+        puts.push({ key, body: String(init?.body ?? "") });
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }),
+    );
+
+    await createPublishStore(config).writeSitePointer(pointer);
+
+    expect(puts).toHaveLength(1);
+    expect(puts[0]?.key).toBe(`site:${pointer.siteId}`);
+    expect(JSON.parse(puts[0]!.body)).toEqual(pointer);
+  });
+});

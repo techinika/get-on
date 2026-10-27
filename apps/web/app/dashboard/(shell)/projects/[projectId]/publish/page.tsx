@@ -13,6 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
+import { countSampleBlocks } from "@get-on/blocks";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -119,6 +120,10 @@ export default async function PublishHistoryPage({ params }: Params) {
   }
 
   const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
+  const sampleContentCount = pageRows.reduce(
+    (total, page) => total + countSampleBlocks(page.blocks),
+    0,
+  );
   const contactEnabled = contactInstall?.state === "active";
   const hasContactForm = pageRows.some((page) =>
     blocksOf(page.blocks).some(
@@ -166,6 +171,7 @@ export default async function PublishHistoryPage({ params }: Params) {
           homepageReady={homepageReady}
           detailsReady={detailsDone}
           contactFormPluginOff={!contactEnabled && hasContactForm}
+          sampleContentCount={sampleContentCount}
           lastPublishedAt={livePublish?.live_at ?? livePublish?.created_at ?? null}
           showHistoryLink={false}
         />

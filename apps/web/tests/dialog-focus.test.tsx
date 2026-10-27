@@ -21,27 +21,102 @@ describe("Dialog focus stability", () => {
     container.remove();
   });
 
-  it("keeps focus in the confirm input when the parent re-renders with a new onClose", () => {
-    function Harness({ onClose }: { onClose: () => void }) {
-      const [value, setValue] = React.useState("");
+  it("keeps focus in the confirm input while typing and re-rendering", () => {
+    let setValue: ((value: string) => void) | null = null;
+
+    function Harness({
+      onClose,
+      dismissible,
+    }: {
+      onClose: () => void;
+      dismissible: boolean;
+    }) {
+      const [value, update] = React.useState("");
+      setValue = update;
       return (
-        <Dialog open onClose={onClose} title="Delete website">
+        <Dialog
+          open
+          onClose={onClose}
+          title="Delete website"
+          dismissible={dismissible}
+        >
           <input
             aria-label="Type the website name to confirm"
             value={value}
-            onChange={(event) => setValue(event.target.value)}
+            onChange={(event) => update(event.target.value)}
           />
         </Dialog>
       );
     }
 
-    act(() => root.render(<Harness onClose={() => {}} />));
+    act(() => root.render(<Harness onClose={() => {}} dismissible />));
     const input = container.querySelector("input");
     expect(input).not.toBeNull();
     act(() => input?.focus());
     expect(document.activeElement).toBe(input);
 
-    act(() => root.render(<Harness onClose={() => {}} />));
+    act(() => setValue?.("R"));
+    expect(document.activeElement).toBe(input);
+
+    act(() =>
+      root.render(<Harness onClose={() => {}} dismissible={false} />),
+    );
+    expect(document.activeElement).toBe(input);
+
+    act(() => root.render(<Harness onClose={() => {}} dismissible />));
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("does not refocus or restore focus when the focus ref identity changes", () => {
+    let setValue: ((value: string) => void) | null = null;
+
+    function Harness({ passRef }: { passRef: boolean }) {
+      const [value, update] = React.useState("");
+      setValue = update;
+      const firstRef = React.useRef<HTMLInputElement>(null);
+      const secondRef = React.useRef<HTMLInputElement>(null);
+      return (
+        <Dialog
+          open
+          onClose={() => {}}
+          title="Delete website"
+          initialFocusRef={passRef ? firstRef : secondRef}
+        >
+          <input
+            ref={firstRef}
+            aria-label="Confirm"
+            value={value}
+            onChange={(event) => update(event.target.value)}
+          />
+        </Dialog>
+      );
+    }
+
+    act(() => root.render(<Harness passRef />));
+    const input = container.querySelector("input");
+    act(() => input?.focus());
+    act(() => setValue?.("R"));
+    act(() => root.render(<Harness passRef={false} />));
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("focuses the requested field when the dialog opens", () => {
+    function Harness() {
+      const inputRef = React.useRef<HTMLInputElement>(null);
+      return (
+        <Dialog
+          open
+          onClose={() => {}}
+          title="Delete website"
+          initialFocusRef={inputRef}
+        >
+          <input ref={inputRef} aria-label="Confirm" />
+        </Dialog>
+      );
+    }
+
+    act(() => root.render(<Harness />));
+    const input = container.querySelector("input");
     expect(document.activeElement).toBe(input);
   });
 });

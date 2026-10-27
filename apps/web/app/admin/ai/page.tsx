@@ -86,13 +86,21 @@ export default async function AdminAiPage({
         title="AI"
         description="Settings, models and usage for the whole platform."
         actions={
-          <Link
-            href="/admin"
-            className={cn(buttonVariants({ variant: "ghost", size: "md" }))}
-          >
-            <ArrowLeft size={20} strokeWidth={1.75} aria-hidden />
-            Admin
-          </Link>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href="/admin/ai/design"
+              className={cn(buttonVariants({ variant: "secondary", size: "md" }))}
+            >
+              Design accuracy
+            </Link>
+            <Link
+              href="/admin"
+              className={cn(buttonVariants({ variant: "ghost", size: "md" }))}
+            >
+              <ArrowLeft size={20} strokeWidth={1.75} aria-hidden />
+              Admin
+            </Link>
+          </div>
         }
       />
 

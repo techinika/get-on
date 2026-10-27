@@ -131,23 +131,26 @@ export function createCloudflareStore(
         cacheTtl: 60,
       });
 
-      const direct = parsePointer(value);
-      if (direct) return direct;
-
+      // Prefer the v2 mapping so a later publish only has to update
+      // `site:{siteId}`. The mapping also carries a full pointer copy for
+      // older Workers that read `host:` directly.
       const mapping = parseHostMapping(value);
-      if (!mapping) return null;
-      const site = await bindings.kv.get(sitePointerKey(mapping.siteId), {
-        type: "json",
-        cacheTtl: 60,
-      });
-      const pointer = parsePointer(site);
-      if (pointer?.siteId !== mapping.siteId) return null;
-      if (mapping.supportPaused === true) {
-        return { ...pointer, supportPaused: true };
+      if (mapping) {
+        const site = await bindings.kv.get(sitePointerKey(mapping.siteId), {
+          type: "json",
+          cacheTtl: 60,
+        });
+        const pointer = parsePointer(site);
+        if (pointer?.siteId !== mapping.siteId) return null;
+        if (mapping.supportPaused === true) {
+          return { ...pointer, supportPaused: true };
+        }
+        return mapping.planLapsed === true
+          ? { ...pointer, planLapsed: true }
+          : pointer;
       }
-      return mapping.planLapsed === true
-        ? { ...pointer, planLapsed: true }
-        : pointer;
+
+      return parsePointer(value);
     },
 
     async getFile(
