@@ -48,6 +48,16 @@ export type SiteHostPointer = Partial<Omit<SitePointer, "siteId">> & {
   supportPaused?: boolean;
 };
 
+/** A tracked short link stored at `link:{code}`. */
+export type SiteLink = {
+  v: 1;
+  siteId: string;
+  projectId: string;
+  targetPath: string;
+  params: Record<string, string>;
+  active: boolean;
+};
+
 export type SiteFile = {
   body: Uint8Array;
   contentType: string;
@@ -74,4 +84,6 @@ export interface SiteStore {
    * live inside the version.
    */
   getSharedFile?(path: string): Promise<SiteFile | null>;
+  /** A tracked short link, when the store supports links. */
+  getLink?(code: string): Promise<SiteLink | null>;
 }

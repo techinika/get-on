@@ -268,3 +268,49 @@ describe("sites worker", () => {
     expect(response.headers.get("allow")).toBe("GET, HEAD");
   });
 });
+
+
+describe("tracked links", () => {
+  it("redirects a short link without reading or filling the cache", async () => {
+    const env = liveEnv();
+    const kv = env.SITES_KV as FakeKv;
+    kv.values.set("link:abcdefgh", {
+      v: 1,
+      siteId: "site-1",
+      projectId: "site-1",
+      targetPath: "/about",
+      params: { utm_source: "qr" },
+      active: true,
+    });
+    const cache = new FakeCache();
+    cache.entries.set(
+      "https://rosebakery.get-on.tech/__cache/pub-1/_l/abcdefgh",
+      new Response("cached", { status: 200 }),
+    );
+    const worker = createSiteWorker({ cache });
+    const response = await worker.fetch(requestFor("rosebakery.get-on.tech", "/_l/abcdefgh"), env);
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "https://rosebakery.get-on.tech/about?utm_source=qr",
+    );
+    expect(cache.puts).toHaveLength(0);
+  });
+
+  it("does not cache a revoked link page", async () => {
+    const env = liveEnv();
+    const kv = env.SITES_KV as FakeKv;
+    kv.values.set("link:abcdefgh", {
+      v: 1,
+      siteId: "site-1",
+      projectId: "site-1",
+      targetPath: "/about",
+      params: {},
+      active: false,
+    });
+    const cache = new FakeCache();
+    const worker = createSiteWorker({ cache });
+    const response = await worker.fetch(requestFor("rosebakery.get-on.tech", "/_l/abcdefgh"), env);
+    expect(response.status).toBe(410);
+    expect(cache.puts).toHaveLength(0);
+  });
+});

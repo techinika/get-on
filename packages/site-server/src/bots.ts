@@ -52,11 +52,15 @@ export function isCountableRequest(req: {
   };
   const purpose = get("sec-purpose") || get("purpose");
   if (purpose && purpose.toLowerCase().includes("prefetch")) return false;
+  const dnt = get("dnt");
+  const gpc = get("sec-gpc");
+  if (dnt === "1" || gpc === "1") return false;
   if (isBot(req.userAgent || get("user-agent"))) return false;
   const accept = get("accept") || "";
   if (!accept.includes("text/html")) return false;
   const path = req.path || "/";
   if (path.startsWith("/_forms")) return false;
   if (path.startsWith("/_gs/")) return false;
+  if (path.startsWith("/_l/")) return false;
   return true;
 }

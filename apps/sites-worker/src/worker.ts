@@ -76,8 +76,13 @@ async function serve(
   });
   const store = memoStore(base);
 
+  const requestPath = rawPathOf(request.url) ?? "/";
   let key: Request | null = null;
-  if (cache && (request.method === "GET" || request.method === "HEAD")) {
+  if (
+    cache &&
+    (request.method === "GET" || request.method === "HEAD") &&
+    !requestPath.startsWith("/_l/")
+  ) {
     const host = parseHost(request.headers.get("host"), rootDomain);
     if (host.ok) {
       const pointer = await store.getPointer(host.hostname);
@@ -110,6 +115,8 @@ async function serve(
     workerSharedSecret: env.WORKER_SHARED_SECRET,
     appOrigin: env.APP_ORIGIN,
     clientIp,
+    waitUntil: ctx?.waitUntil.bind(ctx),
+    statsSaltSecret: env.STATS_SALT_SECRET,
   });
 
   const cacheControl = response.headers.get("cache-control") ?? "";
@@ -119,7 +126,7 @@ async function serve(
     request.method === "GET" &&
     response.status === 200 &&
     !cacheControl.includes("no-store") &&
-    !/^\/_forms\//.test(rawPathOf(request.url) ?? "");
+    !/^\/(?:_forms|_l)\//.test(rawPathOf(request.url) ?? "");
 
   if (cacheable && key) {
     const copy = response.clone();

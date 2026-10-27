@@ -11,4 +11,5 @@ export {
   sitePath,
   pointerPath,
   sharedPath,
+  linkPath,
 } from "./src/node-store";

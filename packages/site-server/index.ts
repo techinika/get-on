@@ -2,6 +2,7 @@ export { handleSiteRequest, filePathFor, isUnsafePath } from "./src/handle";
 export { parseHost, DEFAULT_ROOT_DOMAIN } from "./src/host";
 export { contentTypeFor } from "./src/content-type";
 export { RESERVED_SUBDOMAINS, isReservedSubdomain } from "./src/reserved";
+export { isBot, isCountableRequest } from "./src/bots";
 export {
   domainNotConnectedPage,
   domainPausedPage,
@@ -16,6 +17,7 @@ export type {
   SitePause,
   SitePointer,
   SiteRedirect,
+  SiteLink,
   SiteState,
   SiteStore,
 } from "./src/types";
