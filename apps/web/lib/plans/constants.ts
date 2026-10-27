@@ -7,6 +7,9 @@ export const PLANS = {
     backup_storage_mb: 100,
     redirects_max: 3,
     exports_per_day: 3,
+    site_zip_allowed: false,
+    site_zip_per_day: 0,
+    tracked_links_max: 3,
   },
   basic: {
     name: "Basic",
@@ -16,6 +19,9 @@ export const PLANS = {
     backup_storage_mb: 500,
     redirects_max: 25,
     exports_per_day: 5,
+    site_zip_allowed: true,
+    site_zip_per_day: 3,
+    tracked_links_max: 20,
   },
   pro: {
     name: "Pro",
@@ -25,6 +31,9 @@ export const PLANS = {
     backup_storage_mb: 2048,
     redirects_max: 100,
     exports_per_day: 10,
+    site_zip_allowed: true,
+    site_zip_per_day: 10,
+    tracked_links_max: 100,
   },
   enterprise: {
     name: "Enterprise",
@@ -34,5 +43,8 @@ export const PLANS = {
     backup_storage_mb: 10240,
     redirects_max: 500,
     exports_per_day: 20,
+    site_zip_allowed: true,
+    site_zip_per_day: 30,
+    tracked_links_max: 1000,
   },
 };

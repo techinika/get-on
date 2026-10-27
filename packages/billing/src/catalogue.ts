@@ -30,6 +30,9 @@ const FREE: PlanLimits = {
     storageMb: 100,
   },
   exportsPerDay: 3,
+  siteZipAllowed: false,
+  siteZipPerDay: 0,
+  trackedLinksMax: 3,
   support: "standard",
   watermark: true,
 };
@@ -56,6 +59,9 @@ const BASIC: PlanLimits = {
     storageMb: 1024,
   },
   exportsPerDay: 5,
+  siteZipAllowed: true,
+  siteZipPerDay: 3,
+  trackedLinksMax: 20,
   support: "standard",
   watermark: false,
 };
@@ -82,6 +88,9 @@ const PRO: PlanLimits = {
     storageMb: 5120,
   },
   exportsPerDay: 10,
+  siteZipAllowed: true,
+  siteZipPerDay: 10,
+  trackedLinksMax: 100,
   support: "priority",
   watermark: false,
 };
@@ -108,6 +117,9 @@ const ENTERPRISE: PlanLimits = {
     storageMb: 25600,
   },
   exportsPerDay: 20,
+  siteZipAllowed: true,
+  siteZipPerDay: 30,
+  trackedLinksMax: 1000,
   support: "highest",
   watermark: false,
 };
@@ -201,6 +213,8 @@ export function planFeatures(planId: PlanId): PlanFeatures {
     prioritySupport: limits.support !== "standard",
     previewLinks: limits.maxPreviewLinks > 0,
     exports: limits.exportsPerDay > 0,
+    siteZip: limits.siteZipAllowed,
+    trackedLinks: limits.trackedLinksMax > 0,
   };
 }
 

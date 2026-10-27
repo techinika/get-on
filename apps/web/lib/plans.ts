@@ -26,6 +26,9 @@ export type Plan = {
   backupStorageMb: number;
   redirectsMax: number;
   exportsPerDay: number;
+  siteZipAllowed: boolean;
+  siteZipPerDay: number;
+  trackedLinksMax: number;
 };
 
 function toPlan(id: PlanId): Plan {
@@ -51,6 +54,9 @@ function toPlan(id: PlanId): Plan {
     backupStorageMb: limits.backups.storageMb,
     redirectsMax: limits.maxRedirects,
     exportsPerDay: limits.exportsPerDay,
+    siteZipAllowed: limits.siteZipAllowed,
+    siteZipPerDay: limits.siteZipPerDay,
+    trackedLinksMax: limits.trackedLinksMax,
   };
 }
 

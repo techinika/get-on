@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readFile, readdir, stat, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
 import { contentTypeFor } from "./content-type";
-import type { SiteFile, SitePointer, SiteStore } from "./types";
+import type { SiteFile, SiteLink, SitePointer, SiteStore } from "./types";
 
 /**
  * The local folder that stands in for Cloudflare R2 and KV while developing.
@@ -37,6 +37,10 @@ export function sitePointerPath(rootDir: string, siteId: string): string {
 
 export function sharedPath(rootDir: string, filePath: string): string {
   return path.join(rootDir, "_shared", filePath);
+}
+
+export function linkPath(rootDir: string, code: string): string {
+  return path.join(rootDir, "links", `${code}.json`);
 }
 
 async function readSiteFile(filePath: string): Promise<SiteFile | null> {
@@ -123,6 +127,17 @@ export function createNodeStore(rootDir: string): SiteStore {
     async getSharedFile(filePath: string): Promise<SiteFile | null> {
       const safe = filePath.replace(/\.\.+/g, "");
       return readSiteFile(sharedPath(rootDir, safe));
+    },
+
+    async getLink(code: string): Promise<SiteLink | null> {
+      if (!/^[a-z2-9]{7,10}$/.test(code)) return null;
+      try {
+        const raw = await readFile(linkPath(rootDir, code), "utf8");
+        const parsed = JSON.parse(raw) as SiteLink;
+        return parsed && parsed.v === 1 ? parsed : null;
+      } catch {
+        return null;
+      }
     },
   };
 }

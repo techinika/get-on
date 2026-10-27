@@ -33,6 +33,8 @@ export type WorkerEnv = {
   WORKER_SHARED_SECRET?: string;
   /** The app origin that receives forwarded form submissions. */
   APP_ORIGIN?: string;
+  /** Daily-rotating salt used to count visitors without storing IPs. */
+  STATS_SALT_SECRET?: string;
 };
 
 export type CacheLike = {

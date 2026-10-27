@@ -25,6 +25,17 @@ const BOT_PATTERNS = [
   /uptime/i,
   /pingdom/i,
   /monitor/i,
+  /whatsapp/i,
+  /facebookexternalhit/i,
+  /facebot/i,
+  /twitterbot/i,
+  /linkedinbot/i,
+  /slackbot/i,
+  /telegrambot/i,
+  /discordbot/i,
+  /pinterestbot/i,
+  /skypeuripreview/i,
+  /embedly/i,
 ];
 
 export function isBot(userAgent: string | null | undefined): boolean {
@@ -52,11 +63,40 @@ export function isCountableRequest(req: {
   };
   const purpose = get("sec-purpose") || get("purpose");
   if (purpose && purpose.toLowerCase().includes("prefetch")) return false;
+  const dnt = get("dnt");
+  const gpc = get("sec-gpc");
+  if (dnt === "1" || gpc === "1") return false;
   if (isBot(req.userAgent || get("user-agent"))) return false;
   const accept = get("accept") || "";
   if (!accept.includes("text/html")) return false;
   const path = req.path || "/";
   if (path.startsWith("/_forms")) return false;
   if (path.startsWith("/_gs/")) return false;
+  if (path.startsWith("/_l/")) return false;
   return true;
+}
+
+/**
+ * Link-preview crawlers must still receive the redirect, but they must never
+ * be counted as a person opening the link.
+ */
+export function isCountableLinkRequest(req: {
+  method?: string;
+  headers: Headers | Record<string, string | undefined>;
+  userAgent?: string | null;
+}): boolean {
+  const method = (req.method || "GET").toUpperCase();
+  if (method !== "GET" && method !== "HEAD") return false;
+  const headers = req.headers;
+  const get = (k: string) => {
+    if (headers instanceof Headers) return headers.get(k);
+    const key = Object.keys(headers).find((h) => h.toLowerCase() === k.toLowerCase());
+    return key ? headers[key] : null;
+  };
+  const purpose = get("sec-purpose") || get("purpose");
+  if (purpose && purpose.toLowerCase().includes("prefetch")) return false;
+  const dnt = get("dnt");
+  const gpc = get("sec-gpc");
+  if (dnt === "1" || gpc === "1") return false;
+  return !isBot(req.userAgent || get("user-agent"));
 }

@@ -7,6 +7,7 @@ import {
   pausedPage,
   suspendedPage,
   type SiteFile,
+  type SiteLink,
   type SitePointer,
   type SiteStore,
 } from "../index";
@@ -30,6 +31,7 @@ type StoreState = {
   pointer?: SitePointer | null;
   files?: Record<string, SiteFile>;
   shared?: Record<string, SiteFile>;
+  links?: Record<string, SiteLink>;
 };
 
 function memoryStore(state: StoreState): SiteStore {
@@ -43,6 +45,9 @@ function memoryStore(state: StoreState): SiteStore {
     },
     async getSharedFile(path: string) {
       return state.shared?.[path] ?? null;
+    },
+    async getLink(code: string) {
+      return state.links?.[code] ?? null;
     },
   };
 }
@@ -542,5 +547,71 @@ describe("custom domains", () => {
 
     expect(response.status).toBe(503);
     expect(response.headers.get("Retry-After")).toBe("3600");
+  });
+});
+
+
+describe("tracked links", () => {
+  const link: SiteLink = {
+    v: 1,
+    siteId: "site-1",
+    projectId: "site-1",
+    targetPath: "/about",
+    params: { utm_source: "qr", utm_medium: "qr" },
+    active: true,
+  };
+
+  it("redirects an active link to the main address", async () => {
+    const response = await handleSiteRequest(
+      request("https://rosebakery.get-on.tech/_l/abcdefgh"),
+      memoryStore({ pointer: livePointer, links: { abcdefgh: link } }),
+    );
+    expect(response.status).toBe(302);
+    expect(response.headers.get("location")).toBe(
+      "https://rosebakery.get-on.tech/about?utm_source=qr&utm_medium=qr",
+    );
+    expect(response.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("uses the custom main host when present", async () => {
+    const response = await handleSiteRequest(
+      request("https://rosebakery.get-on.tech/_l/abcdefgh"),
+      memoryStore({
+        pointer: { ...livePointer, primaryHost: "rosebakery.com" },
+        links: { abcdefgh: link },
+      }),
+    );
+    expect(response.headers.get("location")).toBe(
+      "https://rosebakery.com/about?utm_source=qr&utm_medium=qr",
+    );
+  });
+
+  it("keeps link parameters and ignores unknown incoming parameters", async () => {
+    const response = await handleSiteRequest(
+      request("https://rosebakery.get-on.tech/_l/abcdefgh?utm_campaign=spring&x=1"),
+      memoryStore({ pointer: livePointer, links: { abcdefgh: link } }),
+    );
+    expect(response.headers.get("location")).toContain("utm_campaign=spring");
+    expect(response.headers.get("location")).not.toContain("x=1");
+  });
+
+  it("shows a neutral page for a revoked link", async () => {
+    const response = await handleSiteRequest(
+      request("https://rosebakery.get-on.tech/_l/abcdefgh"),
+      memoryStore({
+        pointer: livePointer,
+        links: { abcdefgh: { ...link, active: false } },
+      }),
+    );
+    expect(response.status).toBe(410);
+    expect(await response.text()).toContain("no longer active");
+  });
+
+  it("returns 404 for an unknown link", async () => {
+    const response = await handleSiteRequest(
+      request("https://rosebakery.get-on.tech/_l/abcdefgh"),
+      memoryStore({ pointer: livePointer }),
+    );
+    expect(response.status).toBe(404);
   });
 });

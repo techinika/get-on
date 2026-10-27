@@ -1,6 +1,7 @@
 import {
   contentTypeFor,
   type SiteFile,
+  type SiteLink,
   type SitePointer,
   type SiteState,
   type SiteStore,
@@ -15,6 +16,10 @@ export function pointerKey(hostname: string): string {
 
 export function sitePointerKey(siteId: string): string {
   return `site:${siteId}`;
+}
+
+export function linkKey(code: string): string {
+  return `link:${code}`;
 }
 
 function isState(value: unknown): value is SiteState {
@@ -172,6 +177,23 @@ export function createCloudflareStore(
       const path = safePath(filePath);
       if (!path) return null;
       return readFile(bindings.bucket, sharedKey(path), path);
+    },
+
+    async getLink(code: string): Promise<SiteLink | null> {
+      if (!/^[a-z2-9]{7,10}$/.test(code)) return null;
+      const value = await bindings.kv.get(linkKey(code), { type: "json", cacheTtl: 60 });
+      if (!value || typeof value !== "object") return null;
+      const row = value as Record<string, unknown>;
+      if (row.v !== 1 || typeof row.siteId !== "string" || typeof row.projectId !== "string") return null;
+      if (typeof row.targetPath !== "string" || !row.targetPath.startsWith("/")) return null;
+      return {
+        v: 1,
+        siteId: row.siteId,
+        projectId: row.projectId,
+        targetPath: row.targetPath,
+        params: row.params && typeof row.params === "object" ? (row.params as Record<string, string>) : {},
+        active: row.active === true,
+      };
     },
   };
 }

@@ -1,4 +1,5 @@
 import { contentTypeFor } from "./content-type";
+import { isBot, isCountableLinkRequest, isCountableRequest } from "./bots";
 import { DEFAULT_ROOT_DOMAIN, parseHost } from "./host";
 import {
   domainNotConnectedPage,
@@ -40,6 +41,10 @@ export type HandleOptions = {
   clientIp?: string;
   /** Fetch implementation, injectable for tests. */
   fetchImpl?: typeof fetch;
+  /** Keeps background work alive in the Cloudflare Worker. */
+  waitUntil?: (promise: Promise<unknown>) => void;
+  /** Daily-rotating salt used to count visitors without storing IPs. */
+  statsSaltSecret?: string;
 };
 
 const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
@@ -338,6 +343,145 @@ function canonicalTarget(
   return primary;
 }
 
+const LINK_CODE_RE = /^[a-z2-9]{7,10}$/;
+const TRACKED_PARAMS = new Set([
+  "utm_source",
+  "utm_medium",
+  "utm_campaign",
+  "utm_term",
+  "utm_content",
+  "gclid",
+  "fbclid",
+  "msclkid",
+]);
+
+function linkGonePage(homeUrl: string | null): string {
+  const home = homeUrl
+    ? `<p><a href="${homeUrl.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">Go to the website</a></p>`
+    : "";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>Link no longer active</title><style>body{font-family:system-ui,sans-serif;margin:0;display:grid;place-items:center;min-height:100vh;background:#faf8f4;color:#1f1a17;padding:24px}main{max-width:34rem;background:#fff;border:1px solid #e7e1d8;border-radius:16px;padding:28px}a{color:#0b6b4f;font-weight:600}</style></head><body><main><h1>This link is no longer active</h1><p>The business has turned this link off. You can still visit the website.</p>${home}</main></body></html>`;
+}
+
+async function sendStatsEvent(
+  request: Request,
+  options: HandleOptions,
+  event: {
+    kind: "view" | "click";
+    siteId: string;
+    projectId: string;
+    path: string;
+    linkCode?: string | null;
+    params: Record<string, string>;
+  },
+): Promise<void> {
+  const appOrigin = options.appOrigin;
+  const secret = options.workerSharedSecret ?? "";
+  if (!appOrigin || !secret) return;
+  const date = new Date().toISOString().slice(0, 10);
+  const ua = request.headers.get("user-agent") ?? "";
+  const ip = options.clientIp ?? request.headers.get("cf-connecting-ip") ?? "";
+  const salt = options.statsSaltSecret ?? secret;
+  const visitorHash = await sha256Hex(`${salt}:${date}:${ip}:${ua}`);
+  const body = JSON.stringify({
+    kind: event.kind,
+    siteId: event.siteId,
+    projectId: event.projectId,
+    date,
+    path: event.path,
+    visitorHash,
+    linkCode: event.linkCode ?? null,
+    params: event.params,
+  });
+  const ts = String(Math.floor(Date.now() / 1000));
+  const bodyHash = await sha256Hex(body);
+  const sig = await signWorkerRequest(secret, {
+    ts,
+    host: new URL(request.url).hostname,
+    ip: "",
+    bodyHash,
+  });
+  const doFetch = options.fetchImpl ?? fetch;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 3000);
+  try {
+    await doFetch(`${appOrigin.replace(/\/$/, "")}/api/stats/ingest`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-gs-host": new URL(request.url).hostname,
+        "x-gs-ip": "",
+        "x-gs-ts": ts,
+        "x-gs-sig": sig,
+      },
+      body,
+      signal: controller.signal,
+    });
+  } catch {
+    // Counting never blocks the visitor.
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function handleTrackedLink(
+  request: Request,
+  url: URL,
+  hostname: string,
+  store: SiteStore,
+  options: HandleOptions,
+): Promise<Response> {
+  const code = url.pathname.slice("/_l/".length);
+  if (!LINK_CODE_RE.test(code)) {
+    return platformResponse(linkGonePage(null), 404, "no-store");
+  }
+  const link = await store.getLink?.(code);
+  const pointer = await store.getPointer(hostname);
+  const protocol = url.protocol;
+  const mainHost = pointer?.primaryHost || hostname;
+  const homeUrl = pointer ? `${protocol}//${mainHost}/` : null;
+
+  if (!link || !link.active || !pointer || pointer.state !== "live") {
+    return platformResponse(linkGonePage(homeUrl), link ? 410 : 404, "no-store");
+  }
+
+  const target = new URL(`${protocol}//${mainHost}${link.targetPath}`);
+  for (const [key, value] of Object.entries(link.params ?? {})) {
+    if (TRACKED_PARAMS.has(key) && typeof value === "string") {
+      target.searchParams.set(key, value.slice(0, 200));
+    }
+  }
+  for (const [key, value] of url.searchParams) {
+    if (TRACKED_PARAMS.has(key) && !target.searchParams.has(key)) {
+      target.searchParams.set(key, value.slice(0, 200));
+    }
+  }
+
+  if (
+    request.method === "GET" &&
+    isCountableLinkRequest({ method: request.method, headers: request.headers, userAgent: request.headers.get("user-agent") })
+  ) {
+    const event = sendStatsEvent(request, options, {
+      kind: "click",
+      siteId: link.siteId,
+      projectId: link.projectId,
+      path: link.targetPath,
+      linkCode: code,
+      params: Object.fromEntries(target.searchParams),
+    });
+    if (options.waitUntil) options.waitUntil(event);
+    else void event;
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: target.toString(),
+      "Cache-Control": "no-store",
+      ...SECURITY_HEADERS,
+    },
+  });
+}
+
 async function serveSiteRequest(
   request: Request,
   store: SiteStore,
@@ -371,6 +515,10 @@ async function serveSiteRequest(
 
   if (isFormPost) {
     return handleFormPost(request, url, host.hostname, store, options);
+  }
+
+  if (url.pathname.startsWith("/_l/")) {
+    return handleTrackedLink(request, url, host.hostname, store, options);
   }
 
   if (options.rawPath && isUnsafePath(options.rawPath)) {
@@ -537,6 +685,31 @@ async function serveSiteRequest(
       }
       return response;
     }
+  }
+
+  // Count visible HTML page views. The personalised placeholder pass runs
+  // above, so this always sees the final content before it is served.
+  if (
+    kind === "html" &&
+    file.contentType.includes("html") &&
+    request.method === "GET" &&
+    isCountableRequest({
+      method: request.method,
+      headers: request.headers,
+      path: url.pathname,
+      userAgent: request.headers.get("user-agent"),
+    })
+  ) {
+    const params: Record<string, string> = {};
+    for (const [key, value] of url.searchParams) params[key] = value;
+    void sendStatsEvent(request, options, {
+      kind: "view",
+      siteId: pointer.siteId,
+      projectId: pointer.siteId,
+      path: path,
+      linkCode: typeof params["gs_link"] === "string" ? params["gs_link"] : null,
+      params,
+    }).catch(() => undefined);
   }
 
   return fileResponse(file, request, filePath, kind);

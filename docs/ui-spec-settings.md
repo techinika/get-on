@@ -1,5 +1,7 @@
 # Get-On UI Specification - Website settings completion
 
+See `docs/ui-spec-share-backup.md` for Backups, Export and import, Links and QR codes, Address share controls, Publish success and Visitors. It replaces earlier specs for those screens.
+
 See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.
 
 See also `docs/ui-spec.md`, `docs/ui-spec-app.md`, `docs/ui-spec-publish.md`, and `docs/ui-spec-domains.md` (this replaces the Address settings spec).

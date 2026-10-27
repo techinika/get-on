@@ -151,7 +151,7 @@ export function hasRoom(limit: number | null, used: number): boolean {
 
 export function canCreateWithAccess(
   access: TeamAccess,
-  limitName: Exclude<LimitName, "backups" | "support" | "watermark">,
+  limitName: Exclude<LimitName, "backups" | "support" | "watermark" | "siteZipAllowed">,
   used: number,
 ): boolean {
   return hasRoom(access.limits[limitName], used);
