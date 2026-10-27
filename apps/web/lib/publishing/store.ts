@@ -228,7 +228,9 @@ function cloudflareStore(config: PublishConfig): PublishStore {
       };
 
       await put(`site:${pointer.siteId}`, pointer);
-      await put(`host:${hostname}`, { v: 2, siteId: pointer.siteId });
+      // Keep the full pointer at the free host too. Older Workers read this
+      // key directly, and it makes the KV value self-contained for debugging.
+      await put(`host:${hostname}`, pointer);
     },
     async writeHostPointer(hostname, siteId, options) {
       const url = `${API}/accounts/${accountId}/storage/kv/namespaces/${encodeURIComponent(
