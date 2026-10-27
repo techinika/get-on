@@ -28,7 +28,9 @@ import { useToast } from "@/components/ui/toast";
 import { friendlyError } from "@/lib/errors";
 import { gradientFor } from "@/lib/gradient";
 import { relativeTime } from "@/lib/relative-time";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { cn } from "@/lib/utils";
+import { ShareMenu } from "@/components/app/share-menu";
 
 export type WebsiteSummary = {
   id: string;
@@ -353,6 +355,7 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
               </span>
             )}
             <div className="relative z-10">
+              <ShareMenu url={website.primaryHost ? primaryAddress(readPublishConfig(), website.subdomain, website.primaryHost) : `https://${website.subdomain}.get-on.tech`} label={website.name} />
               <button
                 type="button"
                 aria-label={`More actions for ${website.name}`}

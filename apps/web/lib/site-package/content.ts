@@ -325,6 +325,82 @@ export type WebsiteZipResult = {
   pageCount: number;
 };
 
+function decodeText(bytes: Uint8Array): string {
+  return new TextDecoder().decode(bytes);
+}
+
+function encodeText(value: string): Uint8Array {
+  return new TextEncoder().encode(value);
+}
+
+/**
+ * Makes a built site runnable outside Get-On. It removes platform-only
+ * features (forms, tracked links, analytics, badges) and turns clean URLs
+ * into relative addresses that work from a folder.
+ */
+export function makeWebsiteFilesPortable(
+  files: Record<string, Uint8Array>,
+  email: string | null,
+): { files: Record<string, Uint8Array>; removed: string[] } {
+  const removed: string[] = [];
+  const out: Record<string, Uint8Array> = {};
+  for (const [path, body] of Object.entries(files)) {
+    if (path.startsWith("_forms/") || path.startsWith("_gs/") || path.startsWith("_l/")) {
+      removed.push(path);
+      continue;
+    }
+    if (!path.endsWith(".html")) {
+      out[path] = body;
+      continue;
+    }
+    let html = decodeText(body);
+    // Remove Google Analytics and any other external script.
+    html = html.replace(/<script\b[^>]*>(?:[\s\S]*?)<\/script>/gi, (match) => {
+      return /googletagmanager|google-analytics|gtag\(/i.test(match) ? "" : match;
+    });
+    // Turn contact forms into an email button, or hide them when no email exists.
+    html = html.replace(/<form\b[^>]*>([\s\S]*?)<\/form>/gi, (_match, inner) => {
+      if (!/contact|message|email|phone|name/i.test(inner)) return "";
+      if (!email) return "";
+      const safe = email.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] as string));
+      return `<p class="gs-portable-contact"><a href="mailto:${safe}">Write to us by email</a></p>`;
+    });
+    // Replace tracked short links with the plain address.
+    html = html.replace(/https?:\/\/[^"'\s]+\/_l\/[a-z2-9]{7,10}/gi, "/");
+    // Remove the Get-On watermark link but keep the readable text.
+    html = html.replace(/<a\b[^>]*href="https?:\/\/get-on\.tech"[^>]*>Get-On<\/a>/gi, "Get-On");
+    // Rewrite platform-relative URLs into relative file URLs.
+    html = html.replace(/(href|src)="\/(?!\/)([^"]*)"/gi, (_m, attr, rest) => {
+      if (rest.startsWith("_forms") || rest.startsWith("_gs") || rest.startsWith("_l")) return `${attr}="#"`;
+      if (rest === "") return `${attr}="index.html"`;
+      if (rest.endsWith("/")) return `${attr}="${rest}index.html"`;
+      return `${attr}="${rest}"`;
+    });
+    html = html.replace(/(href|src)="https?:\/\/[^"]*get-on\.tech[^"]*"/gi, '$1="#"');
+    out[path] = encodeText(html);
+  }
+  return { files: out, removed };
+}
+
+function assertPortable(files: Record<string, Uint8Array>): void {
+  const forbidden = [/\/_l\//, /\/_forms/, /\/_gs\//, /get-on\.tech/i, /localhost/i];
+  for (const [path, body] of Object.entries(files)) {
+    if (!path.endsWith(".html")) continue;
+    const text = decodeText(body);
+    for (const pattern of forbidden) {
+      if (pattern.test(text)) {
+        throw new SitePackageError("EXPORT_NOT_PORTABLE", `The website still mentions ${pattern}.`);
+      }
+    }
+    if (/<script\b/i.test(text)) {
+      throw new SitePackageError("EXPORT_NOT_PORTABLE", "The website contains a script.");
+    }
+    if (/<link\b[^>]*rel="stylesheet"/i.test(text)) {
+      throw new SitePackageError("EXPORT_NOT_PORTABLE", "The website contains an external stylesheet.");
+    }
+  }
+}
+
 export async function buildWebsiteZip(
   supabase: Supabase,
   source: PackageSource,
@@ -347,12 +423,35 @@ export async function buildWebsiteZip(
     activePlugins: source.plugins,
   });
   const result = await buildSite(input);
-  const files: Record<string, Uint8Array> = {};
-  for (const [path, file] of Object.entries(result.files)) files[path] = file.body;
-  for (const [path, file] of Object.entries(result.shared)) files[path] = file.body;
-  files["README.txt"] = new TextEncoder().encode(
-    `This is a copy of your published website.\n\nUpload the files in this folder to any static web host. The home page is index.html.\n\nThis copy does not include the Get-On editor, your account, contact messages or visitor statistics.\n`,
+  const raw: Record<string, Uint8Array> = {};
+  for (const [path, file] of Object.entries(result.files)) raw[path] = file.body;
+  for (const [path, file] of Object.entries(result.shared)) raw[path] = file.body;
+  const projectSettings = (source.project.settings ?? {}) as Record<string, unknown>;
+  const contact = ((projectSettings.contact ?? {}) as { email?: unknown });
+  const siteSettings = (source.settings ?? {}) as Record<string, unknown>;
+  const siteContact = ((siteSettings.contact ?? {}) as { email?: unknown });
+  const emailValue = contact.email ?? siteContact.email;
+  const email = typeof emailValue === "string" && emailValue.trim() ? emailValue.trim() : null;
+  const portable = makeWebsiteFilesPortable(raw, email);
+  assertPortable(portable.files);
+  portable.files["README-HOSTING.txt"] = encodeText(
+    [
+      "This is a copy of your website.",
+      "",
+      "How to put it online",
+      "1. Upload every file and folder in this ZIP to your web host, keeping the folder names.",
+      "2. The home page is index.html. Most hosts use it automatically.",
+      "3. Open index.html from the host address to check it.",
+      "",
+      "What does not work after leaving Get-On:",
+      "- Contact forms. Visitors can write to you by email instead when you added an email address.",
+      "- Visitor statistics and tracked links.",
+      "- Newsletters.",
+      "",
+      "To go back to Get-On, open your website in Get-On and publish it again.",
+    ].join("\n"),
   );
+  const files = portable.files;
   return {
     bytes: zipSync(files, { level: 6 }),
     bytesCount: Object.values(files).reduce((sum, value) => sum + value.byteLength, 0),

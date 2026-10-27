@@ -408,6 +408,8 @@ async function sendStatsEvent(
       method: "POST",
       headers: {
         "content-type": "application/json",
+        "x-gs-host": new URL(request.url).hostname,
+        "x-gs-ip": "",
         "x-gs-ts": ts,
         "x-gs-sig": sig,
       },

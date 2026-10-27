@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { verifyWorkerRequest } from "@get-on/site-server/forms";
+import { sha256Hex, verifyWorkerRequest } from "@get-on/site-server";
 
 export const runtime = "nodejs";
 
@@ -31,23 +31,25 @@ export async function POST(request: Request) {
   const hostHeader = request.headers.get("x-gs-host") ?? "";
   const ipHeader = request.headers.get("x-gs-ip") ?? "";
 
+  const raw = await request.text();
+  if (raw.length > 16 * 1024) {
+    return NextResponse.json({ error: "INVALID_BODY" }, { status: 413 });
+  }
+  const bodyHash = await sha256Hex(raw);
   const ok = await verifyWorkerRequest(secret, {
     ts: tsHeader,
     host: hostHeader,
     ip: ipHeader,
-    bodyHash: "", // we don't verify body hash in this minimal version
+    bodyHash,
     sig: sigHeader,
   }).catch(() => false);
-  // The minimal version skips the body hash verification. A production
-  // version should include the body hash. For now we rely on the secret.
-  if (!ok && secret) {
-    // When secret exists but verification fails, reject.
+  if (secret && !ok) {
     return NextResponse.json({ error: "NOT_AUTHENTICATED" }, { status: 403 });
   }
 
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(raw);
   } catch {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
