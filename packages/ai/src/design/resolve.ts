@@ -202,7 +202,6 @@ function themeFor(
   spec: DesignSpec,
   base: Theme,
   composition: Composition,
-  brief: DesignBrief,
 ): { theme: Theme; heroLayout: string; heroProps: Record<string, unknown>; header: NonNullable<Theme["header"]>; footer: NonNullable<Theme["footer"]>; unmet: string | null } {
   const theme = clone(base);
   const baseColors = theme.colors ?? {
@@ -410,7 +409,7 @@ function reportFor(spec: DesignSpec, decision: DesignCheck, contrastUnmet: strin
 
 export function resolveDesign(spec: DesignSpec, brief: DesignBrief = {}, plan: DesignPlan = {}): DesignDecision {
   const { pkg, composition } = chooseArchetype(spec, brief);
-  const prepared = themeFor(spec, composition.theme, composition, brief);
+  const prepared = themeFor(spec, composition.theme, composition);
   const sectionPlan = sectionPlanFor(spec, composition);
   const pages = pagePlanFor(spec, composition, plan);
   const base: DesignCheck = {
