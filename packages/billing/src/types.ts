@@ -32,6 +32,9 @@ export type PlanLimits = {
   formsMonthly: number;
   backups: BackupLimits;
   exportsPerDay: number;
+  siteZipAllowed: boolean;
+  siteZipPerDay: number;
+  trackedLinksMax: number;
   support: SupportLevel;
   watermark: boolean;
 };
@@ -46,6 +49,8 @@ export type PlanFeatures = {
   prioritySupport: boolean;
   previewLinks: boolean;
   exports: boolean;
+  siteZip: boolean;
+  trackedLinks: boolean;
 };
 
 export type PlanCatalogueEntry = {

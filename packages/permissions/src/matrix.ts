@@ -13,6 +13,13 @@ export type Action =
   | "site.domains"
   | "site.plugins"
   | "site.backups"
+  | "links.view"
+  | "links.manage"
+  | "links.delete"
+  | "export.content"
+  | "export.backup"
+  | "export.site_zip"
+  | "import.content"
   | "messages.read"
   | "template.use"
   | "template.manage"
@@ -52,6 +59,13 @@ export const matrix: Record<Action, Record<Role, boolean>> = {
   "site.domains": { owner: true, admin: true, editor: false, viewer: false },
   "site.plugins": { owner: true, admin: true, editor: false, viewer: false },
   "site.backups": { owner: true, admin: true, editor: true, viewer: false },
+  "links.view": { owner: true, admin: true, editor: true, viewer: true },
+  "links.manage": { owner: true, admin: true, editor: true, viewer: false },
+  "links.delete": { owner: true, admin: true, editor: false, viewer: false },
+  "export.content": { owner: true, admin: true, editor: true, viewer: false },
+  "export.backup": { owner: true, admin: true, editor: true, viewer: false },
+  "export.site_zip": { owner: true, admin: true, editor: false, viewer: false },
+  "import.content": { owner: true, admin: true, editor: true, viewer: false },
   "messages.read": { owner: true, admin: true, editor: true, viewer: false },
   "template.use": { owner: true, admin: true, editor: true, viewer: false },
   "template.manage": { owner: true, admin: true, editor: true, viewer: false },
