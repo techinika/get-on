@@ -99,7 +99,7 @@ describe("a published website", () => {
     expect(home.status).toBe(200);
     const html = await home.text();
     expect(html).toContain("Fresh bread every morning");
-    expect(html).toContain("<style>");
+    expect(html).toContain('<style data-gs="1"');
 
     const about = await handleSiteRequest(
       new Request("http://rosebakery.localhost/about-us", {

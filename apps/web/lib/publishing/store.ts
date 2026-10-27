@@ -1,6 +1,6 @@
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { BuiltFile } from "@get-on/publisher";
+import { assertStyledHtml, type BuiltFile } from "@get-on/publisher";
 import {
   createNodeStore,
   hostPointerPath,
@@ -152,6 +152,11 @@ function cloudflareStore(config: PublishConfig): PublishStore {
         if (!sameBytes(stored, home.body)) {
           throw new Error("UPLOAD_VERIFY_FAILED");
         }
+        try {
+          assertStyledHtml(new TextDecoder().decode(stored));
+        } catch {
+          throw new Error("UPLOAD_VERIFY_FAILED");
+        }
       }
     },
     async writeShared(files) {
@@ -282,6 +287,11 @@ function localStore(config: PublishConfig): PublishStore {
       if (home) {
         const stored = new Uint8Array(await readFile(path.join(base, "index.html")));
         if (!sameBytes(stored, home.body)) {
+          throw new Error("UPLOAD_VERIFY_FAILED");
+        }
+        try {
+          assertStyledHtml(new TextDecoder().decode(stored));
+        } catch {
           throw new Error("UPLOAD_VERIFY_FAILED");
         }
       }

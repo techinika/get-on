@@ -48,3 +48,28 @@ export function buildCss(options: {
   ];
   return minifyCss(parts.filter(Boolean).join("\n"));
 }
+
+const REQUIRED_CSS_MARKERS = [
+  ".gs-root{",
+  "--s-primary:",
+  ".gs-header{",
+  ".gs-section{",
+  ".gs-btn{",
+] as const;
+
+/** Stops a publish when the renderer stylesheet was not included. */
+export function assertStyledCss(css: string): void {
+  if (!css.trim()) throw new Error("CSS_MISSING");
+  const compact = css.replace(/\s+/g, "");
+  for (const marker of REQUIRED_CSS_MARKERS) {
+    if (!compact.includes(marker)) throw new Error("CSS_INCOMPLETE");
+  }
+}
+
+/** Stops a publish when the page has no complete inline stylesheet. */
+export function assertStyledHtml(html: string): void {
+  const match = /<style\b([^>]*)>([\s\S]*?)<\/style>/i.exec(html);
+  if (!match) throw new Error("HTML_STYLE_MISSING");
+  if (!/\bdata-gs\b/.test(match[1] ?? "")) throw new Error("HTML_STYLE_UNMARKED");
+  assertStyledCss(match[2] ?? "");
+}

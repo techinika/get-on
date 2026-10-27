@@ -135,8 +135,17 @@ describe("buildSite", () => {
   it("puts the styles in the page", async () => {
     const result = await buildSite(input());
     const html = htmlOf(result.files, "index.html");
-    expect(html).toContain("<style>");
+    expect(html).toContain('<style data-gs="1"');
     expect(html).toContain("--s-primary:#0B6B4F");
+    expect(html).toContain(`data-renderer-version="${result.rendererVersion}"`);
+    expect(result.cssHash).toMatch(/^[a-f0-9]{16}$/);
+    expect(result.cssBytes).toBeGreaterThan(10_000);
+  });
+
+  it("refuses to build a page without the renderer stylesheet", async () => {
+    await expect(buildSite({ ...input(), css: "" })).rejects.toThrow(
+      "CSS_INCOMPLETE",
+    );
   });
 
   it("keeps the page small", async () => {

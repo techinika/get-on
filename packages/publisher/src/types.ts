@@ -138,4 +138,10 @@ export type BuildSiteResult = {
   largestPageBytes: number;
   /** The forms found while building, so the app can store them. */
   forms: BuiltForm[];
+  /** The exact renderer stylesheet used for this version. */
+  rendererVersion: string;
+  /** A short hash of the complete inline stylesheet. */
+  cssHash: string;
+  /** The size of the inline stylesheet, in bytes. */
+  cssBytes: number;
 };

@@ -6,7 +6,12 @@ import { getShellData } from "@/lib/dashboard";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { readPublishConfig, siteHostname } from "@/lib/publishing/config";
 import { createPublishStore } from "@/lib/publishing/store";
-import { publishProject, type PublishContext } from "@/lib/publishing/service";
+import {
+  PublishError,
+  publishProject,
+  rebuildPublishedSite,
+  type PublishContext,
+} from "@/lib/publishing/service";
 
 export type AdminActionResult = { ok: true } | { ok: false; code: string };
 
@@ -180,6 +185,46 @@ export async function bringSiteOnline(siteId: string): Promise<AdminActionResult
   await audit(admin, adminUser.email, "bring_online", project.id, null, {
     publishId: publish.id,
   });
+  refresh(siteId);
+  return { ok: true };
+}
+
+
+export async function rebuildSite(siteId: string): Promise<AdminActionResult> {
+  const adminUser = await requireAdmin();
+  const admin = createAdminClient();
+  const project = await projectRow(admin, siteId);
+  if (!project) return { ok: false, code: "NOT_FOUND" };
+
+  const ctx: PublishContext = {
+    supabase: admin as unknown as PublishContext["supabase"],
+    user: { id: adminUser.id },
+    team: {
+      teamId: project.team_id,
+      planId: await teamPlanId(admin, project.team_id),
+    },
+    project: {
+      id: project.id,
+      name: String(project.name),
+      subdomain: String(project.subdomain),
+    },
+    bypassRateLimit: true,
+    force: true,
+  };
+
+  try {
+    await rebuildPublishedSite(ctx);
+  } catch (error) {
+    const code = error instanceof PublishError ? error.code : "PUBLISH_FAILED";
+    await audit(admin, adminUser.email, "rebuild_site_failed", project.id, null, {
+      error: error instanceof Error ? error.message.slice(0, 200) : "unknown",
+      code,
+    });
+    refresh(siteId);
+    return { ok: false, code };
+  }
+
+  await audit(admin, adminUser.email, "rebuild_site", project.id, null);
   refresh(siteId);
   return { ok: true };
 }

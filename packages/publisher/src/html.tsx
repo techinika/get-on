@@ -1,6 +1,12 @@
 import { renderToStaticMarkup } from "react-dom/server.edge";
 import React from "react";
-import { SiteRoot, SiteHeader, SiteFooter, RenderPage } from "@get-on/renderer";
+import {
+  RENDERER_CSS_VERSION,
+  SiteRoot,
+  SiteHeader,
+  SiteFooter,
+  RenderPage,
+} from "@get-on/renderer";
 import { localBusinessJsonLd, pageSeo, webPageJsonLd } from "./seo";
 import type { PublishPage, SiteSettings } from "./types";
 
@@ -132,7 +138,7 @@ const bingVerification = settings.verification?.bing
     : "";
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -144,7 +150,7 @@ const bingVerification = settings.verification?.bing
 <meta property="og:url" content="${escapeHtml(seo.canonical)}">
 <meta name="twitter:card" content="summary_large_image">${twitterSite}
 <meta name="twitter:title" content="${escapeHtml(seo.title)}">${twitterDescriptionTag}${ogImage}${robotsTag}
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 <script type="application/ld+json">${jsonLdString(jsonLd)}</script>
 </head>
 <body>
@@ -200,14 +206,14 @@ export function renderFormStatusHtml(options: {
   );
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(options.heading)} | ${escapeHtml(settings.businessName)}</title>
 <meta name="robots" content="noindex,nofollow">
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 </head>
 <body>
 ${body}
@@ -262,14 +268,14 @@ export function renderNotFoundHtml(options: {
   );
 
   return `<!doctype html>
-<html lang="en" data-color-mode="light">
+<html lang="en" data-color-mode="light" data-renderer-version="${RENDERER_CSS_VERSION}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light">
 <title>${escapeHtml(title)} | ${escapeHtml(settings.businessName)}</title>
 <meta name="robots" content="noindex,nofollow">
-<style>${options.css}</style>
+<style data-gs="1" data-renderer-version="${RENDERER_CSS_VERSION}">${options.css}</style>
 </head>
 <body>
 ${body}

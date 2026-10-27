@@ -3,11 +3,11 @@
   "private": true,
   "packageManager": "pnpm@12.14.0",
   "scripts": {
-    "dev": "pnpm --filter web dev",
+    "dev": "pnpm --filter @get-on/renderer build:css && pnpm --filter web dev",
     "dev:sites": "pnpm --filter web dev:sites",
     "dev:all": "pnpm --filter web dev:all",
     "seed:site": "pnpm --filter web seed:site",
-    "build": "pnpm --filter web build",
+    "build": "pnpm --filter @get-on/renderer build:css && pnpm --filter web build",
     "lint": "pnpm --filter web lint",
     "typecheck": "pnpm --filter web typecheck && pnpm --filter @get-on/ai typecheck && pnpm --filter @get-on/billing typecheck",
     "test": "pnpm --filter web test && pnpm --filter @get-on/ai test && pnpm --filter @get-on/billing test && pnpm --filter @get-on/site-server test && pnpm --filter @get-on/publisher test && pnpm --filter @get-on/sites-worker test",
@@ -40,7 +40,8 @@
     "job:ai": "pnpm --filter web job:ai",
     "job:ai-monthly": "pnpm --filter web job:ai-monthly",
     "job:ai-expire": "pnpm --filter web job:ai-expire",
-    "job:ai-payloads": "pnpm --filter web job:ai-payloads"
+    "job:ai-payloads": "pnpm --filter web job:ai-payloads",
+    "job:rebuild-published": "pnpm --filter web job:rebuild-published"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

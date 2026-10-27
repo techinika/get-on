@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, ShieldX, WifiOff } from "lucide-react";
+import { RefreshCw, ShieldCheck, ShieldX, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Label, Textarea } from "@/components/ui/input";
@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   approveSite,
   bringSiteOnline,
+  rebuildSite,
   removeReport,
   requestSiteReview,
   takeSiteOffline,
@@ -123,6 +124,19 @@ export function SiteActions({
             Ask for a review
           </Button>
         )}
+
+        <Button
+          variant="secondary"
+          size="md"
+          type="button"
+          loading={pending === "rebuild"}
+          onClick={() =>
+            void run("rebuild", () => rebuildSite(siteId), "The website was rebuilt with the latest styles.")
+          }
+        >
+          <RefreshCw size={18} strokeWidth={1.75} aria-hidden />
+          Rebuild website
+        </Button>
 
         <a
           href={address}
@@ -298,6 +312,8 @@ function errorMessage(code: string): string {
       return "This website has not been published yet.";
     case "PUBLISH_FAILED":
       return "The website could not be published. Please try again.";
+    case "HAS_UNPUBLISHED_CHANGES":
+      return "This website has unpublished changes. Publish those first, then rebuild.";
     case "NOT_FOUND":
       return "We could not find that website.";
     default:

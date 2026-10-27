@@ -202,7 +202,9 @@ describe("local publish store", () => {
     dirs.push(dir);
     const config = readPublishConfig(env({ PUBLISH_STORE: "local", LOCAL_SITES_DIR: dir }));
     const store = createPublishStore(config);
-    const html = new TextEncoder().encode("<!doctype html><h1>Hello</h1>");
+    const html = new TextEncoder().encode(
+      '<!doctype html><html><head><style data-gs="1">.gs-root{--s-primary:#0B6B4F}.gs-header{}.gs-section{}.gs-btn{}</style></head><body><h1>Hello</h1></body></html>',
+    );
 
     const files: Record<string, BuiltFile> = {
       "index.html": {
@@ -237,6 +239,25 @@ describe("local publish store", () => {
     expect(pointer.publishId).toBe("publish-1");
     const sharedFile = await readFile(path.join(dir, "_shared", "fonts", "figtree-400-abc.woff2"));
     expect(Buffer.from(sharedFile).equals(Buffer.from([1, 2]))).toBe(true);
+  });
+
+  it("refuses to upload a page without marked styles", async () => {
+    const dir = await mkdtemp(path.join(tmpdir(), "get-on-publish-"));
+    dirs.push(dir);
+    const config = readPublishConfig(env({ PUBLISH_STORE: "local", LOCAL_SITES_DIR: dir }));
+    const store = createPublishStore(config);
+    const html = new TextEncoder().encode("<!doctype html><h1>Hello</h1>");
+    const files: Record<string, BuiltFile> = {
+      "index.html": {
+        body: html,
+        contentType: "text/html; charset=utf-8",
+        size: html.byteLength,
+      },
+    };
+
+    await expect(
+      store.writeVersion("site-1", "publish-1", files),
+    ).rejects.toThrow("UPLOAD_VERIFY_FAILED");
   });
 });
 

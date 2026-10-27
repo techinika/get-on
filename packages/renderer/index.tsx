@@ -13,6 +13,7 @@ export type {
 } from "./src/site-chrome";
 export { Icon } from "./src/icons";
 export { themeTokens } from "@get-on/blocks";
+export { RENDERER_CSS, RENDERER_CSS_VERSION } from "./src/css-manifest";
 
 export function SiteRoot({
   theme,
