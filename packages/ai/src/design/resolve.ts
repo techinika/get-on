@@ -1,5 +1,6 @@
 import {
   adjustForContrast,
+  bestTextOn,
   contrastRatio,
   deriveTokens,
   mix,
@@ -10,6 +11,7 @@ import { SYSTEM_TEMPLATES, type Composition, type TemplatePackage } from "@get-o
 import { FEEL_FONTS } from "./fonts";
 import { MOOD_PALETTES } from "./colour-vocabulary";
 import type { DesignSpec, Requirement, RequirementStatus, ToneId } from "./spec";
+import { verifyDesign } from "./verify";
 
 export type DesignBrief = {
   businessType?: string;
@@ -61,6 +63,8 @@ export type DesignDecision = {
   report: DesignReport;
 };
 
+export type DesignCheck = Omit<DesignDecision, "report">;
+
 const SECTION_TYPE: Record<string, string> = {
   pricing: "pricing",
   gallery: "gallery",
@@ -81,6 +85,12 @@ const SECTION_TYPE: Record<string, string> = {
   "before-after": "before-after",
   "image-text": "image-text",
 };
+
+const CONTENT_REQUIREMENTS = new Set<Requirement["kind"]>([
+  "copy_mentions",
+  "copy_avoids",
+  "tone",
+]);
 
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
@@ -115,7 +125,10 @@ function templateScore(pkg: TemplatePackage, composition: Composition, spec: Des
   for (const tag of pkg.meta.tags) if (text.includes(tag.toLowerCase())) score += 2;
   const theme = composition.theme;
   const design = theme.design ?? {};
-  if (spec.layout.hero && String(homePage(composition).blocks[0]?.props?.layout ?? "") === spec.layout.hero) score += 6;
+  if (spec.layout.hero) {
+    const hero = homePage(composition).blocks.find((block) => block.type === "hero");
+    if (String(hero?.props?.layout ?? "") === spec.layout.hero) score += 6;
+  }
   if (spec.layout.header && String(theme.header?.style ?? "classic") === spec.layout.header) score += 4;
   if (spec.layout.footer && String(theme.footer?.layout ?? "simple") === spec.layout.footer) score += 3;
   if (spec.layout.rhythm && String(design.rhythm ?? "even") === spec.layout.rhythm) score += 2;
@@ -154,7 +167,12 @@ function darkColors(spec: DesignSpec, base: ThemeColors): ThemeColors {
 
 function applyContrastProtection(spec: DesignSpec, colors: ThemeColors): { colors: ThemeColors; unmet: string | null } {
   const next = { ...colors };
-  const user = new Set(spec.palette.userHex);
+  const user = new Set(spec.palette.userHex.map((value) => value.toLowerCase()));
+  for (const role of ["primary", "accent", "background", "text", "soft"] as const) {
+    const value = spec.palette[role];
+    if (value) user.add(value.toLowerCase());
+  }
+  const isUserColour = (value: string) => user.has(value.toLowerCase());
   const pairs: Array<["text" | "background" | "soft", "text" | "background" | "soft", number]> = [
     ["text", "background", 4.5],
     ["text", "soft", 4.5],
@@ -162,8 +180,8 @@ function applyContrastProtection(spec: DesignSpec, colors: ThemeColors): { color
   let unmet: string | null = null;
   for (const [foreground, background, target] of pairs) {
     if (contrastRatio(next[foreground], next[background]) >= target - 1e-6) continue;
-    const fgUser = user.has(next[foreground]);
-    const bgUser = user.has(next[background]);
+    const fgUser = isUserColour(next[foreground]);
+    const bgUser = isUserColour(next[background]);
     if (!fgUser) {
       next[foreground] = adjustForContrast(next[foreground], next[background], target);
     } else if (!bgUser) {
@@ -171,6 +189,11 @@ function applyContrastProtection(spec: DesignSpec, colors: ThemeColors): { color
     } else {
       unmet = `The colours ${next[foreground]} and ${next[background]} are kept as requested but do not meet the contrast target.`;
     }
+  }
+  for (const role of ["primary", "accent"] as const) {
+    const label = bestTextOn(next[role]);
+    if (contrastRatio(next[role], label) >= 4.5 - 1e-6 || isUserColour(next[role])) continue;
+    next[role] = adjustForContrast(next[role], label, 4.5);
   }
   return { colors: next, unmet };
 }
@@ -223,35 +246,39 @@ function themeFor(
     ...(spec.layout.imageStyle ? { imageStyle: spec.layout.imageStyle } : {}),
   };
 
-  const headingId = spec.fonts.heading?.id ?? (spec.fonts.feel ? FEEL_FONTS[spec.fonts.feel].heading : theme.fonts?.heading.id);
-  const bodyId = spec.fonts.body?.id ?? (spec.fonts.feel ? FEEL_FONTS[spec.fonts.feel].body : theme.fonts?.body.id);
-  if (headingId && bodyId) {
+  const home = homePage(composition);
+  const hero = home.blocks.find((block) => block.type === "hero");
+  const heroProps = { ...(hero?.props ?? {}) };
+  const heroLayout = spec.layout.hero ?? String(heroProps.layout ?? "split");
+  heroProps.layout = heroLayout;
+  if (spec.layout.align) heroProps.align = spec.layout.align;
+
+  const feel = spec.fonts.feel ? FEEL_FONTS[spec.fonts.feel] : undefined;
+  const headingId = spec.fonts.heading?.id ?? feel?.heading ?? theme.fonts?.heading.id;
+  const bodyId = spec.fonts.body?.id ?? feel?.body ?? theme.fonts?.body.id;
+  if (headingId || bodyId) {
+    const heading = headingId ?? bodyId!;
+    const body = bodyId ?? headingId!;
     theme.fonts = {
-      heading: { id: headingId, weight: spec.fonts.heading?.weight ?? theme.fonts?.heading.weight ?? 700 },
-      body: { id: bodyId, weight: spec.fonts.body?.weight ?? theme.fonts?.body.weight ?? 400 },
+      heading: { id: heading, weight: spec.fonts.heading?.weight ?? theme.fonts?.heading.weight ?? 700 },
+      body: { id: body, weight: spec.fonts.body?.weight ?? theme.fonts?.body.weight ?? 400 },
       scale: theme.fonts?.scale ?? "comfortable",
     };
   }
 
   const header = { ...(theme.header ?? {}) };
   if (spec.layout.header) header.style = spec.layout.header as NonNullable<Theme["header"]>["style"];
-  if (header.style === "overlay") {
-    const first = homePage(composition).blocks[0];
-    if (first?.type !== "hero" || !["fullbleed", "card-over-image", "diagonal", "product-shot", "arch"].includes(String(first.props?.layout))) {
-      header.style = "classic";
-    }
+  if (
+    header.style === "overlay" &&
+    !["fullbleed", "card-over-image", "diagonal", "product-shot", "arch"].includes(heroLayout)
+  ) {
+    header.style = "classic";
   }
   theme.header = header;
 
   const footer = { ...(theme.footer ?? {}) };
   if (spec.layout.footer) footer.layout = spec.layout.footer as NonNullable<Theme["footer"]>["layout"];
   theme.footer = footer;
-
-  const hero = homePage(composition).blocks.find((block) => block.type === "hero");
-  const heroProps = { ...(hero?.props ?? {}) };
-  const heroLayout = spec.layout.hero ?? String(heroProps.layout ?? "split");
-  heroProps.layout = heroLayout;
-  if (spec.layout.align) heroProps.align = spec.layout.align;
 
   return {
     theme,
@@ -271,53 +298,89 @@ function sectionPlanFor(spec: DesignSpec, composition: Composition): SectionPlan
     source: "template",
   }));
   const excluded = new Set(spec.sections.exclude.map((id) => SECTION_TYPE[id] ?? id));
-  const filtered = plan.filter((item) => !excluded.has(item.type));
+  let filtered = plan.filter((item) => !excluded.has(item.type));
   for (const id of spec.sections.include) {
     const type = SECTION_TYPE[id] ?? id;
     if (!filtered.some((item) => item.type === type)) filtered.push({ type, source: "added" });
   }
+
+  const order = (spec.sections.order ?? []).map((id) => SECTION_TYPE[id] ?? id);
+  if (order.length) {
+    const rank = new Map(order.map((id, index) => [id, index]));
+    const rankOf = (item: SectionPlanItem) => rank.get(item.type) ?? rank.get(item.variant ?? "");
+    const hero = filtered.filter((item) => item.type === "hero");
+    const rest = filtered.filter((item) => item.type !== "hero");
+    rest.sort((a, b) => {
+      const aRank = rankOf(a);
+      const bRank = rankOf(b);
+      if (aRank === undefined && bRank === undefined) return 0;
+      if (aRank === undefined) return 1;
+      if (bRank === undefined) return -1;
+      return aRank - bRank;
+    });
+    filtered = [...hero, ...rest];
+  }
+
   return filtered;
 }
 
-function pagePlanFor(spec: DesignSpec, composition: Composition, plan: DesignPlan): { pages: string[]; status: RequirementStatus } {
+function pagePlanFor(spec: DesignSpec, composition: Composition, plan: DesignPlan): string[] {
+  const home = composition.pages.find((page) => page.isHome)?.key ?? composition.pages[0]?.key;
   const all = composition.pages.map((page) => page.key);
+  const ordered = home ? [home, ...all.filter((key) => key !== home)] : all;
   const excluded = new Set(spec.pages.exclude);
-  let pages = all.filter((key) => !excluded.has(key));
+
+  const required = home ? [home] : [];
   for (const id of spec.pages.include) {
-    if (!pages.includes(id)) pages.push(id);
+    if (!required.includes(id)) required.push(id);
   }
-  const max = plan.maxPages ?? (plan.planId === "free" ? 1 : 20);
-  if (pages.length > max) pages = pages.slice(0, max);
+  const requiredSet = new Set(required);
+  const optional = ordered.filter((key) => !requiredSet.has(key) && !excluded.has(key));
+  let pages = [...required, ...optional];
+
+  const max = Math.max(1, plan.maxPages ?? (plan.planId === "free" ? 1 : 20));
   const requested = spec.pages.count;
   if (requested) {
-    if (requested > max) return { pages, status: "unmet" };
-    if (requested <= pages.length) pages = pages.slice(0, requested);
-    while (pages.length < requested) pages.push(`extra-page-${pages.length + 1}`);
+    if (requested > required.length) {
+      pages = pages.slice(0, requested);
+      while (pages.length < requested) pages.push(`extra-page-${pages.length + 1}`);
+    } else {
+      pages = required;
+    }
   }
-  return { pages, status: "met" };
+  if (pages.length > max) pages = pages.slice(0, max);
+  return pages;
 }
 
-function reportFor(
-  spec: DesignSpec,
-  decision: Omit<DesignDecision, "report">,
-  pageStatus: RequirementStatus,
-  contrastUnmet: string | null,
-): DesignReport {
+function reportFor(spec: DesignSpec, decision: DesignCheck, contrastUnmet: string | null): DesignReport {
   const weights = { must: 3, should: 2, nice: 1 } as const;
-  const items: DesignReportItem[] = spec.requirements.map((requirement) => {
-    let status: RequirementStatus = "met";
-    let evidence = `Applied ${requirement.kind} ${String(requirement.value)}.`;
-    if (requirement.kind === "page_count" && pageStatus !== "met") {
-      status = pageStatus;
-      evidence = `The plan allows ${decision.pages.length} pages; ${String(requirement.value)} were requested.`;
+  const checked = verifyDesign(spec, decision);
+  const items: DesignReportItem[] = checked.items.map((item) => {
+    const requirement = spec.requirements.find((entry) => entry.id === item.requirementId);
+    if (requirement && CONTENT_REQUIREMENTS.has(requirement.kind)) {
+      return {
+        ...item,
+        status: "met",
+        evidence: "Will be checked after the copy is written.",
+      };
     }
-    if (requirement.kind === "contrast_ok" && contrastUnmet) {
-      status = "unmet";
-      evidence = contrastUnmet;
+    if (
+      contrastUnmet &&
+      (item.requirementId === "contrast_ok:palette" || requirement?.kind === "contrast_ok")
+    ) {
+      return { ...item, status: "unmet", evidence: contrastUnmet };
     }
-    return { requirementId: requirement.id, status, planned: requirement.value, evidence };
+    return item;
   });
-  if (contrastUnmet) {
+  const hasContrastRequirement = spec.requirements.some(
+    (requirement) => requirement.kind === "contrast_ok",
+  );
+  const hasSyntheticContrast = items.some(
+    (item) =>
+      item.requirementId === "contrast_ok:palette" &&
+      !spec.requirements.some((requirement) => requirement.id === item.requirementId),
+  );
+  if (contrastUnmet && !hasContrastRequirement && !hasSyntheticContrast) {
     items.push({
       requirementId: "contrast_ok:palette",
       status: "unmet",
@@ -325,12 +388,13 @@ function reportFor(
       evidence: contrastUnmet,
     });
   }
-  const unmet = items.filter((item) => item.status === "unmet");
-  const supported = spec.requirements;
+  const syntheticContrast =
+    items.some((item) => item.requirementId === "contrast_ok:palette") &&
+    !hasContrastRequirement;
   const total =
-    supported.reduce((sum, requirement) => sum + weights[requirement.strength], 0) +
-    (contrastUnmet ? weights.must : 0);
-  const met = supported.reduce((sum, requirement) => {
+    spec.requirements.reduce((sum, requirement) => sum + weights[requirement.strength], 0) +
+    (syntheticContrast ? weights.must : 0);
+  const met = spec.requirements.reduce((sum, requirement) => {
     const item = items.find((entry) => entry.requirementId === requirement.id);
     return sum + (item?.status === "met" ? weights[requirement.strength] : 0);
   }, 0);
@@ -338,7 +402,7 @@ function reportFor(
   return {
     items,
     accuracy: total === 0 ? 1 : met / total,
-    unmet,
+    unmet: items.filter((item) => item.status === "unmet"),
     unsupported,
     weights,
   };
@@ -349,7 +413,7 @@ export function resolveDesign(spec: DesignSpec, brief: DesignBrief = {}, plan: D
   const prepared = themeFor(spec, composition.theme, composition, brief);
   const sectionPlan = sectionPlanFor(spec, composition);
   const pages = pagePlanFor(spec, composition, plan);
-  const base: Omit<DesignDecision, "report"> = {
+  const base: DesignCheck = {
     archetype: pkg.meta.slug,
     compositionId: composition.id,
     theme: prepared.theme,
@@ -358,10 +422,10 @@ export function resolveDesign(spec: DesignSpec, brief: DesignBrief = {}, plan: D
     heroLayout: prepared.heroLayout,
     heroProps: prepared.heroProps,
     sectionPlan,
-    pages: pages.pages,
+    pages,
     requestedPageCount: spec.pages.count,
   };
-  const report = reportFor(spec, base, pages.status, prepared.unmet);
+  const report = reportFor(spec, base, prepared.unmet);
   return { ...base, report };
 }
 

@@ -48,6 +48,58 @@ describe("design resolver", () => {
     expect(decision.report.unmet.length).toBe(1);
   });
 
+  it("does not count a failed contrast twice when the user asked for it", () => {
+    const spec = parseDesign("background #FFFFFF, text #EEEEEE, main colour #1E40AF");
+    spec.requirements.push({
+      id: "contrast_ok:manual",
+      kind: "contrast_ok",
+      target: "palette",
+      value: true,
+      strength: "must",
+      source: "user",
+    });
+    const decision = resolveDesign(spec);
+    expect(decision.report.unmet).toHaveLength(1);
+    expect(decision.report.unmet[0]?.requirementId).toBe("contrast_ok:manual");
+    expect(decision.report.accuracy).toBeCloseTo(0.75);
+  });
+
+  it("reports contrast failures on soft sections too", () => {
+    const spec = parseDesign("background #FFFFFF, text #333333, soft #555555");
+    const decision = resolveDesign(spec);
+    expect(decision.report.unmet).toHaveLength(1);
+    expect(decision.report.unmet[0]?.requirementId).toBe("contrast_ok:palette");
+    expect(decision.report.accuracy).toBeCloseTo(0.75);
+  });
+
+  it("applies the requested section order after the hero", () => {
+    const spec = parseDesign("pricing then gallery then faq");
+    const decision = resolveDesign(spec, { businessType: "restaurant" }, { planId: "basic", maxPages: 5 });
+    const types = decision.sectionPlan.map((item) => item.type);
+    expect(types[0]).toBe("hero");
+    expect(types.indexOf("pricing")).toBeGreaterThan(0);
+    expect(types.indexOf("pricing")).toBeLessThan(types.indexOf("gallery"));
+    expect(types.indexOf("gallery")).toBeLessThan(types.indexOf("faq"));
+    expect(decision.report.unmet).toHaveLength(0);
+  });
+
+  it("keeps an explicitly requested page when the plan has to trim pages", () => {
+    const spec = parseDesign("add a gallery page and three pages");
+    const decision = resolveDesign(spec, { businessType: "restaurant" }, { planId: "basic", maxPages: 5 });
+    expect(decision.pages).toHaveLength(3);
+    expect(decision.pages[0]).toBe("home");
+    expect(decision.pages).toContain("gallery");
+    expect(decision.report.unmet).toHaveLength(0);
+  });
+
+  it("only uses an overlay header with a compatible hero and reports the mismatch", () => {
+    const spec = parseDesign("transparent header, editorial hero");
+    const decision = resolveDesign(spec, { businessType: "restaurant" });
+    expect(decision.heroLayout).toBe("editorial");
+    expect(decision.theme.header?.style).toBe("classic");
+    expect(decision.report.unmet.map((item) => item.requirementId)).toContain("header_style:site");
+  });
+
   it("is deterministic for the same request and seed", () => {
     const spec = parseDesign("modern clean website with a split hero and green accents");
     const first = resolveDesign(spec, { teamId: "team", requestId: "request" });

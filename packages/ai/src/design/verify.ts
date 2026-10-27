@@ -1,6 +1,6 @@
 import { contrastRatio, deriveTokens, hexToOklch, luminance } from "@get-on/blocks";
 import { FONT_CATALOGUE } from "./fonts";
-import type { DesignDecision, DesignReportItem } from "./resolve";
+import type { DesignCheck, DesignReportItem } from "./resolve";
 import type { DesignSpec, Requirement, RequirementStatus } from "./spec";
 
 export type DesignContent = {
@@ -57,7 +57,7 @@ function normalised(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function checkRequirement(requirement: Requirement, decision: DesignDecision, content?: DesignContent): { status: RequirementStatus; evidence: string } {
+function checkRequirement(requirement: Requirement, decision: DesignCheck, content?: DesignContent): { status: RequirementStatus; evidence: string } {
   const value = requirement.value;
   const theme = decision.theme;
   const design = theme.design ?? {};
@@ -176,11 +176,11 @@ function checkRequirement(requirement: Requirement, decision: DesignDecision, co
   }
 }
 
-function specLanguageMet(_decision: DesignDecision, requirement: Requirement): boolean {
+function specLanguageMet(_decision: DesignCheck, requirement: Requirement): boolean {
   return typeof requirement.value === "string" && requirement.value.length >= 2;
 }
 
-export function verifyDesign(spec: DesignSpec, decision: DesignDecision, content?: DesignContent): VerifyResult {
+export function verifyDesign(spec: DesignSpec, decision: DesignCheck, content?: DesignContent): VerifyResult {
   const items: DesignReportItem[] = spec.requirements.map((requirement) => {
     const checked = checkRequirement(requirement, decision, content);
     return {
