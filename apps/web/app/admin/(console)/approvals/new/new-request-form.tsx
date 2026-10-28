@@ -32,6 +32,7 @@ export function NewApprovalRequestForm({
     teamId?: string;
     monthlyCredits?: string;
     planId?: string;
+    versionId?: string;
     decision?: string;
   };
 }) {
@@ -44,6 +45,7 @@ export function NewApprovalRequestForm({
   const [amountCredits, setAmountCredits] = useState("");
   const [teamId, setTeamId] = useState(initial?.teamId ?? "");
   const [monthlyCredits, setMonthlyCredits] = useState(initial?.monthlyCredits ?? "");
+  const [versionId, setVersionId] = useState(initial?.versionId ?? "");
   const [days, setDays] = useState("");
   const [holdAction, setHoldAction] = useState("place");
   const [planId, setPlanId] = useState(
@@ -68,6 +70,7 @@ export function NewApprovalRequestForm({
     setAmountCredits("");
     setTeamId("");
     setMonthlyCredits("");
+    setVersionId("");
     setDays("");
     setHoldAction("place");
     setStartsAt("");
@@ -89,6 +92,7 @@ export function NewApprovalRequestForm({
       amountCredits,
       teamId,
       monthlyCredits,
+      versionId,
       days,
       holdAction,
       planId,
@@ -149,6 +153,26 @@ export function NewApprovalRequestForm({
           />
           <p className="mt-1.5 text-[13px] text-text-muted">{config.targetHint}</p>
         </div>
+
+        {config.extra === "template_version" ? (
+          <div>
+            <Label htmlFor="request-version">Template version ID</Label>
+            <Input
+              id="request-version"
+              value={versionId}
+              onChange={(event) => setVersionId(event.target.value)}
+              className="mt-2 font-mono text-[13px]"
+              placeholder="00000000-0000-0000-0000-000000000000"
+              maxLength={200}
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+            <p className="mt-1.5 text-[13px] text-text-muted">
+              Choose the saved version from the template record.
+            </p>
+          </div>
+        ) : null}
 
         {config.extra === "refund_amount" || config.extra === "payment_amount" ? (
           <div>

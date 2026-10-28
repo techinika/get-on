@@ -9,6 +9,7 @@ import {
 import { getApprovalPolicies, requestApproval } from "@/lib/admin/approvals";
 import { canStaff, requireStaff } from "@/lib/admin/staff";
 import { queueApprovalRequested } from "@/lib/email/approval-notifications";
+import { getSystemTemplate } from "@/lib/templates/admin";
 import type { StaffAction } from "@get-on/permissions";
 
 export type CreateApprovalResult =
@@ -61,12 +62,30 @@ export async function createApprovalRequestAction(
   }
 
   try {
+    let stateHash: string | null = null;
+    if (built.value.kind === "template_publish") {
+      const detail = await getSystemTemplate(built.value.targetId);
+      const versionId = built.value.payload.version_id;
+      if (!detail) {
+        return { ok: false, error: "We could not find that system template." };
+      }
+      const version = detail.versions.find((item) => item.id === versionId);
+      if (!version) {
+        return { ok: false, error: "Choose a saved version for that template." };
+      }
+      built.value.payload.template_name = detail.template.name;
+      built.value.payload.version = version.version;
+      built.value.payload.package_hash = version.package_hash;
+      stateHash = version.package_hash;
+    }
+
     const requestId = await requestApproval({
       kind: built.value.kind,
       targetType: built.value.targetType,
       targetId: built.value.targetId,
       reason: built.value.reason,
       payload: built.value.payload,
+      stateHash,
       amountUsd: built.value.amountUsd,
       amountCredits: built.value.amountCredits,
     });

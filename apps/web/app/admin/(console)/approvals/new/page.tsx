@@ -25,6 +25,7 @@ export default async function NewApprovalRequestPage({
     team_id?: string;
     monthly_credits?: string;
     plan_id?: string;
+    version_id?: string;
     decision?: string;
   }>;
 }) {
@@ -88,6 +89,7 @@ export default async function NewApprovalRequestPage({
             teamId: params.team_id ?? "",
             monthlyCredits: params.monthly_credits ?? "",
             planId: initialPlan,
+            versionId: params.version_id ?? "",
             decision:
               params.decision === "reject" || params.decision === "approve"
                 ? params.decision

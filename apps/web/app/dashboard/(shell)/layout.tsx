@@ -30,6 +30,7 @@ export default async function ShellLayout({ children }: { children: ReactNode })
         usage={data.usage}
         sidebar={sidebar}
         isAdmin={Boolean(staff)}
+        isSuperAdmin={staff?.role === "super_admin"}
       >
         {children}
       </AppShell>

@@ -116,6 +116,20 @@ describe("approval summaries", () => {
     expect(approvalHasExecutor("grace_extend")).toBe(true);
     expect(approvalHasExecutor("billing_hold")).toBe(true);
     expect(approvalHasExecutor("website_plan_pause")).toBe(true);
+    expect(approvalHasExecutor("template_publish")).toBe(true);
     expect(approvalHasExecutor("account_delete")).toBe(false);
+  });
+
+  it("names the template and version being published", () => {
+    const request = {
+      kind: "template_publish",
+      target_type: "template",
+      target_id: "12345678-abcd-4000-8000-123456789012",
+      payload: { template_name: "Starter", version: 3 },
+    };
+    expect(approvalTarget(request)).toBe("Starter");
+    expect(approvalSummary(request)).toBe(
+      "Publish Starter version 3 for new websites.",
+    );
   });
 });

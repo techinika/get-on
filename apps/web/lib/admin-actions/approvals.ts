@@ -8,6 +8,7 @@ import {
 } from "@/lib/admin/approvals";
 import {
   extendBillingGrace,
+  publishSystemTemplate,
   recordStaffAction,
   setBillingHold,
   setMemberAiLimit,
@@ -540,6 +541,72 @@ async function runDomainRemove(request: ApprovalRequest) {
   if (!result.ok) throw new ApprovalActionError(result.error);
 }
 
+async function runTemplatePublish(request: ApprovalRequest) {
+  if (request.target_type !== "template") unsupported();
+  const templateId = uuid(request.target_id, "template");
+  const payloadTemplate = text(request.payload, "template_id");
+  if (payloadTemplate && payloadTemplate !== templateId) {
+    throw new ApprovalActionError(
+      "The template in this request no longer matches the target.",
+    );
+  }
+  const versionId = uuid(text(request.payload, "version_id"), "template version");
+  const payloadHash = text(request.payload, "package_hash");
+
+  const admin = createAdminClient();
+  const { data: template } = await admin
+    .from("templates")
+    .select("id, kind, status, current_version_id")
+    .eq("id", templateId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (!template || template.kind !== "system") {
+    throw new ApprovalActionError("We could not find that system template.");
+  }
+
+  const { data: version } = await admin
+    .from("template_versions")
+    .select("id, template_id, version, package_hash")
+    .eq("id", versionId)
+    .maybeSingle();
+  if (!version || version.template_id !== templateId) {
+    throw new ApprovalActionError(
+      "That version does not belong to this template.",
+    );
+  }
+  if (
+    (payloadHash && payloadHash !== version.package_hash) ||
+    (request.state_hash && request.state_hash !== version.package_hash)
+  ) {
+    throw new ApprovalActionError(
+      "The template changed since this was requested. Ask for a new approval.",
+    );
+  }
+  if (
+    template.status === "published" &&
+    template.current_version_id === versionId
+  ) {
+    return;
+  }
+
+  const result = await publishSystemTemplate({
+    templateId,
+    versionId,
+    reason: request.reason,
+    approvalId: request.id,
+  });
+  if (result.duplicate) return;
+
+  await recordStaffAction({
+    action: "template.published",
+    targetType: "template",
+    targetId: templateId,
+    reason: request.reason,
+    approvalId: request.id,
+    details: { version: version.version, package_hash: version.package_hash },
+  }).catch(() => undefined);
+}
+
 async function dispatch(
   request: ApprovalRequest,
   staffId: string,
@@ -576,6 +643,8 @@ async function dispatch(
       return runDomainRemove(request);
     case "domain_plan_lapse":
       return runDomainPlanLapse(request);
+    case "template_publish":
+      return runTemplatePublish(request);
     default:
       return unsupported();
   }
@@ -596,6 +665,15 @@ function failureMessage(error: unknown): string {
   }
   if (raw.includes("PLAN_NOT_FOUND")) return "That plan is no longer available.";
   if (raw.includes("TEAM_NOT_FOUND")) return "We could not find that team.";
+  if (raw.includes("TEMPLATE_NOT_FOUND")) {
+    return "We could not find that system template.";
+  }
+  if (raw.includes("TEMPLATE_VERSION_NOT_FOUND")) {
+    return "We could not find that template version.";
+  }
+  if (raw.includes("TEMPLATE_SLUG_INVALID")) {
+    return "That template name cannot be saved.";
+  }
   if (raw.includes("NOTE_REQUIRED") || raw.includes("REASON_REQUIRED")) {
     return "Add a longer reason before trying again.";
   }

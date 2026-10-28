@@ -11,13 +11,21 @@ export type ApprovalRequestExtra =
   | "domain_decision"
   | "days"
   | "hold"
+  | "template_version"
   | "none";
 
 export type ApprovalRequestKind = {
   kind: ApprovalKind;
   label: string;
   description: string;
-  targetType: "team" | "project" | "invoice" | "payment" | "domain" | "ai";
+  targetType:
+    | "team"
+    | "project"
+    | "invoice"
+    | "payment"
+    | "domain"
+    | "ai"
+    | "template";
   targetLabel: string;
   targetHint: string;
   extra: ApprovalRequestExtra;
@@ -159,6 +167,15 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     targetHint: "Copy the domain ID from the domains list.",
     extra: "none",
   },
+  {
+    kind: "template_publish",
+    label: "Publish a system template",
+    description: "Make one saved template version the live version.",
+    targetType: "template",
+    targetLabel: "Template ID",
+    targetHint: "Open Templates in the staff console and copy the template ID.",
+    extra: "template_version",
+  },
 ];
 
 const KIND_BY_ID = new Map(
@@ -175,6 +192,7 @@ export function requestApprovalHref(input: {
   targetId?: string;
   amountUsd?: number;
   planId?: string;
+  versionId?: string;
   decision?: "approve" | "reject";
 }): string {
   const params = new URLSearchParams({ kind: input.kind });
@@ -183,6 +201,7 @@ export function requestApprovalHref(input: {
     params.set("amount_usd", String(input.amountUsd));
   }
   if (input.planId) params.set("plan_id", input.planId);
+  if (input.versionId) params.set("version_id", input.versionId);
   if (input.decision) params.set("decision", input.decision);
   return `/admin/approvals/new?${params.toString()}`;
 }
@@ -195,6 +214,7 @@ export type ApprovalRequestInput = {
   amountCredits?: string;
   teamId?: string;
   monthlyCredits?: string;
+  versionId?: string;
   days?: string;
   holdAction?: string;
   planId?: string;
@@ -368,6 +388,15 @@ export function buildApprovalRequest(
 
   if (config.kind === "website_plan_pause") {
     payload.project_id = targetId;
+  }
+
+  if (config.extra === "template_version") {
+    const versionId = clean(input.versionId);
+    if (!UUID.test(versionId)) {
+      return { ok: false, error: "Add a valid template version ID." };
+    }
+    payload.template_id = targetId;
+    payload.version_id = versionId;
   }
 
   if (config.extra === "domain_decision") {

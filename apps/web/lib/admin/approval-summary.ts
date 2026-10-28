@@ -52,6 +52,9 @@ const PAYLOAD_LABELS: Record<string, string> = {
   plan_id: "Plan",
   team_name: "Team",
   site_name: "Website",
+  template_name: "Template",
+  version: "Version",
+  version_id: "Version reference",
   hostname: "Address",
   member_id: "Member reference",
   starts_at: "Starts",
@@ -95,6 +98,7 @@ export function approvalTarget(input: ApprovalSummaryInput): string {
   const name =
     text(payload.team_name) ||
     text(payload.site_name) ||
+    text(payload.template_name) ||
     text(payload.hostname) ||
     text(payload.invoice_number);
   if (name) return name;
@@ -109,6 +113,7 @@ export function approvalTarget(input: ApprovalSummaryInput): string {
     ai: "AI member",
     staff: "Staff member",
     account: "Account",
+    template: "Template",
   };
   const label = labels[input.target_type] ?? "Record";
   return `${label} ${shortReference(input.target_id)}`;
@@ -178,8 +183,12 @@ export function approvalSummary(input: ApprovalSummaryInput): string {
       return `Remove ${target} from its website.`;
     case "account_delete":
       return `Delete the account for ${target}.`;
-    case "template_publish":
-      return "Publish a change to the system templates.";
+    case "template_publish": {
+      const version = integer(payload.version);
+      return `Publish ${target}${
+        version === null ? "" : ` version ${version}`
+      } for new websites.`;
+    }
     default:
       return "A staff action needs a decision.";
   }
@@ -265,6 +274,7 @@ const EXECUTABLE_KINDS = new Set<ApprovalKind>([
   "domain_review",
   "domain_remove",
   "domain_plan_lapse",
+  "template_publish",
 ]);
 
 export function approvalHasExecutor(kind: string): boolean {

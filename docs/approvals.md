@@ -82,7 +82,7 @@ amount_usd, amount_credits)`:
   email through the outbox.
 
 Target types are `team`, `project`, `website`, `domain`, `invoice`, `payment`,
-`ai`, `staff` and `account`.
+`ai`, `staff`, `account` and `template`.
 
 The payload is data, not code. The executor must validate it again and must not
 trust it just because it was approved.
@@ -147,6 +147,7 @@ are connected:
 | `domain_review` | Approves, or rejects with the request reason. |
 | `domain_remove` | Removes the domain and its provider hostnames through the domain service. |
 | `domain_plan_lapse` | Re-checks the live domain, then pauses it with reason `plan` and writes `planLapsed` host pointers. |
+| `template_publish` | Re-reads the system template and version, checks the package hash, then makes that version live through `admin_template_publish`. |
 
 The other kinds return a plain "not connected yet" error and change nothing.
 They need their own service function before they can be switched on.
@@ -219,8 +220,8 @@ rebuild permission.
 
 - Free access and AI credit requests are still started from New request with a
   pasted team id. The other record screens prefill the target.
-- The executor does not cover `credit_adjust`, `account_delete` or
-  `template_publish`, so those kinds are hidden from New request.
+- The executor does not cover `credit_adjust` or `account_delete`, so those
+  kinds are hidden from New request.
 - "Request changes" closes the request as rejected. The requester must send a
   new request with the change.
 - Billing settings, discounts and other super-admin-only forms are still shown

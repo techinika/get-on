@@ -198,3 +198,23 @@ export async function setTeamPlan(teamId: string, planId: string, note: string) 
     p_note: note,
   });
 }
+
+export async function publishSystemTemplate(input: {
+  templateId: string;
+  versionId: string;
+  reason: string;
+  approvalId?: string | null;
+}) {
+  return rpc<{
+    ok: boolean;
+    duplicate: boolean;
+    template_id: string;
+    version_id: string;
+    version: number;
+  }>("admin_template_publish", {
+    p_template: input.templateId,
+    p_version: input.versionId,
+    p_reason: input.reason,
+    p_approval: input.approvalId ?? null,
+  });
+}

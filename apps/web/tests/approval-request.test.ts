@@ -20,9 +20,41 @@ describe("approval request builder", () => {
     expect(kinds).toContain("grace_extend");
     expect(kinds).toContain("billing_hold");
     expect(kinds).toContain("website_plan_pause");
+    expect(kinds).toContain("template_publish");
     expect(kinds).not.toContain("account_delete");
     expect(approvalRequestKind("refund")?.targetType).toBe("payment");
     expect(approvalRequestKind("credits_limit")?.targetType).toBe("ai");
+    expect(approvalRequestKind("template_publish")?.targetType).toBe("template");
+  });
+
+  it("builds a template publish request with its version", () => {
+    const version = "33333333-3333-4333-8333-333333333333";
+    const result = buildApprovalRequest({
+      kind: "template_publish",
+      targetId: target,
+      versionId: version,
+      reason,
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        kind: "template_publish",
+        targetType: "template",
+        targetId: target,
+        reason,
+        payload: { template_id: target, version_id: version },
+        amountUsd: null,
+        amountCredits: null,
+      },
+    });
+
+    expect(
+      buildApprovalRequest({
+        kind: "template_publish",
+        targetId: target,
+        reason,
+      }).ok,
+    ).toBe(false);
   });
 
   it("builds a refund with cents and the dual-control amount", () => {
@@ -268,6 +300,15 @@ describe("request approval link", () => {
       requestApprovalHref({ kind: "domain_review", targetId: target, decision: "reject" }),
     ).toBe(
       `/admin/approvals/new?kind=domain_review&target_id=${target}&decision=reject`,
+    );
+    expect(
+      requestApprovalHref({
+        kind: "template_publish",
+        targetId: target,
+        versionId: "33333333-3333-4333-8333-333333333333",
+      }),
+    ).toBe(
+      `/admin/approvals/new?kind=template_publish&target_id=${target}&version_id=33333333-3333-4333-8333-333333333333`,
     );
   });
 });
