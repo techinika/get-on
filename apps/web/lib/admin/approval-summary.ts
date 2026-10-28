@@ -41,6 +41,8 @@ const PAYLOAD_LABELS: Record<string, string> = {
   amount_cents: "Amount",
   amount_usd: "Amount",
   credits: "Credits",
+  monthly_credits: "Monthly credits",
+  member_name: "Member",
   payment_id: "Payment reference",
   team_id: "Team reference",
   project_id: "Website reference",
@@ -56,6 +58,7 @@ const PAYLOAD_LABELS: Record<string, string> = {
   ends_at: "Ends",
   expires_at: "Expires",
   days: "Days",
+  action: "Action",
   decision: "Decision",
   note: "Note",
   reason: "Reason",
@@ -103,7 +106,7 @@ export function approvalTarget(input: ApprovalSummaryInput): string {
     domain: "Domain",
     invoice: "Invoice",
     payment: "Payment",
-    ai: "AI balance",
+    ai: "AI member",
     staff: "Staff member",
     account: "Account",
   };
@@ -117,6 +120,10 @@ export function approvalAmount(input: ApprovalSummaryInput): string {
   if (cents !== null && cents > 0) return formatMoney(cents);
   const usd = decimal(payload.amount_usd);
   if (usd !== null && usd > 0) return formatMoney(Math.round(usd * 100));
+  const monthly = integer(payload.monthly_credits);
+  if (monthly !== null && monthly >= 0) {
+    return `${monthly.toLocaleString("en-US")} AI credits a month`;
+  }
   const credits = integer(payload.credits);
   if (credits !== null && credits > 0) return `${credits.toLocaleString("en-US")} AI credits`;
   const plan = text(payload.plan_id);
@@ -146,11 +153,17 @@ export function approvalSummary(input: ApprovalSummaryInput): string {
     case "grace_extend":
       return `Extend grace time for ${target} by ${text(payload.days) || "the requested number of"} days.`;
     case "billing_hold":
-      return `Place a billing hold on ${target}.`;
+      return `${
+        text(payload.action) === "release" ? "Release" : "Place"
+      } a billing hold on ${target}.`;
     case "plan_change":
       return `Move ${target} to the ${text(payload.plan_id) || "chosen"} plan.`;
-    case "credits_limit":
-      return `Change an AI limit for ${target}.`;
+    case "credits_limit": {
+      const limit = integer(payload.monthly_credits);
+      return `Set the monthly AI limit for ${text(payload.member_name) || target} to ${
+        limit === null ? "the requested amount" : limit.toLocaleString("en-US")
+      } credits.`;
+    }
     case "website_takedown":
       return `Take ${target} down.`;
     case "website_reinstate":
@@ -237,15 +250,21 @@ export function approvalThreshold(
 
 const EXECUTABLE_KINDS = new Set<ApprovalKind>([
   "refund",
+  "manual_payment",
   "access_grant",
   "free_access",
   "invoice_void",
   "plan_change",
   "ai_credits",
+  "credits_limit",
+  "grace_extend",
+  "billing_hold",
+  "website_plan_pause",
   "website_takedown",
   "website_reinstate",
   "domain_review",
   "domain_remove",
+  "domain_plan_lapse",
 ]);
 
 export function approvalHasExecutor(kind: string): boolean {

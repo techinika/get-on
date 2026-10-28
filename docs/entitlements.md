@@ -43,7 +43,10 @@ transaction that performs the mutation.
 2. **Active access grant.** Highest plan rank, then latest start.
 3. **Grace.** When a paid term ended and `grace_ends_at > at`, keep the paid
    plan and set `status = 'grace'`. The plan keeps working; the dashboard shows
-   a billing notice with the exact end date.
+   a billing notice with the exact end date. Support can extend one team beyond
+   the global grace days. Those extensions live in `billing_grace_extensions`;
+   `billing_resolve_team` uses the later of the normal grace end and the latest
+   extension.
 4. **Free.** Otherwise use `free`.
 5. **Lapse.** When grace has ended, `status = 'lapsed'`, `planId = 'free'` and
    the team keeps all data. No data is deleted by a lapse.

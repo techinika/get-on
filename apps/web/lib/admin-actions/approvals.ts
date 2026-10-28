@@ -6,15 +6,26 @@ import {
   type ApprovalKind,
   type ApprovalRequest,
 } from "@/lib/admin/approvals";
-import { setTeamPlan } from "@/lib/admin/access";
+import {
+  extendBillingGrace,
+  recordStaffAction,
+  setBillingHold,
+  setMemberAiLimit,
+  setTeamPlan,
+} from "@/lib/admin/access";
 import { createBillingGrant, voidBillingInvoice } from "@/lib/admin/screens";
 import { BillingError, refundPayment } from "@/lib/billing/service";
 import {
   approveDomain,
+  pauseDomainForPlan,
   rejectDomain,
   removeDomain,
 } from "@/lib/domains/admin-actions";
-import { bringSiteOnline, takeSiteOffline } from "@/lib/admin-actions/site";
+import {
+  bringSiteOnline,
+  pauseSiteForPlan,
+  takeSiteOffline,
+} from "@/lib/admin-actions/site";
 
 export type ApprovalExecutionResult =
   | { ok: true }
@@ -121,6 +132,121 @@ async function runRefund(request: ApprovalRequest, staffId: string) {
   }
 }
 
+async function runManualPayment(request: ApprovalRequest, staffId: string) {
+  if (request.target_type !== "invoice") unsupported();
+  const invoiceId = uuid(request.target_id, "invoice");
+  const payloadInvoice = text(request.payload, "invoice_id");
+  if (payloadInvoice && payloadInvoice !== invoiceId) {
+    throw new ApprovalActionError(
+      "The invoice in this request no longer matches the target.",
+    );
+  }
+  const amountCents = integer(request.payload, ["amount_cents"]);
+  if (amountCents === null || amountCents <= 0) {
+    throw new ApprovalActionError("This request is missing a payment amount.");
+  }
+
+  const admin = createAdminClient();
+  const { data: invoice } = await admin
+    .from("invoices")
+    .select("id, team_id, status, total_cents, currency")
+    .eq("id", invoiceId)
+    .maybeSingle();
+  if (!invoice) {
+    throw new ApprovalActionError("We could not find that invoice.");
+  }
+
+  const reference = `manual:${request.id}`;
+  if (invoice.status === "paid") {
+    const { data: payment } = await admin
+      .from("payments")
+      .select("id")
+      .eq("provider_reference", reference)
+      .maybeSingle();
+    if (payment) return;
+    throw new ApprovalActionError("That invoice is already paid.");
+  }
+  if (!["open", "payment_pending"].includes(String(invoice.status))) {
+    throw new ApprovalActionError("That invoice can no longer be paid.");
+  }
+  if (String(invoice.currency).toUpperCase() !== "USD") {
+    throw new ApprovalActionError(
+      "Manual payments are only available for USD invoices.",
+    );
+  }
+  if (amountCents !== Number(invoice.total_cents)) {
+    throw new ApprovalActionError(
+      "The payment must match the invoice total exactly.",
+    );
+  }
+
+  const { data: attempt } = await admin
+    .from("payment_attempts")
+    .select("id")
+    .eq("merchant_reference", reference)
+    .maybeSingle();
+  if (!attempt) {
+    const { error: attemptError } = await admin.from("payment_attempts").insert({
+      team_id: invoice.team_id,
+      invoice_id: invoice.id,
+      provider: "manual",
+      merchant_reference: reference,
+      amount_cents: amountCents,
+      currency: "USD",
+      status: "pending",
+      created_by: staffId,
+      metadata: { approval_id: request.id },
+    });
+    if (attemptError) {
+      throw new ApprovalActionError("We could not prepare that manual payment.");
+    }
+  }
+
+  const { data, error } = await admin.rpc("billing_confirm_payment", {
+    p_provider: "manual",
+    p_provider_reference: reference,
+    p_merchant_reference: reference,
+    p_amount_cents: amountCents,
+    p_currency: "USD",
+    p_method: "manual",
+    p_confirmation_code: null,
+    p_paid_at: new Date().toISOString(),
+    p_event_key: reference,
+    p_event_type: "MANUAL",
+    p_summary: { approval_id: request.id, staff_user_id: staffId },
+  });
+  if (error) {
+    throw new ApprovalActionError("We could not record that payment.");
+  }
+  const status = String((data as { status?: unknown } | null)?.status ?? "");
+  if (!["confirmed", "duplicate"].includes(status)) {
+    throw new ApprovalActionError("That invoice could not be marked paid.");
+  }
+  if (status === "duplicate") {
+    const { data: payment } = await admin
+      .from("payments")
+      .select("id")
+      .eq("provider_reference", reference)
+      .maybeSingle();
+    if (!payment) {
+      throw new ApprovalActionError("That invoice is already paid.");
+    }
+  }
+
+  await recordStaffAction({
+    action: "billing.manual_payment_recorded",
+    targetType: "invoice",
+    targetId: invoiceId,
+    reason: request.reason,
+    approvalId: request.id,
+    details: {
+      team_id: invoice.team_id,
+      amount_cents: amountCents,
+      provider_reference: reference,
+    },
+  }).catch(() => undefined);
+}
+
 async function runFreeAccess(request: ApprovalRequest) {
   if (request.target_type !== "team") unsupported();
   const teamId = uuid(request.target_id, "team");
@@ -160,6 +286,55 @@ async function runPlanChange(request: ApprovalRequest) {
   await setTeamPlan(teamId, planId, request.reason);
 }
 
+async function runGraceExtend(request: ApprovalRequest) {
+  if (request.target_type !== "team") unsupported();
+  const teamId = uuid(request.target_id, "team");
+  const payloadTeam = text(request.payload, "team_id");
+  if (payloadTeam && payloadTeam !== teamId) {
+    throw new ApprovalActionError(
+      "The team in this request no longer matches the target.",
+    );
+  }
+  const days = integer(request.payload, ["days"]);
+  if (days === null || days < 1 || days > 365) {
+    throw new ApprovalActionError(
+      "This request needs a number of days between 1 and 365.",
+    );
+  }
+  await extendBillingGrace({
+    teamId,
+    days,
+    reason: request.reason,
+    approvalId: request.id,
+  });
+}
+
+async function runBillingHold(request: ApprovalRequest) {
+  if (request.target_type !== "team") unsupported();
+  const teamId = uuid(request.target_id, "team");
+  const payloadTeam = text(request.payload, "team_id");
+  if (payloadTeam && payloadTeam !== teamId) {
+    throw new ApprovalActionError(
+      "The team in this request no longer matches the target.",
+    );
+  }
+  const action = text(request.payload, "action") || "place";
+  if (!["place", "release"].includes(action)) {
+    throw new ApprovalActionError("This request needs a hold action.");
+  }
+  const days = integer(request.payload, ["days"]);
+  if (action === "place" && days !== null && (days < 1 || days > 365)) {
+    throw new ApprovalActionError("A hold must be between 1 and 365 days.");
+  }
+  await setBillingHold({
+    teamId,
+    action: action as "place" | "release",
+    reason: request.reason,
+    days: action === "place" ? days : null,
+    approvalId: request.id,
+  });
+}
+
 async function runAiCredits(request: ApprovalRequest) {
   if (!["team", "ai"].includes(request.target_type)) unsupported();
   const teamId = uuid(request.target_id, "team");
@@ -182,6 +357,44 @@ async function runAiCredits(request: ApprovalRequest) {
   if (error) {
     throw new ApprovalActionError("We could not add those AI credits.");
   }
+}
+
+async function runCreditsLimit(request: ApprovalRequest) {
+  if (request.target_type !== "ai") unsupported();
+  const memberId = uuid(request.target_id, "member");
+  const teamId = uuid(text(request.payload, "team_id"), "team");
+  const payloadMember = text(request.payload, "member_id");
+  if (payloadMember && payloadMember !== memberId) {
+    throw new ApprovalActionError(
+      "The member in this request no longer matches the target.",
+    );
+  }
+  const limit = integer(request.payload, ["monthly_credits", "credits"]);
+  if (limit === null || limit < 0 || limit > 1_000_000) {
+    throw new ApprovalActionError(
+      "This request needs a monthly limit between 0 and 1,000,000 credits.",
+    );
+  }
+
+  const admin = createAdminClient();
+  const { data: member } = await admin
+    .from("team_members")
+    .select("user_id")
+    .eq("team_id", teamId)
+    .eq("user_id", memberId)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!member) {
+    throw new ApprovalActionError("That member is no longer in this team.");
+  }
+
+  await setMemberAiLimit({
+    teamId,
+    memberId,
+    monthlyCredits: limit,
+    note: request.reason,
+    approvalId: request.id,
+  });
 }
 
 async function runSiteTakedown(request: ApprovalRequest) {
@@ -211,6 +424,43 @@ async function runSiteTakedown(request: ApprovalRequest) {
   }
 }
 
+async function runSitePlanPause(request: ApprovalRequest) {
+  if (!["project", "website"].includes(request.target_type)) unsupported();
+  const siteId = uuid(request.target_id, "website");
+  const payloadSite = text(request.payload, "project_id");
+  if (payloadSite && payloadSite !== siteId) {
+    throw new ApprovalActionError(
+      "The website in this request no longer matches the target.",
+    );
+  }
+
+  const result = await pauseSiteForPlan(siteId, request.reason);
+  if (!result.ok) {
+    if (result.code === "NOT_FOUND") {
+      throw new ApprovalActionError("We could not find that website.");
+    }
+    if (result.code === "NO_LIVE_VERSION") {
+      throw new ApprovalActionError(
+        "This website has no published version to pause.",
+      );
+    }
+    if (result.code === "SUSPENDED") {
+      throw new ApprovalActionError(
+        "Take the website back online before pausing it for a plan.",
+      );
+    }
+    throw new ApprovalActionError("We could not pause that website.");
+  }
+
+  await recordStaffAction({
+    action: "website.plan_paused",
+    targetType: "project",
+    targetId: siteId,
+    reason: request.reason,
+    approvalId: request.id,
+  }).catch(() => undefined);
+}
+
 async function runSiteReinstate(request: ApprovalRequest, staffId: string) {
   if (!["project", "website"].includes(request.target_type)) unsupported();
   const siteId = uuid(request.target_id, "website");
@@ -236,6 +486,20 @@ async function runSiteReinstate(request: ApprovalRequest, staffId: string) {
     }
     throw new ApprovalActionError("We could not bring that website back.");
   }
+}
+
+async function runDomainPlanLapse(request: ApprovalRequest) {
+  if (request.target_type !== "domain") unsupported();
+  const domainId = uuid(request.target_id, "domain");
+  const payloadDomain = text(request.payload, "domain_id");
+  if (payloadDomain && payloadDomain !== domainId) {
+    throw new ApprovalActionError(
+      "The domain in this request no longer matches the target.",
+    );
+  }
+
+  const result = await pauseDomainForPlan(domainId);
+  if (!result.ok) throw new ApprovalActionError(result.error);
 }
 
 async function runDomainReview(request: ApprovalRequest) {
@@ -283,6 +547,8 @@ async function dispatch(
   switch (request.kind as ApprovalKind) {
     case "refund":
       return runRefund(request, staffId);
+    case "manual_payment":
+      return runManualPayment(request, staffId);
     case "access_grant":
     case "free_access":
       return runFreeAccess(request);
@@ -292,14 +558,24 @@ async function dispatch(
       return runPlanChange(request);
     case "ai_credits":
       return runAiCredits(request);
+    case "credits_limit":
+      return runCreditsLimit(request);
+    case "grace_extend":
+      return runGraceExtend(request);
+    case "billing_hold":
+      return runBillingHold(request);
     case "website_takedown":
       return runSiteTakedown(request);
     case "website_reinstate":
       return runSiteReinstate(request, staffId);
+    case "website_plan_pause":
+      return runSitePlanPause(request);
     case "domain_review":
       return runDomainReview(request);
     case "domain_remove":
       return runDomainRemove(request);
+    case "domain_plan_lapse":
+      return runDomainPlanLapse(request);
     default:
       return unsupported();
   }

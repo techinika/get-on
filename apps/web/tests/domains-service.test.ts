@@ -1031,6 +1031,50 @@ describe("domain service", () => {
     expect(db.rows.projects?.[0]?.primary_host).toBe(host.hostname);
   });
 
+  it("pauses a live domain for a real plan lapse", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady(host.hostname);
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: host.hostname,
+        value: "customers.get-on.tech",
+      },
+    ];
+    await service.refreshAddress(host.id);
+
+    await service.pauseDomainForPlan(started.id);
+
+    expect(db.rows.domains?.[0]?.status).toBe("plan_lapsed");
+    expect(db.rows.domains?.[0]?.status_reason).toBe("plan");
+    expect(pointers.site.planLapsed[host.hostname]).toBe(true);
+    expect(db.rows.projects?.[0]?.primary_host).toBeNull();
+    expect(db.rows.domain_events).toContainEqual(
+      expect.objectContaining({ event: "plan_lapsed" }),
+    );
+
+    await service.pauseDomainForPlan(started.id);
+    expect(db.rows.domain_events?.filter((row) => row.event === "plan_lapsed")).toHaveLength(1);
+  });
+
   it("simulates and restores a plan lapse", async () => {
     const { service, resolver, provider, pointers, db } = setup();
     const started = await service.startDomain({

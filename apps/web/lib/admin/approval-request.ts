@@ -3,17 +3,21 @@ import type { ApprovalKind } from "@get-on/permissions";
 
 export type ApprovalRequestExtra =
   | "refund_amount"
+  | "payment_amount"
   | "credits"
+  | "ai_limit"
   | "plan"
   | "plan_dates"
   | "domain_decision"
+  | "days"
+  | "hold"
   | "none";
 
 export type ApprovalRequestKind = {
   kind: ApprovalKind;
   label: string;
   description: string;
-  targetType: "team" | "project" | "invoice" | "payment" | "domain";
+  targetType: "team" | "project" | "invoice" | "payment" | "domain" | "ai";
   targetLabel: string;
   targetHint: string;
   extra: ApprovalRequestExtra;
@@ -28,6 +32,15 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     targetLabel: "Payment ID",
     targetHint: "Copy the payment ID from the team's billing screen.",
     extra: "refund_amount",
+  },
+  {
+    kind: "manual_payment",
+    label: "Record a manual payment",
+    description: "Mark an invoice paid outside the provider.",
+    targetType: "invoice",
+    targetLabel: "Invoice ID",
+    targetHint: "Copy the invoice ID from the team's billing screen.",
+    extra: "payment_amount",
   },
   {
     kind: "access_grant",
@@ -66,6 +79,15 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     extra: "credits",
   },
   {
+    kind: "credits_limit",
+    label: "Change an AI limit",
+    description: "Set one member's monthly AI allowance.",
+    targetType: "ai",
+    targetLabel: "Member user ID",
+    targetHint: "Copy the member user ID from the team screen.",
+    extra: "ai_limit",
+  },
+  {
     kind: "website_takedown",
     label: "Take a website down",
     description: "Suspend a published website.",
@@ -81,6 +103,42 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     targetType: "project",
     targetLabel: "Website ID",
     targetHint: "Copy the website ID from the websites list.",
+    extra: "none",
+  },
+  {
+    kind: "grace_extend",
+    label: "Extend grace time",
+    description: "Keep a team online beyond the normal grace window.",
+    targetType: "team",
+    targetLabel: "Team ID",
+    targetHint: "Copy the team ID from the team's billing screen.",
+    extra: "days",
+  },
+  {
+    kind: "billing_hold",
+    label: "Place or release a billing hold",
+    description: "Stop billing reminders while a case is open.",
+    targetType: "team",
+    targetLabel: "Team ID",
+    targetHint: "Copy the team ID from the team's billing screen.",
+    extra: "hold",
+  },
+  {
+    kind: "website_plan_pause",
+    label: "Pause a website for a plan",
+    description: "Keep the live website visible but stop new publishes.",
+    targetType: "project",
+    targetLabel: "Website ID",
+    targetHint: "Copy the website ID from the websites list.",
+    extra: "none",
+  },
+  {
+    kind: "domain_plan_lapse",
+    label: "Pause a custom address for a plan",
+    description: "Pause one custom address because its plan lapsed.",
+    targetType: "domain",
+    targetLabel: "Domain ID",
+    targetHint: "Copy the domain ID from the domains list.",
     extra: "none",
   },
   {
@@ -135,6 +193,10 @@ export type ApprovalRequestInput = {
   reason: string;
   amountUsd?: string;
   amountCredits?: string;
+  teamId?: string;
+  monthlyCredits?: string;
+  days?: string;
+  holdAction?: string;
   planId?: string;
   startsAt?: string;
   endsAt?: string;
@@ -185,18 +247,25 @@ export function buildApprovalRequest(
   let amountUsd: number | null = null;
   let amountCredits: number | null = null;
 
-  if (config.extra === "refund_amount") {
+  if (config.extra === "refund_amount" || config.extra === "payment_amount") {
     const raw = clean(input.amountUsd);
     if (!MONEY.test(raw)) {
-      return { ok: false, error: "Add a refund amount greater than zero." };
+      return {
+        ok: false,
+        error:
+          config.extra === "refund_amount"
+            ? "Add a refund amount greater than zero."
+            : "Add a payment amount greater than zero.",
+      };
     }
     const usd = Number(raw);
     const cents = Math.round(usd * 100);
     if (!Number.isFinite(cents) || cents <= 0 || cents > 100_000_000) {
-      return { ok: false, error: "Add a refund amount between $0.01 and $1,000,000." };
+      return { ok: false, error: "Add an amount between $0.01 and $1,000,000." };
     }
     amountUsd = cents / 100;
-    payload.payment_id = targetId;
+    if (config.extra === "refund_amount") payload.payment_id = targetId;
+    else payload.invoice_id = targetId;
     payload.amount_cents = cents;
   }
 
@@ -241,6 +310,64 @@ export function buildApprovalRequest(
     amountCredits = credits;
     payload.credits = credits;
     if (expiresAt.value) payload.expires_at = expiresAt.value;
+  }
+
+  if (config.extra === "ai_limit") {
+    const teamId = clean(input.teamId);
+    if (!UUID.test(teamId)) {
+      return { ok: false, error: "Add a valid team ID." };
+    }
+    const raw = clean(input.monthlyCredits);
+    if (!/^[0-9]+$/.test(raw)) {
+      return { ok: false, error: "Add a whole number of monthly credits." };
+    }
+    const limit = Number(raw);
+    if (!Number.isSafeInteger(limit) || limit < 0 || limit > 1_000_000) {
+      return {
+        ok: false,
+        error: "Add a monthly limit between 0 and 1,000,000 credits.",
+      };
+    }
+    payload.team_id = teamId;
+    payload.member_id = targetId;
+    payload.monthly_credits = limit;
+  }
+
+  if (config.extra === "days") {
+    const raw = clean(input.days);
+    if (!/^[0-9]+$/.test(raw)) {
+      return { ok: false, error: "Add a whole number of days." };
+    }
+    const days = Number(raw);
+    if (!Number.isSafeInteger(days) || days < 1 || days > 365) {
+      return { ok: false, error: "Add between 1 and 365 days." };
+    }
+    payload.team_id = targetId;
+    payload.days = days;
+  }
+
+  if (config.extra === "hold") {
+    const action = clean(input.holdAction) || "place";
+    if (!["place", "release"].includes(action)) {
+      return { ok: false, error: "Choose whether to place or release the hold." };
+    }
+    payload.team_id = targetId;
+    payload.action = action;
+    const raw = clean(input.days);
+    if (raw) {
+      if (!/^[0-9]+$/.test(raw)) {
+        return { ok: false, error: "Add a whole number of days." };
+      }
+      const days = Number(raw);
+      if (!Number.isSafeInteger(days) || days < 1 || days > 365) {
+        return { ok: false, error: "Add between 1 and 365 days." };
+      }
+      payload.days = days;
+    }
+  }
+
+  if (config.kind === "website_plan_pause") {
+    payload.project_id = targetId;
   }
 
   if (config.extra === "domain_decision") {

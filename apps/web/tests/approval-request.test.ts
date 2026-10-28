@@ -14,9 +14,15 @@ describe("approval request builder", () => {
     const kinds = APPROVAL_REQUEST_KINDS.map((item) => item.kind);
     expect(kinds).toContain("refund");
     expect(kinds).toContain("domain_remove");
-    expect(kinds).not.toContain("manual_payment");
+    expect(kinds).toContain("credits_limit");
+    expect(kinds).toContain("domain_plan_lapse");
+    expect(kinds).toContain("manual_payment");
+    expect(kinds).toContain("grace_extend");
+    expect(kinds).toContain("billing_hold");
+    expect(kinds).toContain("website_plan_pause");
     expect(kinds).not.toContain("account_delete");
     expect(approvalRequestKind("refund")?.targetType).toBe("payment");
+    expect(approvalRequestKind("credits_limit")?.targetType).toBe("ai");
   });
 
   it("builds a refund with cents and the dual-control amount", () => {
@@ -38,6 +44,27 @@ describe("approval request builder", () => {
           amount_cents: 20050,
         },
         amountUsd: 200.5,
+        amountCredits: null,
+      },
+    });
+  });
+
+  it("builds a manual payment for the invoice total", () => {
+    const result = buildApprovalRequest({
+      kind: "manual_payment",
+      targetId: target,
+      reason,
+      amountUsd: "79.99",
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        kind: "manual_payment",
+        targetType: "invoice",
+        targetId: target,
+        reason,
+        payload: { invoice_id: target, amount_cents: 7999 },
+        amountUsd: 79.99,
         amountCredits: null,
       },
     });
@@ -78,6 +105,80 @@ describe("approval request builder", () => {
     expect(domain.ok && domain.value.payload.decision).toBe("reject");
   });
 
+  it("builds a member AI limit and a plan-lapse domain pause", () => {
+    const team = "22222222-2222-4222-8222-222222222222";
+    const limit = buildApprovalRequest({
+      kind: "credits_limit",
+      targetId: target,
+      teamId: team,
+      monthlyCredits: "0",
+      reason,
+    });
+    expect(limit.ok).toBe(true);
+    if (!limit.ok) return;
+    expect(limit.value.targetType).toBe("ai");
+    expect(limit.value.payload).toEqual({
+      team_id: team,
+      member_id: target,
+      monthly_credits: 0,
+    });
+
+    const domain = buildApprovalRequest({
+      kind: "domain_plan_lapse",
+      targetId: target,
+      reason,
+    });
+    expect(domain.ok).toBe(true);
+    if (!domain.ok) return;
+    expect(domain.value.targetType).toBe("domain");
+    expect(domain.value.payload).toEqual({});
+  });
+
+  it("builds grace, billing hold and website plan pause requests", () => {
+    const grace = buildApprovalRequest({
+      kind: "grace_extend",
+      targetId: target,
+      reason,
+      days: "14",
+    });
+    expect(grace.ok).toBe(true);
+    if (!grace.ok) return;
+    expect(grace.value.payload).toEqual({ team_id: target, days: 14 });
+
+    const hold = buildApprovalRequest({
+      kind: "billing_hold",
+      targetId: target,
+      reason,
+      holdAction: "place",
+      days: "30",
+    });
+    expect(hold.ok).toBe(true);
+    if (!hold.ok) return;
+    expect(hold.value.payload).toEqual({
+      team_id: target,
+      action: "place",
+      days: 30,
+    });
+
+    const release = buildApprovalRequest({
+      kind: "billing_hold",
+      targetId: target,
+      reason,
+      holdAction: "release",
+    });
+    expect(release.ok && release.value.payload).toEqual({
+      team_id: target,
+      action: "release",
+    });
+
+    const pause = buildApprovalRequest({
+      kind: "website_plan_pause",
+      targetId: target,
+      reason,
+    });
+    expect(pause.ok && pause.value.payload).toEqual({ project_id: target });
+  });
+
   it("rejects missing records, short reasons and bad amounts", () => {
     expect(
       buildApprovalRequest({ kind: "refund", targetId: "nope", reason }).ok,
@@ -108,9 +209,45 @@ describe("approval request builder", () => {
     ).toBe(false);
     expect(
       buildApprovalRequest({
+        kind: "credits_limit",
+        targetId: target,
+        teamId: "nope",
+        monthlyCredits: "10",
+        reason,
+      }).ok,
+    ).toBe(false);
+    expect(
+      buildApprovalRequest({
+        kind: "credits_limit",
+        targetId: target,
+        teamId: "22222222-2222-4222-8222-222222222222",
+        monthlyCredits: "1.5",
+        reason,
+      }).ok,
+    ).toBe(false);
+    expect(
+      buildApprovalRequest({
         kind: "manual_payment",
         targetId: target,
         reason,
+        amountUsd: "0",
+      }).ok,
+    ).toBe(false);
+    expect(
+      buildApprovalRequest({
+        kind: "grace_extend",
+        targetId: target,
+        reason,
+        days: "0",
+      }).ok,
+    ).toBe(false);
+    expect(
+      buildApprovalRequest({
+        kind: "billing_hold",
+        targetId: target,
+        reason,
+        holdAction: "release",
+        days: "999",
       }).ok,
     ).toBe(false);
   });

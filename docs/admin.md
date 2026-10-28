@@ -70,7 +70,7 @@ Compared with Section 9 of the brief. These have no email today and must gain on
 - Domain lifecycle emails (live, attention, stalled, expiring, plan lapsed/restored, removal notice, claim lost, review, reverify) exist in behaviour but not all are mailed.
 - Billing: `invoice_created`, `invoice_voided`, `invoice_expiring`, `payment_pending`, `payment_reversed`, `refund_requested`/`completed`, `subscription_extended`, `grace_reminder`, `lapsed_reminder`, `plan_restored`, `coupon_assigned`, `access_granted`/`revoked`, `billing_email_verify`, `billing_details_changed`, `billing_hold`, `billing_grace_extended`, `credits_added_by_support`.
 - AI: `ai.credits_low`, `ai.credits_added`, `ai.limit_set`, referral digests.
-- Staff: `staff_added`, `staff_role_changed`, `staff_removed`, `staff_mfa_reset`, `staff_security_alert`, `approval_requested`, `approval_decided`, `approval_expired`, `campaign_finished`, `campaign_paused_by_guard`, `admin_weekly_report`, `admin_alert`. Approval mail is queued by `apps/web/lib/email/approval-notifications.ts`; it carries approval metadata only and never customer content.
+- Staff: `staff_added`, `staff_role_changed`, `staff_removed`, `staff_mfa_reset`, `staff_security_alert`, `approval_requested`, `approval_decided`, `approval_expired`, `campaign_finished`, `campaign_paused_by_guard`, `admin_weekly_report`, `admin_alert`. Approval mail is queued by `apps/web/lib/email/approval-notifications.ts`; it carries approval metadata only and never customer content. Member AI caps, real plan-lapse domain pauses, grace extensions, billing holds and website plan pauses now have approval executors.
 
 ### 0.4 Admin code that touches content tables
 

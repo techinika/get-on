@@ -100,6 +100,7 @@ type LoadedSite = {
     review_state: string;
     suspended_reason: string | null;
     primary_host: string | null;
+    plan_paused_at: string | null;
     redirect_free_address: boolean;
   };
   settings: SourceSettings | null;
@@ -121,6 +122,8 @@ function asProject(row: Record<string, unknown>): LoadedSite["project"] {
     suspended_reason: (row.suspended_reason as string | null) ?? null,
     primary_host:
       typeof row.primary_host === "string" ? row.primary_host : null,
+    plan_paused_at:
+      typeof row.plan_paused_at === "string" ? row.plan_paused_at : null,
     redirect_free_address: row.redirect_free_address !== false,
   };
 }
@@ -132,7 +135,7 @@ async function loadSite(
   const { data: row, error } = await supabase
     .from("projects")
     .select(
-      "id, name, subdomain, settings, content_revision, review_state, suspended_reason, primary_host, redirect_free_address",
+      "id, name, subdomain, settings, content_revision, review_state, suspended_reason, primary_host, plan_paused_at, redirect_free_address",
     )
     .eq("id", projectId)
     .maybeSingle();
@@ -228,6 +231,9 @@ export async function publishProject(
   const { project, settings, pages, media, activePlugins, redirects } = loaded;
   if (project.suspended_reason) {
     throw new PublishError("SUSPENDED");
+  }
+  if (project.plan_paused_at) {
+    throw new PublishError("PLAN_PAUSED");
   }
   if (project.review_state === "pending") {
     throw new PublishError("UNDER_REVIEW");
@@ -513,6 +519,7 @@ export async function restorePublish(
   const config = readPublishConfig();
   const loaded = await loadSite(ctx.supabase, ctx.project.id);
   if (!loaded) throw new PublishError("PROJECT_NOT_FOUND");
+  if (loaded.project.plan_paused_at) throw new PublishError("PLAN_PAUSED");
 
   const { data: target } = await ctx.supabase
     .from("publishes")

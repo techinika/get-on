@@ -23,6 +23,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   FILE_TYPE_INVALID: "Please choose a PNG or JPG picture.",
   SUSPENDED: "This website has been taken offline. Please contact us if you think this is a mistake.",
   UNDER_REVIEW: "We are taking a quick look at your website before it goes live.",
+  PLAN_PAUSED: "Publishing is paused while your plan is sorted out. Please contact us.",
   PUBLISH_RATE_LIMITED: "You have published a few times already. Please try again a little later.",
   PUBLISH_FAILED: "We could not publish your website. Your live website has not changed.",
   PUBLISH_NOT_CONFIGURED: "Publishing is not available right now. Please try again later.",

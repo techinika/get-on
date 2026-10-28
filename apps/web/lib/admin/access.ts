@@ -114,6 +114,63 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
   return data as T;
 }
 
+export async function extendBillingGrace(input: {
+  teamId: string;
+  days: number;
+  reason: string;
+  approvalId?: string | null;
+}) {
+  return rpc<{ ok: boolean; grace_ends_at?: string; duplicate?: boolean }>(
+    "admin_billing_extend_grace",
+    {
+      p_team: input.teamId,
+      p_days: input.days,
+      p_reason: input.reason,
+      p_approval: input.approvalId ?? null,
+    },
+  );
+}
+
+export async function setBillingHold(input: {
+  teamId: string;
+  action: "place" | "release";
+  reason: string;
+  caseId?: string | null;
+  days?: number | null;
+  approvalId?: string | null;
+}) {
+  return rpc<{ ok: boolean; hold_id?: string; duplicate?: boolean }>(
+    "admin_billing_set_hold",
+    {
+      p_team: input.teamId,
+      p_action: input.action,
+      p_reason: input.reason,
+      p_case_id: input.caseId ?? null,
+      p_days: input.days ?? null,
+      p_approval: input.approvalId ?? null,
+    },
+  );
+}
+
+export async function setMemberAiLimit(input: {
+  teamId: string;
+  memberId: string;
+  monthlyCredits: number;
+  note: string;
+  approvalId?: string | null;
+}) {
+  return rpc<{ ok: boolean; from: number | null; to: number }>(
+    "admin_ai_set_member_limit",
+    {
+      p_team: input.teamId,
+      p_member: input.memberId,
+      p_monthly_credits: input.monthlyCredits,
+      p_note: input.note,
+      p_approval: input.approvalId ?? null,
+    },
+  );
+}
+
 export async function listProjects(limit = 200) {
   return rpc<unknown[]>("admin_list_projects", { p_limit: limit });
 }

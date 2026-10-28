@@ -910,6 +910,43 @@ export class DomainService {
     );
   }
 
+  async pauseDomainForPlan(domainId: string): Promise<void> {
+    const domain = await this.loadDomain(domainId);
+    if (domain.status === "plan_lapsed") return;
+    if (!domain.projectId) throw new DomainError("DOMAIN_NOT_CONNECTED");
+    if (
+      [
+        "draft",
+        "awaiting_txt",
+        "unassigned",
+        "removing",
+        "removed",
+        "failed",
+        "paused",
+      ].includes(domain.status)
+    ) {
+      throw new DomainError("DOMAIN_NOT_CONNECTED");
+    }
+
+    await this.updateDomain(domainId, {
+      status: "plan_lapsed",
+      plan_previous_status: domain.status,
+      status_reason: "plan",
+    });
+    const { data } = await this.supabase
+      .from("domain_hostnames")
+      .select("hostname, status")
+      .eq("domain_id", domainId)
+      .eq("status", "live");
+    for (const host of data ?? []) {
+      await this.pointers.writeHostPointer(String(host.hostname), domain.projectId, {
+        planLapsed: true,
+      });
+    }
+    await this.refreshPrimaryAddress(domain.projectId);
+    await this.event(domainId, "plan_lapsed", "Domain paused because the plan lapsed");
+  }
+
   async restorePlanLapse(domainId: string): Promise<void> {
     const { data } = await this.supabase
       .from("domains")
