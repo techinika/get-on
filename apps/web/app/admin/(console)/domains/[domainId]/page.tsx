@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { loadAdminDomain } from "@/lib/admin/domain-rows";
+import { canStaff, requireStaff } from "@/lib/admin/staff";
 import { recordFullName, relativeName, verificationRecord } from "@/lib/domains/records";
 import { DomainStatusBadge, HostnameStatusBadge } from "@/app/dashboard/(shell)/projects/[projectId]/settings/address/address-status";
 import { AdminDomainActions } from "./admin-domain-actions";
@@ -23,6 +24,7 @@ function date(value: string | null | undefined): string {
 
 export default async function AdminDomainPage({ params }: Props) {
   const { domainId } = await params;
+  const staff = await requireStaff();
   const result = await loadAdminDomain(domainId);
   if (!result) notFound();
 
@@ -71,6 +73,9 @@ export default async function AdminDomainPage({ params }: Props) {
           providerId: host.providerId,
         }))}
         targets={targets}
+        canReviewDirect={canStaff(staff.role, "domain.review.approve")}
+        canReviewRequest={canStaff(staff.role, "domain.review.request")}
+        canRemoveRequest={canStaff(staff.role, "domain.remove.request")}
       />
 
       <div className="mt-5 grid gap-5">

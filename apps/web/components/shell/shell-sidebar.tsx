@@ -26,6 +26,7 @@ import {
   Rocket,
   Settings,
   Shield,
+  ShieldCheck,
   Sparkles,
   UserCircle,
   Users,
@@ -522,6 +523,19 @@ export function ShellSidebar({
                 <Users size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
                 <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
                   Teams
+                </span>
+              </Link>
+              <Link
+                href="/admin/approvals"
+                title={collapsed ? "Admin approvals" : undefined}
+                className={cn(
+                  "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                  collapsed && "mx-auto w-12 justify-center px-0",
+                )}
+              >
+                <ShieldCheck size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                  Approvals
                 </span>
               </Link>
               <Link

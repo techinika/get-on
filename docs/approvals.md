@@ -11,7 +11,7 @@ too when the policy requires it. Read it with `docs/admin.md`,
 |---|---|---|
 | Request | A staff member with the policy's `request_permission` | `staff_assert(request_permission)` |
 | Decide | A staff member with the policy's `approve_permission` | `staff_assert(approve_permission)` |
-| Execute | The server-side executor | `approval_begin_execute` and `approval_finish_execute` |
+| Execute | The server-side executor | `approval_begin_execute` and `approval_finish_execute`; both also require the policy's `approve_permission` |
 | Cancel | The requester, while pending | `requested_by = auth.uid()` |
 
 Every request, decision, execution and cancellation writes `staff_audit_log`.
@@ -127,6 +127,29 @@ The executor is responsible for:
 There is no generic "execute anything" endpoint. Each kind needs its own small
 executor and its own re-validation.
 
+The dispatcher lives in `apps/web/lib/admin-actions/approvals.ts`. These kinds
+are connected:
+
+| Kind | What the executor does |
+|---|---|
+| `refund` | Re-reads the payment, checks the remaining amount, then calls `refundPayment` with the approval id. |
+| `access_grant` / `free_access` | Creates a plan grant through `admin_billing_create_grant`. |
+| `invoice_void` | Calls `admin_billing_void_invoice`. |
+| `plan_change` | Calls `admin_set_team_plan`. |
+| `ai_credits` | Adds an admin credit bucket through `grant_credits`, keyed by the approval id. |
+| `website_takedown` | Rebuilds the pointer as suspended and records a site flag. |
+| `website_reinstate` | Restores the last publish and resolves the suspension flag. |
+| `domain_review` | Approves, or rejects with the request reason. |
+| `domain_remove` | Removes the domain and its provider hostnames through the domain service. |
+
+The other kinds return a plain "not connected yet" error and change nothing.
+They need their own service function before they can be switched on.
+
+A failed request can be retried by a Super admin through `approval_retry`, but
+only inside the 72-hour window. The retry clears the previous error and puts the
+request back in `approved`. Refunds store the approval id so a retry after a
+successful refund cannot refund twice.
+
 ## 7. Expiry and limits
 
 - Lifetime: 72 hours.
@@ -137,7 +160,25 @@ executor and its own re-validation.
 
 Expired requests stay visible for audit. They cannot be approved or executed.
 
-## 8. UI behaviour
+## 8. Notifications
+
+All three approval emails go through `notification_outbox` with a stable dedupe
+key and are sent by `pnpm job:notifications`:
+
+- `approval_requested` goes to active staff who can give the approval, except
+  the requester.
+- `approval_decided` goes to the requester when the result is rejected,
+  executed or failed. It also asks the remaining approvers for a second
+  decision after the first approval of a dual-control request.
+- `approval_expired` goes to the requester when the expiry job closes the
+  request.
+
+The expiry job collects the due request ids before calling `approval_expire()`
+and queues one outcome email for each. A notification failure never breaks the
+approval itself, and the request link always points at `/admin/approvals/{id}`.
+The email contains only approval metadata, never customer content.
+
+## 9. UI behaviour
 
 The approvals screen is specified in `docs/ui-spec-admin.md`:
 
@@ -151,16 +192,32 @@ The approvals screen is specified in `docs/ui-spec-admin.md`:
 - The screen never renders customer content. It shows record identifiers,
   masked emails and the approved metadata.
 
-The database helpers are in `apps/web/lib/admin/approvals.ts`. The screen and
-the per-kind executor dispatcher are still to be built.
+The database helpers are in `apps/web/lib/admin/approvals.ts`, the email helper
+is `apps/web/lib/email/approval-notifications.ts`, the screen is at
+`/admin/approvals`, and the dispatcher is in
+`apps/web/lib/admin-actions/approvals.ts`.
 
-## 9. Current gaps
+`/admin/approvals/new` creates a request for any action the signed-in member can
+ask for and the executor can finish. It asks for the record id, the reason and
+the action fields (amount, plan, dates, credits or domain decision). It never
+shows customer content and never executes the action. The queue shows the New
+request button only when the member can request at least one action.
 
-- No approvals screen exists in `app/admin/(console)` yet.
-- No executor dispatcher maps an approved kind to a service function. This is
-  the main remaining wiring task before any request can complete end to end.
-- `approval_requested`, `approval_decided` and `approval_expired` emails are in
-  the catalogue but are not enqueued yet.
-- The few direct super-admin actions in the billing/domain/site screens still
-  need to be reviewed against the policy table so they either request or record
-  an approval.
+Sites, domains, teams and billing prefill the target id and action through
+`RequestApprovalLink`. A direct form is shown only when the member has the
+`direct` permission for that action; otherwise the screen shows the matching
+request link. Plan changes use `access.free.direct`, not the broader entitlement
+rebuild permission.
+
+## 10. Current gaps
+
+- Free access and AI credit requests are still started from New request with a
+  pasted team id. The other record screens prefill the target.
+- The executor does not cover `manual_payment`, `credit_adjust`,
+  `grace_extend`, `billing_hold`, `credits_limit`, `website_plan_pause`,
+  `domain_plan_lapse`, `account_delete` or `template_publish`, so those kinds are
+  hidden from New request.
+- "Request changes" closes the request as rejected. The requester must send a
+  new request with the change.
+- Billing settings, discounts and other super-admin-only forms are still shown
+  to customer success; only their server actions refuse the change.

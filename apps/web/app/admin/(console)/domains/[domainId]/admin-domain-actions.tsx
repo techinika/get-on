@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
+import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 import {
   approveDomainAction,
   deleteProviderHostnameAction,
@@ -26,6 +27,9 @@ export function AdminDomainActions({
   canSimulate,
   hostnames,
   targets,
+  canReviewDirect,
+  canReviewRequest,
+  canRemoveRequest,
 }: {
   domainId: string;
   reviewState: string;
@@ -33,6 +37,9 @@ export function AdminDomainActions({
   canSimulate: boolean;
   hostnames: { id: string; hostname: string; providerId: string | null }[];
   targets: { id: string; name: string; teamName: string }[];
+  canReviewDirect: boolean;
+  canReviewRequest: boolean;
+  canRemoveRequest: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -96,7 +103,7 @@ export function AdminDomainActions({
             Retry {host.hostname}
           </Button>
         ))}
-        {reviewState !== "approved" ? (
+        {reviewState !== "approved" && canReviewDirect ? (
           <Button
             type="button"
             loading={busy === "approve"}
@@ -107,6 +114,14 @@ export function AdminDomainActions({
           >
             Approve
           </Button>
+        ) : null}
+        {reviewState !== "approved" && !canReviewDirect && canReviewRequest ? (
+          <RequestApprovalLink
+            kind="domain_review"
+            targetId={domainId}
+            decision="approve"
+            label="Request review decision"
+          />
         ) : null}
         {["draft", "awaiting_txt", "unassigned", "removing", "removed", "failed"].includes(status) ? null : (
           <Button
@@ -139,10 +154,18 @@ export function AdminDomainActions({
             Delete provider hostname
           </Button>
         ) : null}
-        {reviewState !== "rejected" ? (
+        {reviewState !== "rejected" && canReviewDirect ? (
           <Button type="button" variant="danger-outline" onClick={() => setRejectOpen(true)}>
             Reject
           </Button>
+        ) : null}
+        {canRemoveRequest ? (
+          <RequestApprovalLink
+            kind="domain_remove"
+            targetId={domainId}
+            label="Request removal"
+            variant="danger-outline"
+          />
         ) : null}
       </div>
       {error ? <p className="mt-2 text-sm text-danger-text" role="alert">{error}</p> : null}

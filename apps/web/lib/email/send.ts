@@ -29,6 +29,9 @@ export type EmailKind =
   | "billing_invoice_expired"
   | "billing_refund"
   | "billing_grant"
+  | "approval_requested"
+  | "approval_decided"
+  | "approval_expired"
   | "auth";
 
 export type SendEmailInput = {
@@ -73,6 +76,9 @@ const CRITICAL_KINDS = new Set([
   "billing_grace_started",
   "billing_lapsed",
   "billing_refund",
+  "approval_requested",
+  "approval_decided",
+  "approval_expired",
 ]);
 const RETRY_MINUTES = [1, 5, 30, 60];
 const MAX_ATTEMPTS = 4;

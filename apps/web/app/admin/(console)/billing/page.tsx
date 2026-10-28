@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { formatMoney } from "@/lib/billing/format";
 import { getBillingOverview, type AdminCoupon } from "@/lib/admin";
+import { canStaff, requireStaff } from "@/lib/admin/staff";
+import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 import { cn } from "@/lib/utils";
 import {
   createCoupon,
@@ -46,6 +48,13 @@ export default async function AdminBillingPage({
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   const params = await searchParams;
+  const staff = await requireStaff();
+  const canDirectRefund = canStaff(staff.role, "billing.refund.direct");
+  const canRequestRefund = canStaff(staff.role, "billing.refund.request");
+  const canDirectVoid = canStaff(staff.role, "billing.invoice.void.direct");
+  const canRequestVoid = canStaff(staff.role, "billing.invoice.void.request");
+  const canDirectGrant = canStaff(staff.role, "access.free.direct");
+  const canRequestGrant = canStaff(staff.role, "access.free.request");
   const {
     settings,
     terms,
@@ -252,6 +261,7 @@ export default async function AdminBillingPage({
 
       <Section title="Plan grants" description="A grant gives a team a plan without a payment. It does not change invoices.">
         <div className="grid grid-cols-1 gap-4 min-[900px]:grid-cols-2">
+          {canDirectGrant ? (
           <AppCard className="p-5">
             <h3 className="text-[15px] font-semibold text-text">Add a grant</h3>
             <form action={createGrant} className="mt-3 flex flex-col gap-3">
@@ -289,6 +299,21 @@ export default async function AdminBillingPage({
               </button>
             </form>
           </AppCard>
+          ) : (
+            <AppCard className="p-5">
+              <h3 className="text-[15px] font-semibold text-text">Add a grant</h3>
+              <p className="mt-2 text-sm text-text-muted">
+                A Super admin adds grants directly. You can start a request with the team id.
+              </p>
+              {canRequestGrant ? (
+                <RequestApprovalLink
+                  kind="access_grant"
+                  label="Start a free access request"
+                  className="mt-3 w-full"
+                />
+              ) : null}
+            </AppCard>
+          )}
 
           <AppCard className="p-5">
             <h3 className="text-[15px] font-semibold text-text">Active grants</h3>
@@ -307,12 +332,14 @@ export default async function AdminBillingPage({
                         {grant.note ? ` · ${String(grant.note)}` : ""}
                       </p>
                     </div>
-                    <form action={revokeGrant}>
-                      <input type="hidden" name="id" value={String(grant.id)} />
-                      <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                        Remove
-                      </button>
-                    </form>
+                    {canDirectGrant ? (
+                      <form action={revokeGrant}>
+                        <input type="hidden" name="id" value={String(grant.id)} />
+                        <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                          Remove
+                        </button>
+                      </form>
+                    ) : null}
                   </div>
                 ))
               )}
@@ -371,15 +398,25 @@ export default async function AdminBillingPage({
                   <td className="px-4 py-3 text-text-muted">{date(String(payment.paid_at ?? ""))}</td>
                   <td className="px-4 py-3 text-right">
                     {["confirmed", "partly_refunded"].includes(String(payment.status)) ? (
-                      <form action={refundPaymentAction} className="flex flex-wrap justify-end gap-2">
-                        <input type="hidden" name="team_id" value={String(payment.team_id)} />
-                        <input type="hidden" name="payment_id" value={String(payment.id)} />
-                        <input name="amount_cents" type="number" min={1} max={Number(payment.amount_cents)} placeholder="Cents" required className={cn(fieldClass, "max-w-[110px]")} />
-                        <input name="reason" placeholder="Reason" required minLength={3} className={cn(fieldClass, "max-w-[180px]")} />
-                        <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                          Refund
-                        </button>
-                      </form>
+                      canDirectRefund ? (
+                        <form action={refundPaymentAction} className="flex flex-wrap justify-end gap-2">
+                          <input type="hidden" name="team_id" value={String(payment.team_id)} />
+                          <input type="hidden" name="payment_id" value={String(payment.id)} />
+                          <input name="amount_cents" type="number" min={1} max={Number(payment.amount_cents)} placeholder="Cents" required className={cn(fieldClass, "max-w-[110px]")} />
+                          <input name="reason" placeholder="Reason" required minLength={3} className={cn(fieldClass, "max-w-[180px]")} />
+                          <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                            Refund
+                          </button>
+                        </form>
+                      ) : canRequestRefund ? (
+                        <RequestApprovalLink
+                          kind="refund"
+                          targetId={String(payment.id)}
+                          label="Request refund"
+                          variant="ghost"
+                          size="sm"
+                        />
+                      ) : null
                     ) : null}
                   </td>
                 </tr>
@@ -412,13 +449,23 @@ export default async function AdminBillingPage({
                   <td className="px-4 py-3 text-text-muted">{date(String(invoice.expires_at ?? ""))}</td>
                   <td className="px-4 py-3 text-right">
                     {["open", "payment_pending"].includes(String(invoice.status)) ? (
-                      <form action={voidInvoice} className="flex justify-end gap-2">
-                        <input type="hidden" name="id" value={String(invoice.id)} />
-                        <input name="reason" placeholder="Reason" required minLength={3} className={cn(fieldClass, "max-w-[180px]")} />
-                        <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
-                          Cancel
-                        </button>
-                      </form>
+                      canDirectVoid ? (
+                        <form action={voidInvoice} className="flex justify-end gap-2">
+                          <input type="hidden" name="id" value={String(invoice.id)} />
+                          <input name="reason" placeholder="Reason" required minLength={3} className={cn(fieldClass, "max-w-[180px]")} />
+                          <button type="submit" className={buttonVariants({ variant: "ghost", size: "sm" })}>
+                            Cancel
+                          </button>
+                        </form>
+                      ) : canRequestVoid ? (
+                        <RequestApprovalLink
+                          kind="invoice_void"
+                          targetId={String(invoice.id)}
+                          label="Request void"
+                          variant="ghost"
+                          size="sm"
+                        />
+                      ) : null
                     ) : null}
                   </td>
                 </tr>

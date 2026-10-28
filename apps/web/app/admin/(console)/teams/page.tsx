@@ -5,6 +5,8 @@ import { AppCard } from "@/components/app/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { listTeams } from "@/lib/admin";
+import { canStaff, requireStaff } from "@/lib/admin/staff";
+import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 import { createClient } from "@/lib/supabase/server";
 import { relativeTime } from "@/lib/relative-time";
 import { PlanForm } from "./plan-form";
@@ -25,6 +27,9 @@ type TeamRow = {
 };
 
 export default async function AdminTeamsPage() {
+  const staff = await requireStaff();
+  const canDirectPlan = canStaff(staff.role, "access.free.direct");
+  const canRequestPlan = canStaff(staff.role, "access.free.request");
   const [teams, plansResult] = await Promise.all([
     listTeams(200) as Promise<TeamRow[]>,
     (async () => {
@@ -75,7 +80,21 @@ export default async function AdminTeamsPage() {
                 </div>
               </div>
               <div className="mt-3 border-t border-border pt-3">
-                <PlanForm teamId={team.id} planId={team.plan_id} plans={plans} />
+                {canDirectPlan ? (
+                  <PlanForm teamId={team.id} planId={team.plan_id} plans={plans} />
+                ) : canRequestPlan ? (
+                  <RequestApprovalLink
+                    kind="plan_change"
+                    targetId={team.id}
+                    planId={team.plan_id}
+                    label="Request plan change"
+                    size="sm"
+                  />
+                ) : (
+                  <p className="text-[13px] text-text-muted">
+                    You cannot change this team&apos;s plan.
+                  </p>
+                )}
               </div>
             </AppCard>
           ))}

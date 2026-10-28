@@ -12,6 +12,7 @@ import {
   SiteActions,
 } from "@/components/admin/site-actions";
 import { getAdminSite } from "@/lib/admin";
+import { canStaff, requireStaff } from "@/lib/admin/staff";
 import { adminSiteStatus } from "@/lib/admin/site-status";
 import { adminSiteAddress, displayHostname } from "@/lib/admin/site-address";
 import { relativeTime } from "@/lib/relative-time";
@@ -31,6 +32,7 @@ export default async function AdminSitePage({
   params: Promise<{ siteId: string }>;
 }) {
   const { siteId } = await params;
+  const staff = await requireStaff();
   const site = await getAdminSite(siteId);
   if (!site) notFound();
 
@@ -94,6 +96,10 @@ export default async function AdminSitePage({
               address={address}
               suspended={Boolean(site.suspended_at)}
               reviewPending={site.review_state === "pending"}
+              canTakeDownDirect={canStaff(staff.role, "website.takedown.direct")}
+              canTakeDownRequest={canStaff(staff.role, "website.takedown.request")}
+              canReinstateDirect={canStaff(staff.role, "website.reinstate.direct")}
+              canReinstateRequest={canStaff(staff.role, "website.reinstate.request")}
             />
           </div>
         </AppCard>

@@ -124,6 +124,13 @@ export async function deleteProviderHostname(
   return { ok: true, domainId: String(host.domain_id) };
 }
 
+export async function removeDomain(domainId: string): Promise<DomainActionResult> {
+  const { admin, domain } = await domainRow(domainId);
+  if (!domain) return { ok: false, error: "We could not find that domain." };
+  await new DomainService({ supabase: admin }).removeDomain(domainId);
+  return { ok: true };
+}
+
 export async function approveDomain(domainId: string): Promise<DomainActionResult> {
   const { admin, domain } = await domainRow(domainId);
   if (!domain) return { ok: false, error: "We could not find that domain." };

@@ -70,7 +70,7 @@ Compared with Section 9 of the brief. These have no email today and must gain on
 - Domain lifecycle emails (live, attention, stalled, expiring, plan lapsed/restored, removal notice, claim lost, review, reverify) exist in behaviour but not all are mailed.
 - Billing: `invoice_created`, `invoice_voided`, `invoice_expiring`, `payment_pending`, `payment_reversed`, `refund_requested`/`completed`, `subscription_extended`, `grace_reminder`, `lapsed_reminder`, `plan_restored`, `coupon_assigned`, `access_granted`/`revoked`, `billing_email_verify`, `billing_details_changed`, `billing_hold`, `billing_grace_extended`, `credits_added_by_support`.
 - AI: `ai.credits_low`, `ai.credits_added`, `ai.limit_set`, referral digests.
-- Staff: `staff_added`, `staff_role_changed`, `staff_removed`, `staff_mfa_reset`, `staff_security_alert`, `approval_requested`, `approval_decided`, `approval_expired`, `campaign_finished`, `campaign_paused_by_guard`, `admin_weekly_report`, `admin_alert`.
+- Staff: `staff_added`, `staff_role_changed`, `staff_removed`, `staff_mfa_reset`, `staff_security_alert`, `approval_requested`, `approval_decided`, `approval_expired`, `campaign_finished`, `campaign_paused_by_guard`, `admin_weekly_report`, `admin_alert`. Approval mail is queued by `apps/web/lib/email/approval-notifications.ts`; it carries approval metadata only and never customer content.
 
 ### 0.4 Admin code that touches content tables
 
@@ -159,6 +159,7 @@ The one website action a staff member may take is a super-admin **takedown** (se
 - Approved requests re-validate state (`APPROVAL_STALE` when plan/balance/invoice/website state changed in a way that matters), execute through the same service functions the customer features use, record requester + approver, email the parties, and mark `executed` or `failed`.
 - Requests expire after 72 hours (`job:approvals-expire`). At most 20 open requests per support member; duplicate open requests are rejected. A requester can cancel their own pending request.
 - Super-admin direct actions require a reason and fresh authentication; dual control applies above thresholds and whenever two or more super admins exist for the listed kinds.
+- Record screens show a direct form only when the member has the matching `direct` permission. Everyone else gets a prefilled request link when they can request that action.
 
 Seeded policies and thresholds live in `docs/approvals.md`.
 
