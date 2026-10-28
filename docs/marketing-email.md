@@ -170,8 +170,15 @@ Opt-out does the same with `granted = false`.
 consent record says refused, and turns them off with
 `marketing_source = 'consent_audit'`.
 
-The public unsubscribe page and the account preference controls are still to be
-built.
+The public page is `/email/unsubscribe?token=…`. The `?token=` value is the
+only input; the page does nothing on GET and opts out on the POST button. This
+keeps link scanners from unsubscribing people. After success the token is
+removed from the address bar.
+
+Signed-in customers can turn marketing on or off in Account → Email
+preferences. That switch uses `email_preference_set()` with source `account`.
+Opting in again still respects the suppression list; a hard bounce or complaint
+keeps the address blocked.
 
 ## 8. Tracking
 
@@ -200,5 +207,5 @@ shown to staff.
   The database and jobs are ready; staff currently need SQL or a script.
 - Campaign approval is not wired to a UI.
 - The complaint/bounce guards need a scheduled calculation and a pause action.
-- The public unsubscribe page, tracking endpoints and the marketing report view
-  remain to be built.
+- Tracking endpoints and the marketing report view remain to be built.
+- The campaign preview and test-send screens are not built.

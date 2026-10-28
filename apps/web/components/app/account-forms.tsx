@@ -6,7 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { useToast } from "@/components/ui/toast";
-import { updatePassword, updateProfile } from "@/app/dashboard/(shell)/account/actions";
+import { Switch } from "@/components/ui/switch";
+import {
+  updateMarketingConsent,
+  updatePassword,
+  updateProfile,
+} from "@/app/dashboard/(shell)/account/actions";
 
 /** Profile settings (spec §6.4). */
 export function ProfileForm({ fullName, email }: { fullName: string; email: string }) {
@@ -142,5 +147,39 @@ export function PasswordForm() {
         Update password
       </Button>
     </form>
+  );
+}
+
+/** Marketing email preference (spec §6.4). */
+export function MarketingPreference({ enabled }: { enabled: boolean }) {
+  const { toast } = useToast();
+  const [checked, setChecked] = React.useState(enabled);
+  const [saving, setSaving] = React.useState(false);
+
+  async function change(next: boolean) {
+    const previous = checked;
+    setChecked(next);
+    setSaving(true);
+    const result = await updateMarketingConsent(next);
+    setSaving(false);
+    if (result.ok) {
+      toast(
+        next ? "Marketing email is on." : "Marketing email is off.",
+        "success",
+      );
+    } else {
+      setChecked(previous);
+      toast(result.error, "error");
+    }
+  }
+
+  return (
+    <Switch
+      checked={checked}
+      onCheckedChange={change}
+      disabled={saving}
+      label="Product news and tips"
+      description="Occasional product news, tips and offers. Receipts and account messages are not affected."
+    />
   );
 }

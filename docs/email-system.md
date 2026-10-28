@@ -118,8 +118,15 @@ Schema: `supabase/migrations/20261103000500_email_consent.sql`.
 - `marketing_can_send(user_id)` is the final check: opted in, confirmed email
   and not suppressed.
 
-The public unsubscribe page and the account preference controls are still to be
-built. The database functions they need already exist.
+The public unsubscribe page is `/email/unsubscribe?token=…`. It checks the
+token shape, shows a button and calls `email_unsubscribe()` only on the POST
+server action. A GET never changes anything, so a mail scanner cannot opt a
+person out. The page is `noindex`, uses `no-referrer`, and drops the token from
+the URL after success. Invalid or missing tokens show a plain explanation.
+
+Account settings has a "Product news and tips" switch for signed-in users. It
+calls `email_preference_set()` with source `account` and records the salted IP
+hash only when the switch is turned on.
 
 ## 6. Delivery events and suppression
 
@@ -203,8 +210,6 @@ business events should use the outbox.
 - Most business call sites still use `sendEmail()` rather than
   `email_enqueue()`. The outbox worker and schema exist; the event-by-event
   retrofit is the remaining work.
-- There is no public `/email/unsubscribe` page yet, so the link in a marketing
-  template cannot complete the opt-out. `email_unsubscribe(token)` is ready.
 - Tracking links and opens are stored and purged, but the click/open endpoints
   and the `EMAIL_TRACKING_BASE` rewrite are not built.
 - The console email screen shows the log and suppressions. Resending, removing
