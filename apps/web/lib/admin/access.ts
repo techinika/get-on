@@ -1,352 +1,143 @@
-import { createAdminClient } from "@/lib/supabase/admin";
-import type { Role, Action } from "@get-on/permissions";
+import { createClient } from "@/lib/supabase/server";
+import { StaffError } from "./staff";
 
-const admin = createAdminClient();
+export type AccessPurpose =
+  | "support_case"
+  | "billing_question"
+  | "payment_issue"
+  | "abuse_report"
+  | "customer_request"
+  | "reporting";
 
-/** Get the currently acting staff email from app context */
-function getStaffEmail(): string | null {
-  try {
-    const ctx: any = (global as any).staffContext;
-    return ctx?.email ?? null;
-  } catch {
-    return null;
-  }
-}
-
-/** Salted IP hash for audit logging - derived from request context */
-function getIPHash(): string {
-  return (global as any).staffContext?.ipHash ?? "00000000-0000-0000-0000-000000000000";
-}
-
-/** Read customer team data only through approved views */
-export async function openCustomerTeam(teamId: string) {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const { data: team, error: teamError } = await admin
-    .from("v_teams_with_members")
-    .select("*")
-    .eq("id", teamId)
-    .single();
-
-  if (teamError) throw teamError;
-  if (!team) throw new Error("TEAM_NOT_FOUND");
-
-  const { data: members } = await admin
-    .from("team_members")
-    .select("*")
-    .eq("team_id", teamId);
-
-  return { team, members };
-}
-
-/** Read customer project data only through approved views */
-export async function openCustomerProject(projectId: string) {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const { data: project } = await admin
-    .from("v_projects_with_team")
-    .select("*")
-    .eq("id", projectId)
-    .single();
-
-  if (!project) throw new Error("PROJECT_NOT_FOUND");
-  return project;
-}
-
-/** Read customer page data only through approved views */
-export async function openCustomerPage(pageId: string) {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const { data: page } = await admin
-    .from("v_pages_with_context")
-    .select("*")
-    .eq("id", pageId)
-    .single();
-
-  if (!page) throw new Error("PAGE_NOT_FOUND");
-  return page;
-}
-
-/** Edit customer content - only through explicit approved actions */
-export async function editCustomerContent(
-  pageId: string,
-  updates: Record<string, unknown>,
-): Promise<void> {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const forbiddenKeys = ["created_by", "owner_id", "team_id", "status"];
-  for (const key of forbiddenKeys) {
-    if (key in updates) {
-      throw new Error(`FORBIDDEN_KEY: ${key}`);
-    }
-  }
-
-  await admin.from("pages").update(updates).eq("id", pageId);
-}
-
-/** Publish customer page - requires approval for non-owner staff */
-export async function publishCustomerPage(
-  pageId: string,
-  requiresApproval: boolean = true,
-): Promise<void> {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const staffRole: Role = staffEmail.includes("super_admin")
-    ? ("owner" as Role)
-    : ("admin" as Role);
-
-  if (requiresApproval) {
-    await requestApproval(staffRole, "page.publish", pageId);
-  }
-
-  await admin.from("pages").update({ status: "published" }).eq("id", pageId);
-}
-
-/** Request approval through the four-eyes engine */
-export async function requestApproval(
-  actor: Role,
-  action: Action,
-  targetId: string,
-): Promise<{ approved: boolean; reason?: string }> {
-  const staffEmail = getStaffEmail();
-  if (!staffEmail) throw new Error("NO_STAFF_CONTEXT");
-
-  const { data: policy, error: policyError } = await admin
-    .from("approval_policies")
-    .select("*")
-    .eq("target_type", "page")
-    .eq("action", action)
-    .maybeSingle();
-
-  if (policyError) throw policyError;
-  if (!policy || !policy.requires_approval) {
-    return { approved: false };
-  }
-
-  // Check if there's an existing pending request
-  const { data: existing, error: existingError } = await admin
-    .from("approval_requests")
-    .select("id")
-    .eq("target_type", "page")
-    .eq("target_id", targetId)
-    .eq("status", "pending")
-    .maybeSingle();
-
-  if (existingError) throw existingError;
-  if (existing) {
-    return { approved: false, reason: "approval_pending" };
-  }
-
-  // Create new approval request - need requester_id from platform_staff
-  const { data: requesterStaff, error: requesterError } = await admin
-    .from("platform_staff")
-    .select("id")
-    .eq("email", staffEmail)
-    .maybeSingle();
-
-  if (requesterError) throw requesterError;
-
-  const { data: requestData, error: requestError } = await admin
-    .from("approval_requests")
-    .insert({
-      policy_id: policy.id,
-      requester_id: requesterStaff?.id,
-      requester_email: staffEmail,
-      target_type: "page",
-      target_id: targetId,
-      status: "pending",
-      required_roles: policy.allowed_roles,
-      expires_at: new Date(
-        Date.now() + (policy.staleness_hours || 24) * 60 * 60 * 1000,
-      ).toISOString(),
-    })
-    .select("id")
-    .single();
-
-  if (requestError) throw requestError;
-  const requestId = requestData.id;
-
-  // Log the approval request
-  const { error: logError } = await admin.from("staff_audit_log").insert({
-    staff_id: requesterStaff?.id,
-    purpose: "execute",
-    action: `approval.request`,
-    target_type: "page",
-    target_id: targetId,
-    ip_hash: getIPHash(),
-    details: JSON.stringify({ actor, action, targetId, staffEmail }),
+/** Open a 60-minute window to read a team's metadata. Reason is required. */
+export async function openCustomerTeam(
+  teamId: string,
+  purpose: AccessPurpose,
+  caseId?: string | null,
+  ipHash?: string | null,
+): Promise<string> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("staff_open_access", {
+    p_team_id: teamId,
+    p_purpose: purpose,
+    p_case_id: caseId ?? null,
+    p_ip_hash: ipHash ?? null,
   });
-
-  if (logError) throw logError;
-
-  return { approved: false };
+  if (error) throw new StaffError(error.message, error.message);
+  return data as string;
 }
 
-/** Decide on an approval request (super admin or customer success) */
-export async function decideApproval(
-  requestId: string,
-  decision: "approve" | "reject",
-  staffEmail: string,
-): Promise<{ success: boolean }> {
-  const adminClient = createAdminClient();
-
-  // Validate the staff member has authority to decide
-  const { data: staffMember, error: staffError } = await adminClient
-    .from("platform_staff")
-    .select("role")
-    .eq("email", staffEmail)
-    .maybeSingle();
-
-  if (staffError) throw staffError;
-  if (!staffMember) throw new Error("STAFF_NOT_FOUND");
-
-  const role = staffMember.role as "super_admin" | "customer_success";
-
-  // Super admins can directly approve/reject
-  // Customer success needs explicit policy permission
-  if (role !== "super_admin") {
-    const { data: policy, error: policyError } = await admin.from("approval_policies").select("*").eq("target_type", "approval").maybeSingle();
-
-    if (policyError) throw policyError;
-
-    // Check if this staff member can decide this type of approval
-    const canDecide = policy?.allowed_roles?.includes(role) ?? false;
-    if (!canDecide) throw new Error("NOT_AUTHORIZED_TO_DECIDE");
-  }
-
-  // Update the approval request
-  const updateData: Record<string, any> = {
-    status: decision,
-  };
-
-  if (decision === "approve") {
-    updateData.approved_by = staffEmail;
-    updateData.approved_at = new Date().toISOString();
-  } else {
-    updateData.rejected_by = staffEmail;
-    updateData.rejected_at = new Date().toISOString();
-  }
-
-  const { error: updateError } = await adminClient
-    .from("approval_requests")
-    .update(updateData)
-    .eq("id", requestId);
-
-  if (updateError) throw updateError;
-
-  // Log the decision
-  const { data: logData, error: logError } = (await adminClient
-    .from("staff_audit_log")
-    .insert({
-      staff_id: (await adminClient
-        .from("platform_staff")
-        .select("id")
-        .eq("email", staffEmail)
-        .maybeSingle()).data?.id,
-      purpose: "execute",
-      action: `approval.${decision}`,
-      target_type: "approval",
-      target_id: requestId,
-      ip_hash: getIPHash(),
-      details: JSON.stringify({ requestId, decision, staffEmail }),
-    })) as { data: any; error: any };
-
-  if (logError) throw logError;
-
-  return { success: true };
+export async function closeCustomerAccess(sessionId: string): Promise<void> {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("staff_close_access", {
+    p_session_id: sessionId,
+  });
+  if (error) throw new StaffError(error.message, error.message);
 }
 
-/** Check if an approval request is stale and can be auto-expired */
-export function isStale(request: { expires_at?: string }): boolean {
-  if (!request?.expires_at) return false;
-  const expires = new Date(request.expires_at);
-  const now = new Date();
-  return now > expires;
+export async function getDashboard(): Promise<Record<string, number | boolean>> {
+  return rpc<Record<string, number | boolean>>("admin_dashboard", {});
 }
 
-/** Get the current pending approvals for a staff member */
-export async function getPendingApprovals(staffEmail: string): Promise<any[]> {
-  const { data, error } = await admin
-    .from("approval_requests")
-    .select("*")
-    .eq("status", "pending")
-    .order("expires_at", { ascending: true });
-
-  if (error) return [];
-  if (!data) return [];
-
-  return data.filter((req: any) => isStale(req) === false);
+export async function searchAccounts(query: string, limit = 20) {
+  return rpc("admin_search", { p_query: query, p_limit: limit });
 }
 
-/** Execute an approved action - only after approval is confirmed */
-export async function executeApprovedAction(
-  requestId: string,
-  action: "page.publish" | "site.create" | "site.delete" | "site.restore" | "page.edit",
-): Promise<void> {
-  const { data: request, error: requestError } = await admin
-    .from("approval_requests")
-    .select("status, target_type, target_id")
-    .eq("id", requestId)
-    .single();
-
-  if (requestError) throw requestError;
-  if (request.status !== "approved") {
-    throw new Error("APPROVAL_NOT_GIVEN");
-  }
-
-  // Execute the actual action based on target type
-  const { target_type, target_id } = request;
-
-  switch (action) {
-    case "page.publish":
-      await admin.from("pages").update({ status: "published" }).eq("id", target_id);
-      break;
-    case "site.create":
-      // Site creation handled through separate workflow
-      break;
-    case "site.delete":
-      await admin.from("projects").update({ deleted_at: new Date() }).eq("id", target_id);
-      break;
-    case "site.restore":
-      await admin.from("projects").update({ deleted_at: null }).eq("id", target_id);
-      break;
-    case "page.edit":
-      // Page edit handled through explicit edit function
-      break;
-    default:
-      throw new Error("UNKNOWN_ACTION");
-  }
-
-  // Log the execution
-  const staffEmail = getStaffEmail();
-  const { data: staffData, error: staffError } = staffEmail
-    ? await admin
-        .from("platform_staff")
-        .select("id")
-        .eq("email", staffEmail)
-        .maybeSingle()
-    : { data: null, error: null };
-
-  const staffId = staffError ? undefined : (staffData?.id ?? undefined);
-
-  const { data: logData, error: logError } = (await admin
-    .from("staff_audit_log")
-    .insert({
-      staff_id: staffId,
-      purpose: "execute",
-      action: `approval.${action}`,
-      target_type: target_type,
-      target_id: target_id,
-      ip_hash: getIPHash(),
-      details: JSON.stringify({ requestId, action, target_type, target_id }),
-    })) as { data: any; error: any };
-
-  if (logError) throw logError;
+export async function listTeams(limit = 100) {
+  return rpc<unknown[]>("admin_list_teams", { p_limit: limit });
 }
 
-export type { Role, Action };
+export async function getTeamMetadata(teamId: string) {
+  return rpc("admin_team", { p_team_id: teamId });
+}
+
+export async function getProjectMetadata(projectId: string) {
+  return rpc("admin_project", { p_project_id: projectId });
+}
+
+export async function getBillingSummary(teamId: string) {
+  return rpc("admin_billing_summary", { p_team_id: teamId });
+}
+
+export async function getAiSummary(teamId: string) {
+  return rpc("admin_ai_summary", { p_team_id: teamId });
+}
+
+export async function getAbuseReports(projectId: string) {
+  return rpc<unknown[]>("admin_abuse_reports", { p_project_id: projectId });
+}
+
+export async function listEmailLog(limit = 100) {
+  return rpc<unknown[]>("admin_email_log", { p_limit: limit });
+}
+
+export async function listSupportCases(status?: string | null) {
+  return rpc<unknown[]>("admin_support_cases", { p_status: status ?? null });
+}
+
+export async function listAudit(limit = 100) {
+  return rpc<unknown[]>("admin_audit_list", { p_limit: limit });
+}
+
+export async function listStaff() {
+  return rpc<unknown[]>("admin_staff_list", {});
+}
+
+export async function recordStaffAction(input: {
+  action: string;
+  targetType: string;
+  targetId: string;
+  purpose?: string | null;
+  reason?: string | null;
+  approvalId?: string | null;
+  details?: Record<string, unknown>;
+  ipHash?: string | null;
+  userAgent?: string | null;
+}): Promise<string> {
+  return rpc<string>("staff_audit", {
+    p_action: input.action,
+    p_target_type: input.targetType,
+    p_target_id: input.targetId,
+    p_purpose: input.purpose ?? null,
+    p_reason: input.reason ?? null,
+    p_approval_id: input.approvalId ?? null,
+    p_details: input.details ?? {},
+    p_ip_hash: input.ipHash ?? null,
+    p_user_agent: input.userAgent ?? null,
+  });
+}
+
+async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc(fn, args);
+  if (error) throw new StaffError(error.message, error.message);
+  return data as T;
+}
+
+export async function listProjects(limit = 200) {
+  return rpc<unknown[]>("admin_list_projects", { p_limit: limit });
+}
+
+export async function getEmailSummary() {
+  return rpc<Record<string, number>>("admin_email_summary", {});
+}
+
+export async function listEmailSuppressions(limit = 50) {
+  return rpc<unknown[]>("admin_email_suppressions", { p_limit: limit });
+}
+
+export async function getDomainOps() {
+  return rpc<{
+    counts: Record<string, number>;
+    runs: unknown[];
+    health: Record<string, unknown> | null;
+  }>("admin_domain_ops", {});
+}
+
+export async function setTeamPlan(teamId: string, planId: string, note: string) {
+  return rpc<{ ok: boolean; from: string; to: string }>("admin_set_team_plan", {
+    p_team: teamId,
+    p_plan: planId,
+    p_note: note,
+  });
+}

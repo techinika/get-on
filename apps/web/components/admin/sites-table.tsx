@@ -6,7 +6,7 @@ import { ArrowDown, ArrowUp, ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { adminSiteStatus, type AdminSiteRow } from "@/lib/admin-data";
+import { adminSiteStatus, type AdminSiteRow } from "@/lib/admin/site-status";
 import { relativeTime } from "@/lib/relative-time";
 
 export type SiteTableRow = AdminSiteRow & { address: string };

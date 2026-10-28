@@ -41,7 +41,8 @@
     "job:ai-monthly": "pnpm --filter web job:ai-monthly",
     "job:ai-expire": "pnpm --filter web job:ai-expire",
     "job:ai-payloads": "pnpm --filter web job:ai-payloads",
-    "job:rebuild-published": "pnpm --filter web job:rebuild-published"
+    "job:rebuild-published": "pnpm --filter web job:rebuild-published",
+    "admin:bootstrap": "pnpm --filter web admin:bootstrap"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

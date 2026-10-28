@@ -19,6 +19,17 @@ const jobs = [
   "scripts/jobs/links-expire.ts",
   "scripts/jobs/links-kv-resync.ts",
   "scripts/jobs/link-stats-rollup.ts",
+  "scripts/jobs/notifications.ts",
+  "scripts/jobs/campaigns-send.ts",
+  "scripts/jobs/campaign-stats.ts",
+  "scripts/jobs/consent-audit.ts",
+  "scripts/jobs/approvals-expire.ts",
+  "scripts/jobs/sla-check.ts",
+  "scripts/jobs/reports-refresh.ts",
+  "scripts/jobs/finance-snapshot.ts",
+  "scripts/jobs/weekly-report.ts",
+  "scripts/jobs/email-tracking-purge.ts",
+  "scripts/jobs/staff-sessions-sweep.ts",
 ];
 
 let failed = 0;

@@ -66,7 +66,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `PUBLISH_STORE`: `local` (default) builds into `.local-sites`; `cloudflare` uploads to R2 and KV
    - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_KV_NAMESPACE_ID`, `CLOUDFLARE_R2_BUCKET`: needed for `cloudflare`
    - `ROOT_DOMAIN`: the live root domain, default `get-on.tech`
-   - `ADMIN_EMAILS`: comma-separated emails allowed into `/admin`; empty disables it
+   - Staff console: identity comes from `platform_staff` and TOTP (AAL2), not an email allow-list. See `docs/admin.md`
    - `ABUSE_EMAIL`: where report notifications and abuse contacts go
 
    Legal pages:
@@ -122,7 +122,7 @@ This starts the app and the local site server at `http://localhost:8787`, servin
    pnpm --filter @get-on/sites-worker deploy
    ```
 4. Register `get-on.tech` with the Public Suffix List so each website gets browser isolation.
-5. Set `ADMIN_EMAILS` and `ABUSE_EMAIL`.
+5. Run `pnpm admin:bootstrap -- --email <address>` to create the first super admin, then set `ABUSE_EMAIL`.
 6. Check that the R2 REST upload keeps the `Content-Type` header the adapter sends. The adapter also verifies `index.html` by reading it back.
 
 ## Scripts
@@ -131,7 +131,7 @@ This starts the app and the local site server at `http://localhost:8787`, servin
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:e2e` (set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers cannot download)
-- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens, plus `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` for the admin screens)
+- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens, plus `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` (an MFA-enrolled staff account) for the staff screens)
 - `pnpm dev:all` (app plus the local published-site server)
 - `pnpm seed:site` (create the local `rosebakery` sample site)
 

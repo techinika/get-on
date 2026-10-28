@@ -1,4 +1,4 @@
-import { getSender, safeHeader } from "@get-on/email";
+import { describeEmailKind, getSender, safeHeader, type EmailStream } from "@get-on/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EmailKind =
@@ -37,9 +37,12 @@ export type SendEmailInput = {
   text: string;
   html: string;
   replyTo?: string;
-  fromName?: string;
-  from?: string;
   kind: EmailKind | string;
+  stream?: EmailStream;
+  /** @deprecated Sender names come from the stream. */
+  fromName?: string;
+  /** @deprecated Sender addresses come from the stream. */
+  from?: string;
   relatedType?: string;
   relatedId?: string;
 };
@@ -89,7 +92,7 @@ function normaliseEmail(value: string): string {
   return value.trim().toLowerCase();
 }
 
-function isTransient(error: unknown): boolean {
+export function isTransient(error: unknown): boolean {
   const value = error as { name?: string; code?: string; $metadata?: { httpStatusCode?: number } };
   const status = value?.$metadata?.httpStatusCode ?? 0;
   if (status >= 500) return true;
@@ -128,7 +131,7 @@ async function overDailyGuard(admin: AdminClient, kind: string): Promise<boolean
   return (await sentTodayCount(admin)) >= Math.floor(limit * 0.9);
 }
 
-async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0]) {
+export async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0]) {
   return Promise.race([
     getSender().send(message),
     new Promise<never>((_, reject) =>
@@ -137,7 +140,7 @@ async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>[
   ]);
 }
 
-function nextAttempt(attempts: number): string {
+export function nextAttempt(attempts: number): string {
   const minutes = RETRY_MINUTES[Math.min(Math.max(attempts - 1, 0), RETRY_MINUTES.length - 1)] ?? 60;
   return new Date(Date.now() + minutes * 60 * 1000).toISOString();
 }
@@ -150,16 +153,12 @@ function nextAttempt(attempts: number): string {
 export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const to = normaliseEmail(input.to);
   const subject = safeHeader(input.subject, 180);
-  const from = billingSender(input.kind);
+  const stream = input.stream ?? describeEmailKind(input.kind).stream;
+  const message = { ...input, to, subject, stream };
   const admin = adminOrNull();
   if (!admin) {
     try {
-      const result = await sendWithTimeout({
-        ...input,
-        to,
-        subject,
-        from,
-      });
+      const result = await sendWithTimeout(message);
       return { status: "sent", logId: null, messageId: result.id };
     } catch (error) {
       console.error("[email] send failed", error);
@@ -195,7 +194,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
       status: "queued",
       attempts: guarded ? 0 : 1,
       next_attempt_at: guarded ? new Date().toISOString() : null,
-      payload: { ...input, to, subject },
+      payload: message,
       related_type: input.relatedType ?? null,
       related_id: input.relatedId ?? null,
     })
@@ -213,7 +212,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   }
 
   try {
-    const result = await sendWithTimeout({ ...input, to, subject, from });
+    const result = await sendWithTimeout(message);
     await admin
       .from("email_log")
       .update({
@@ -304,9 +303,3 @@ export async function readMemoryOutbox() {
   return memorySender.messages;
 }
 
-
-/** Billing email uses its own verified identity; all other mail uses team@. */
-export function billingSender(kind: string): string | undefined {
-  if (!kind.startsWith("billing_")) return undefined;
-  return process.env.BILLING_EMAIL ?? "billing@contact.get-on.tech";
-}

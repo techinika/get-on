@@ -30,6 +30,17 @@
     "job:redirects-resync": "tsx scripts/jobs/redirects-resync.ts",
     "job:billing": "tsx scripts/jobs/billing.ts",
     "job:backfill-media-hashes": "tsx scripts/jobs/backfill-media-hashes.ts",
+    "job:notifications": "tsx scripts/jobs/notifications.ts",
+    "job:campaigns-send": "tsx scripts/jobs/campaigns-send.ts",
+    "job:campaign-stats": "tsx scripts/jobs/campaign-stats.ts",
+    "job:consent-audit": "tsx scripts/jobs/consent-audit.ts",
+    "job:approvals-expire": "tsx scripts/jobs/approvals-expire.ts",
+    "job:sla-check": "tsx scripts/jobs/sla-check.ts",
+    "job:reports-refresh": "tsx scripts/jobs/reports-refresh.ts",
+    "job:finance-snapshot": "tsx scripts/jobs/finance-snapshot.ts",
+    "job:weekly-report": "tsx scripts/jobs/weekly-report.ts",
+    "job:email-tracking-purge": "tsx scripts/jobs/email-tracking-purge.ts",
+    "job:staff-sessions-sweep": "tsx scripts/jobs/staff-sessions-sweep.ts",
     "job:all": "tsx scripts/jobs/all.ts",
     "job:domains": "tsx scripts/jobs/domains.ts",
     "job:domains-poll": "tsx scripts/jobs/domains.ts poll",
@@ -43,7 +54,9 @@
     "job:ai-expire": "tsx scripts/jobs/ai.ts expire",
     "job:ai-payloads": "tsx scripts/jobs/ai.ts payloads",
     "job:rebuild-published": "tsx scripts/jobs/rebuild-published.ts",
-    "art:templates": "tsx scripts/generate-template-art.ts"
+    "art:templates": "tsx scripts/generate-template-art.ts",
+    "staff:docs": "tsx scripts/generate-staff-permissions.ts",
+    "admin:bootstrap": "tsx scripts/admin-bootstrap.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

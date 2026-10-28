@@ -172,7 +172,7 @@ When a publish is stopped for review the dialog shows the "Under review" InfoBox
 - Metadata: title "Report a website | Get-On", `noindex`.
 
 ### 9.3 Admin console (`/admin`, internal)
-- Only people whose email is in `ADMIN_EMAILS` may open it. Everyone else gets the standard 404 page, so the console cannot be found by guessing the address.
+- Only platform staff with two-step sign-in may open it. Everyone else gets the standard 404 page, so the console cannot be found by guessing the address. See `docs/admin.md`.
 - It uses the dashboard shell (same sidebar and top bar as the rest of the app) with an extra "Admin" item at the bottom of the sidebar, marked with a small shield icon.
 - **Overview** (`/admin`): three cards in a row (stack on mobile): "Live websites" (count of published sites), "Waiting for review" (count of `review_state = 'pending'` sites, link to the list) and "Reports today" (count of `abuse_reports` in the last 24 hours). Below them, a table of the sites that need attention: each row shows the website address, the owner email, the reason (reason text or "Reported"), the time and a button to open the site.
 - **Site list** (`/admin/sites`): a search field ("Search by address or owner email") above a table with columns: website address, owner, status (Live, Not published, Under review, Suspended), last published, reports. Rows are sortable by last published and by reports. The search filters as you type. An empty result shows "No websites match that search."

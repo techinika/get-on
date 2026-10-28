@@ -15,8 +15,8 @@ import {
   requestSiteReview,
   takeSiteOffline,
   type AdminActionResult,
-} from "@/app/admin/actions";
-import type { AdminReport } from "@/lib/admin-data";
+} from "@/app/admin/(console)/actions";
+import type { AdminSiteReport } from "@/lib/admin";
 import { REPORT_REASON_LABELS } from "@/lib/report";
 import { relativeTime } from "@/lib/relative-time";
 
@@ -212,7 +212,7 @@ export function ReportList({
   reports,
 }: {
   siteId: string;
-  reports: AdminReport[];
+  reports: AdminSiteReport[];
 }) {
   const router = useRouter();
   const { toast } = useToast();

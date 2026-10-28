@@ -8,7 +8,7 @@ import * as React from "react";
 const OPTIONS: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
   { value: "light", label: "Light", icon: Sun },
   { value: "dark", label: "Dark", icon: Moon },
-  { value: "system", label: "Match my device", icon: Monitor },
+  { value: "system", label: "System", icon: Monitor },
 ];
 
 const CHANGE_EVENT = "get-on-theme-change";
