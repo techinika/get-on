@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import {
   emailLayout,
   emailKindUsesConsent,
@@ -13,6 +14,12 @@ import {
   nextAttempt,
   sendWithTimeout,
 } from "@/lib/email/send";
+import {
+  addOpenPixel,
+  rewriteTrackedLinks,
+  trackableLinks,
+  trackingOrigin,
+} from "@/lib/email/tracking";
 
 const MAX_ATTEMPTS = 5;
 
@@ -70,7 +77,7 @@ async function marketingStatus(admin: AdminClient) {
   const [{ data: settings }, { data: emailSettings }] = await Promise.all([
     admin
       .from("marketing_settings")
-      .select("paused,pause_reason,unsubscribe_base,physical_address")
+      .select("paused,pause_reason,unsubscribe_base,physical_address,tracking_base")
       .eq("id", true)
       .maybeSingle(),
     admin.from("email_settings").select("marketing_paused").eq("id", true).maybeSingle(),
@@ -82,6 +89,7 @@ async function marketingStatus(admin: AdminClient) {
       settings?.unsubscribe_base ?? "https://get-on.tech/email/unsubscribe",
     ),
     physicalAddress: settings?.physical_address ? String(settings.physical_address) : null,
+    trackingBase: settings?.tracking_base ? String(settings.tracking_base) : null,
   };
 }
 
@@ -101,6 +109,32 @@ async function latestMarketingConsent(admin: AdminClient, userId: string): Promi
     .limit(1)
     .maybeSingle();
   return consent ? Boolean(consent.granted) : true;
+}
+
+
+async function addTracking(
+  admin: AdminClient,
+  row: OutboxRow,
+  html: string,
+  unsubscribeUrl: string,
+  settingBase: string | null,
+): Promise<string> {
+  const origin = trackingOrigin(settingBase || process.env.EMAIL_TRACKING_BASE);
+  if (!origin) return html;
+
+  const replacements = new Map<string, string>();
+  for (const url of trackableLinks(html, unsubscribeUrl)) {
+    const token = randomBytes(24).toString("hex");
+    const { error } = await admin.from("email_tracking_links").insert({
+      outbox_id: row.id,
+      token,
+      url,
+    });
+    if (!error) replacements.set(url, `${origin}/email/click/${token}`);
+  }
+
+  const tracked = rewriteTrackedLinks(html, replacements);
+  return addOpenPixel(tracked, `${origin}/email/open/${row.id}`);
 }
 
 async function buildMessage(
@@ -138,13 +172,14 @@ async function buildMessage(
       unsubscribeUrl,
       physicalAddress: settings.physicalAddress,
     });
+    const html = await addTracking(admin, row, rendered.html, unsubscribeUrl, settings.trackingBase);
     return {
       stream: "marketing",
       kind: row.kind,
       message: {
         to,
         subject: rendered.subject,
-        html: rendered.html,
+        html,
         text: rendered.text,
         kind: row.kind,
         stream: "marketing",

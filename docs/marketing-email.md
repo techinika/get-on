@@ -182,10 +182,26 @@ keeps the address blocked.
 
 ## 8. Tracking
 
-`email_tracking_links` and `email_tracking_opens` are keyed by outbox row.
-`pnpm job:email-tracking-purge` deletes both after 24 months. The click/open
-endpoints, the `EMAIL_TRACKING_BASE` rewrite and any reporting screen are not
-built yet. Tracking must stay optional and must not block the unsubscribe link.
+Tracking is optional. It turns on when `marketing_settings.tracking_base` (or
+`EMAIL_TRACKING_BASE`) has an http(s) origin. The base is an origin such as
+`https://get-on.tech`; the routes add their own path.
+
+When it is on, the outbox:
+
+- rewrites each unique http(s) link to
+  `/email/click/{token}` and stores the original URL in
+  `email_tracking_links`;
+- leaves the unsubscribe link, `mailto:` links and relative links alone;
+- adds a one-pixel image at `/email/open/{outboxId}`.
+
+`email_track_click(token)` increments the count and returns the stored URL;
+the route then redirects. `email_track_open(outboxId)` inserts or increments
+the open row. Both are service-role-only, atomic and do not store an IP
+address or user agent. A failed link insert keeps the original link, so
+tracking can never break the message.
+
+`pnpm job:email-tracking-purge` deletes both tables' rows after 24 months. The
+marketing report view is not built yet.
 
 ## 9. Operations
 
@@ -207,5 +223,5 @@ shown to staff.
   The database and jobs are ready; staff currently need SQL or a script.
 - Campaign approval is not wired to a UI.
 - The complaint/bounce guards need a scheduled calculation and a pause action.
-- Tracking endpoints and the marketing report view remain to be built.
+- The marketing report view remains to be built.
 - The campaign preview and test-send screens are not built.
