@@ -972,6 +972,7 @@ export async function refundPayment(input: {
   amountCents: number;
   reason: string;
   actorId: string | null;
+  approvalId?: string | null;
 }): Promise<{ status: string; message: string }> {
   const admin = createAdminClient();
   const { data: payment } = await admin
@@ -1011,6 +1012,7 @@ export async function refundPayment(input: {
       reason: input.reason.trim(),
       status: "requested",
       created_by: input.actorId,
+      approval_id: input.approvalId ?? null,
     })
     .select("id")
     .single();
@@ -1081,7 +1083,11 @@ export async function refundPayment(input: {
       amount_cents: -input.amountCents,
       currency: String(payment.currency),
       description: "Refund processed",
-      metadata: { reason: input.reason.trim(), provider_reference: result.providerReference },
+      metadata: {
+        reason: input.reason.trim(),
+        provider_reference: result.providerReference,
+        ...(input.approvalId ? { approval_id: input.approvalId } : {}),
+      },
       created_by: input.actorId,
     });
     const { data: invoice } = await admin

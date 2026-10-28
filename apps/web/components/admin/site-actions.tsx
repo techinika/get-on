@@ -15,21 +15,30 @@ import {
   requestSiteReview,
   takeSiteOffline,
   type AdminActionResult,
-} from "@/app/admin/actions";
-import type { AdminReport } from "@/lib/admin-data";
+} from "@/app/admin/(console)/actions";
+import type { AdminSiteReport } from "@/lib/admin";
 import { REPORT_REASON_LABELS } from "@/lib/report";
 import { relativeTime } from "@/lib/relative-time";
+import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 
 export function SiteActions({
   siteId,
   address,
   suspended,
   reviewPending,
+  canTakeDownDirect,
+  canTakeDownRequest,
+  canReinstateDirect,
+  canReinstateRequest,
 }: {
   siteId: string;
   address: string;
   suspended: boolean;
   reviewPending: boolean;
+  canTakeDownDirect: boolean;
+  canTakeDownRequest: boolean;
+  canReinstateDirect: boolean;
+  canReinstateRequest: boolean;
 }) {
   const router = useRouter();
   const { toast } = useToast();
@@ -69,19 +78,27 @@ export function SiteActions({
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap gap-2">
         {suspended ? (
-          <Button
-            variant="primary"
-            size="md"
-            type="button"
-            loading={pending === "online"}
-            onClick={() =>
-              void run("online", () => bringSiteOnline(siteId), "The website is live again.")
-            }
-          >
-            <ShieldCheck size={18} strokeWidth={1.75} aria-hidden />
-            Bring back online
-          </Button>
-        ) : (
+          canReinstateDirect ? (
+            <Button
+              variant="primary"
+              size="md"
+              type="button"
+              loading={pending === "online"}
+              onClick={() =>
+                void run("online", () => bringSiteOnline(siteId), "The website is live again.")
+              }
+            >
+              <ShieldCheck size={18} strokeWidth={1.75} aria-hidden />
+              Bring back online
+            </Button>
+          ) : canReinstateRequest ? (
+            <RequestApprovalLink
+              kind="website_reinstate"
+              targetId={siteId}
+              label="Request reinstatement"
+            />
+          ) : null
+        ) : canTakeDownDirect ? (
           <Button
             variant="danger-outline"
             size="md"
@@ -95,7 +112,14 @@ export function SiteActions({
             <WifiOff size={18} strokeWidth={1.75} aria-hidden />
             Take offline
           </Button>
-        )}
+        ) : canTakeDownRequest ? (
+          <RequestApprovalLink
+            kind="website_takedown"
+            targetId={siteId}
+            label="Request takedown"
+            variant="danger-outline"
+          />
+        ) : null}
 
         {reviewPending ? (
           <Button
@@ -212,7 +236,7 @@ export function ReportList({
   reports,
 }: {
   siteId: string;
-  reports: AdminReport[];
+  reports: AdminSiteReport[];
 }) {
   const router = useRouter();
   const { toast } = useToast();

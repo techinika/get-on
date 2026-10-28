@@ -241,3 +241,115 @@ export function teamNoticeEmail(opts: {
   ].filter(Boolean).join('\n');
   return { subject: title, html, text };
 }
+
+export interface MarketingBlock {
+  type: 'heading' | 'paragraph' | 'bullet' | 'button' | 'quote' | 'divider';
+  text?: string;
+  label?: string;
+  url?: string;
+}
+
+export interface MarketingContent {
+  heading?: string;
+  intro?: string;
+  blocks?: MarketingBlock[];
+  footer?: string;
+}
+
+function safeMarketingUrl(value: string | undefined): string | null {
+  const raw = sanitizeLine(value).slice(0, 500);
+  if (!raw) return null;
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+function marketingBlock(block: MarketingBlock): { html: string; text: string } | null {
+  const text = sanitizeLine(block.text).slice(0, 2000);
+  if (block.type === 'divider') {
+    return { html: '<hr style="border:0;border-top:1px solid #E8DFD0;margin:24px 0;">', text: '' };
+  }
+  if (block.type === 'button') {
+    const url = safeMarketingUrl(block.url);
+    if (!url) return null;
+    const label = sanitizeLine(block.label || block.text).slice(0, 60) || 'Open Get-On';
+    return { html: button(url, label), text: `${label}: ${url}` };
+  }
+  if (!text) return null;
+  if (block.type === 'heading') {
+    return {
+      html: `<h2 style="margin:24px 0 8px 0;font-size:20px;line-height:1.3;color:#1F1A17;">${escapeHtml(text)}</h2>`,
+      text,
+    };
+  }
+  if (block.type === 'quote') {
+    return {
+      html: `<blockquote style="margin:16px 0;padding:12px 16px;background:#F6F0E6;border-left:3px solid #0B6B4F;color:#1F1A17;">${escapeHtml(text)}</blockquote>`,
+      text: `"${text}"`,
+    };
+  }
+  if (block.type === 'bullet') {
+    return { html: `<ul style="margin:0 0 16px 20px;padding:0;"><li>${escapeHtml(text)}</li></ul>`, text: `- ${text}` };
+  }
+  return { html: `<p style="margin:0 0 16px 0;">${escapeHtml(text)}</p>`, text };
+}
+
+/**
+ * Marketing campaigns use plain content blocks, never raw HTML. Every link is
+ * checked and every value is escaped before it reaches the layout.
+ */
+export function marketingCampaignEmail(opts: {
+  subject: string;
+  preheader?: string | null;
+  content?: MarketingContent | null;
+  unsubscribeUrl: string;
+  physicalAddress?: string | null;
+  reason?: string | null;
+}) {
+  const subject = sanitizeLine(opts.subject).slice(0, 60) || 'Get-On update';
+  const preheader = sanitizeLine(opts.preheader).slice(0, 110) || undefined;
+  const content = opts.content ?? {};
+  const heading = sanitizeLine(content.heading).slice(0, 120);
+  const intro = sanitizeLine(content.intro).slice(0, 600);
+  const blocks = (content.blocks ?? []).slice(0, 40).map(marketingBlock).filter(Boolean) as Array<{
+    html: string;
+    text: string;
+  }>;
+  const footer = sanitizeLine(content.footer).slice(0, 300);
+  const address = sanitizeLine(opts.physicalAddress).slice(0, 200);
+  const body = [
+    heading ? `<h1 style="margin:0 0 16px 0;font-size:24px;line-height:1.3;color:#1F1A17;">${escapeHtml(heading)}</h1>` : '',
+    intro ? `<p style="margin:0 0 16px 0;">${escapeHtml(intro)}</p>` : '',
+    ...blocks.map((block) => block.html),
+    footer ? `<p style="margin:24px 0 0 0;font-size:13px;color:#6B6158;">${escapeHtml(footer)}</p>` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+  const html = emailLayout({
+    title: subject,
+    preheader,
+    body: body || `<p style="margin:0 0 16px 0;">${escapeHtml(subject)}</p>`,
+    footer: address || undefined,
+    reason:
+      sanitizeLine(opts.reason).slice(0, 200) ||
+      'You are getting this because you opted in to Get-On updates.',
+    unsubscribeUrl: opts.unsubscribeUrl,
+  });
+  const text = [
+    heading,
+    intro,
+    '',
+    ...blocks.map((block) => block.text).filter(Boolean),
+    footer,
+    '',
+    'Turn off marketing email: ' + opts.unsubscribeUrl,
+    address,
+  ]
+    .filter((line) => line !== undefined && line !== null && line !== '')
+    .join('\n');
+  return { subject, html, text };
+}

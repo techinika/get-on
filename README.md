@@ -2,7 +2,7 @@
 
 Get-On helps non-technical small business owners create a website quickly. Users sign up, get a personal team, and build websites inside teams.
 
-This repository contains the app: Next.js web app, Supabase schema and migrations, landing and auth pages, the dashboard, the 6-step website wizard, the project area, publishing to `{name}.get-on.tech`, the report and admin moderation flows, and the legal pages.
+This repository contains the app: Next.js web app, Supabase schema and migrations, landing and auth pages, the dashboard, the 6-step website wizard, the project area, publishing to `{name}.get-on.tech`, the report and admin moderation flows, the staff console, and the legal pages.
 
 ## Documentation
 - `docs/ui-spec.md` - the original UI specification (scaffolding, auth, landing, dashboard, wizard, project area).
@@ -10,6 +10,13 @@ This repository contains the app: Next.js web app, Supabase schema and migration
 - `docs/ui-spec-editor.md` - the visual editor, site look, images library, version history and preview, plus what is still to be built.
 - `docs/ui-spec-publish.md` - publishing, public site pages, safety/moderation, the report page and the admin console.
 - `docs/legal.md` - legal pages setup, company details, review markers and the pre-launch checklist.
+- `docs/admin.md` - staff roles, the privacy boundary and the admin console.
+- `docs/ui-spec-admin.md` - the admin and email screens.
+- `docs/email-system.md` - streams, outbox, consent, delivery events and jobs.
+- `docs/marketing-email.md` - opt-in campaigns, segments, limits and operations.
+- `docs/approvals.md` - four-eyes requests, policy thresholds and execution.
+- `docs/support-cases.md` - cases, notes, SLA and support screens.
+- `docs/reports.md` - report snapshots, finance months and the weekly report.
 - `docs/ai.md` - AI architecture, providers, pipeline and invariants.
 - `docs/ai-spike.md` - Workers AI and AI Gateway research and manual checks.
 - `docs/ai-prompts.md`, `docs/credits.md`, `docs/skill-packs.md` - AI prompt, credit and skill-pack rules.
@@ -42,7 +49,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `NEXT_PUBLIC_SITE_URL`: app URL (local default: `http://localhost:3000`)
    - `NEXT_PUBLIC_SUPABASE_URL`: local or hosted Supabase URL
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`: anon key for that Supabase project
-   - `SUPABASE_SERVICE_ROLE_KEY`: service role key, only used on the server for demo requests, publishing and the admin console
+   - `SUPABASE_SERVICE_ROLE_KEY`: service role key, only used on the server for demo requests, publishing, jobs and privileged staff operations. The staff console reads metadata through RPCs and never uses it directly.
    - `NEXT_PUBLIC_ENABLE_GOOGLE_AUTH`: `true` to show Google auth button
    - `SUPPORT_EMAIL`: support mailbox for help panel
    - `SUPPORT_WHATSAPP_NUMBER`: WhatsApp number in international format, no `+`
@@ -52,8 +59,8 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    Request-a-demo (see `apps/web/.env.example` for the full list):
    - `IP_HASH_SALT`: salt used to hash the visitor IP for rate limiting
    - `FORM_TOKEN_SECRET`: secret used to sign the form timing token
-   - `TEAM_EMAIL`, `EMAIL_TRANSPORT`, AWS SES keys: Amazon SES for all platform emails (see docs/ses-setup.md). Without credentials emails are logged to the console instead.
-   - `EMAIL_FROM`: the from address for those emails
+   - `EMAIL_PROVIDER`, AWS SES keys and the three `SES_CONFIGURATION_SET_*` names: Amazon SES for all platform emails (see `docs/ses-setup.md` and `docs/email-system.md`). Without credentials email is logged to the console.
+   - `TEAM_EMAIL`: the human Reply-To and legal/support contact. Sender addresses are fixed per stream and must not be set in the environment.
    - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys. When the secret is set, the form must pass Turnstile
    - `NEXT_PUBLIC_COOKIE_CONSENT`: set to `true` to show the cookie notice
 
@@ -66,7 +73,7 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `PUBLISH_STORE`: `local` (default) builds into `.local-sites`; `cloudflare` uploads to R2 and KV
    - `CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_KV_NAMESPACE_ID`, `CLOUDFLARE_R2_BUCKET`: needed for `cloudflare`
    - `ROOT_DOMAIN`: the live root domain, default `get-on.tech`
-   - `ADMIN_EMAILS`: comma-separated emails allowed into `/admin`; empty disables it
+   - Staff console: identity comes from `platform_staff` and TOTP (AAL2), not an email allow-list. See `docs/admin.md`
    - `ABUSE_EMAIL`: where report notifications and abuse contacts go
 
    Legal pages:
@@ -122,7 +129,7 @@ This starts the app and the local site server at `http://localhost:8787`, servin
    pnpm --filter @get-on/sites-worker deploy
    ```
 4. Register `get-on.tech` with the Public Suffix List so each website gets browser isolation.
-5. Set `ADMIN_EMAILS` and `ABUSE_EMAIL`.
+5. Run `pnpm admin:bootstrap -- --email <address>` to create the first super admin, then set `ABUSE_EMAIL`.
 6. Check that the R2 REST upload keeps the `Content-Type` header the adapter sends. The adapter also verifies `index.html` by reading it back.
 
 ## Scripts
@@ -131,7 +138,7 @@ This starts the app and the local site server at `http://localhost:8787`, servin
 - `pnpm test`
 - `pnpm build`
 - `pnpm test:e2e` (set `PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` if browsers cannot download)
-- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens, plus `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` for the admin screens)
+- `pnpm screenshots` (captures `docs/screenshots/` at 360 to 1440 px in light and dark; add `E2E_SCREENSHOTS=1` for signed-in screens, plus `E2E_ADMIN_EMAIL` and `E2E_ADMIN_PASSWORD` (an MFA-enrolled staff account) for the staff screens)
 - `pnpm dev:all` (app plus the local published-site server)
 - `pnpm seed:site` (create the local `rosebakery` sample site)
 

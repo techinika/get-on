@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { hashIp } from "@/lib/spam";
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -55,5 +57,35 @@ export async function updatePassword(formData: FormData): Promise<ActionResult> 
     return { ok: false, error: "We could not change your password. Please try again." };
   }
 
+  return { ok: true };
+}
+
+/** Turns marketing email on or off and records the choice. */
+export async function updateMarketingConsent(enabled: boolean): Promise<ActionResult> {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return { ok: false, error: "Please sign in again." };
+  }
+
+  const headerList = await headers();
+  const ip =
+    headerList.get("x-forwarded-for")?.split(",")[0]?.trim() ??
+    headerList.get("x-real-ip") ??
+    null;
+  const { error } = await supabase.rpc("email_preference_set", {
+    p_marketing_opt_in: enabled,
+    p_source: "account",
+    p_ip_hash: enabled ? hashIp(ip) : null,
+    p_user_agent: headerList.get("user-agent"),
+  });
+
+  if (error) {
+    return { ok: false, error: "We could not save that. Please try again." };
+  }
+
+  revalidatePath("/dashboard/account");
   return { ok: true };
 }

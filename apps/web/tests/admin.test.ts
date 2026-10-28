@@ -1,30 +1,37 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { adminEmails, isAdminEmail } from "@/lib/admin";
-import { adminSiteStatus } from "@/lib/admin-data";
+import { describe, expect, it } from "vitest";
+import {
+  forbiddenTables,
+  isForbiddenTable,
+  staffActionIds,
+  staffCan,
+  staffMatrix,
+} from "@get-on/permissions";
+import { adminSiteStatus } from "@/lib/admin/site-status";
 
-const previous = process.env.ADMIN_EMAILS;
-
-afterEach(() => {
-  if (previous === undefined) delete process.env.ADMIN_EMAILS;
-  else process.env.ADMIN_EMAILS = previous;
-});
-
-describe("admin access", () => {
-  it("reads a comma-separated list and ignores blanks", () => {
-    process.env.ADMIN_EMAILS = " A@Example.com, ,b@example.com ";
-    expect(adminEmails()).toEqual(["a@example.com", "b@example.com"]);
+describe("staff permissions", () => {
+  it("gives a super admin every staff permission", () => {
+    for (const action of staffActionIds) {
+      expect(staffCan("super_admin", action), action).toBe(true);
+    }
   });
 
-  it("matches email case-insensitively", () => {
-    process.env.ADMIN_EMAILS = "a@example.com";
-    expect(isAdminEmail(" A@EXAMPLE.COM ")).toBe(true);
-    expect(isAdminEmail("someone@example.com")).toBe(false);
-    expect(isAdminEmail(null)).toBe(false);
+  it("keeps money, access and staff changes away from customer success", () => {
+    expect(staffCan("customer_success", "account.view")).toBe(true);
+    expect(staffCan("customer_success", "billing.payment_status")).toBe(true);
+    expect(staffCan("customer_success", "billing.refund.request")).toBe(true);
+    expect(staffCan("customer_success", "billing.refund.approve")).toBe(false);
+    expect(staffCan("customer_success", "billing.refund.direct")).toBe(false);
+    expect(staffCan("customer_success", "staff.manage")).toBe(false);
+    expect(staffCan("customer_success", "marketing.campaign.send")).toBe(false);
+    expect(staffCan("customer_success", "finance.close")).toBe(false);
   });
 
-  it("allows nobody when the list is empty", () => {
-    process.env.ADMIN_EMAILS = "";
-    expect(isAdminEmail("owner@example.com")).toBe(false);
+  it("never lets staff into customer content", () => {
+    for (const table of ["pages", "publishes", "contact_messages", "ai_payloads", "backups"]) {
+      expect(isForbiddenTable(table), table).toBe(true);
+    }
+    expect(forbiddenTables).not.toContain("teams");
+    expect(staffMatrix["account.view"].customer_success).toBe(true);
   });
 });
 
