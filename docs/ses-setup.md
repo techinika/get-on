@@ -1,94 +1,168 @@
 # Amazon SES setup for Get-On
 
-This document describes the steps to send all platform emails through Amazon SES. Normal platform mail uses `team@get-on.tech`; billing mail uses `billing@contact.get-on.tech`.
+All platform email goes through Amazon SES. The app is the only sender; Supabase
+Auth uses SES SMTP only for sign-in and account emails.
 
-## 1) Verify the domain
-1. In SES, go to **Verified identities** → **Create identity** → **Domain** and enter `get-on.tech`.
-2. Choose **Easy DKIM** (RSA 2048-bit). SES will provide three CNAME records.
-3. In Cloudflare DNS for `get-on.tech`, add those three CNAME records with **Proxy status = DNS only (grey cloud)**.
-4. Wait for verification (can take a few minutes).
+Read this with `docs/email-system.md` and `docs/marketing-email.md`. The stream
+and sender rules are in `packages/email/src/streams.ts`; do not add a new From
+address outside that file.
 
-## 2) Custom MAIL FROM domain
-1. In the domain identity, set a custom MAIL FROM domain (e.g. `contact.get-on.tech`).
-2. Add the MX record SES provides (priority as shown) and the SPF TXT record (`v=spf1 include:amazonses.com ~all` or as instructed).
-3. Verify the MAIL FROM domain in SES.
+## 1. Verify the sending domain
 
-## 3) DMARC
-Add a TXT record at `_dmarc.get-on.tech` starting at `p=none`:
+1. In SES, open **Verified identities** → **Create identity** → **Domain** and
+   enter `contact.get-on.tech`.
+2. Choose **Easy DKIM** (RSA 2048-bit).
+3. Add the three CNAME records in Cloudflare DNS with **Proxy status = DNS only**
+   (grey cloud).
+4. Wait for the identity to verify.
+
+`get-on.tech` must also stay verified for the human mailboxes and the
+`team@get-on.tech` Reply-To. `contact.get-on.tech` is the sending subdomain.
+
+## 2. Custom MAIL FROM
+
+1. Set a custom MAIL FROM domain such as `mail.contact.get-on.tech`.
+2. Add the MX record SES gives you.
+3. Add the SPF TXT record (`v=spf1 include:amazonses.com ~all` unless SES shows
+   something different).
+4. Verify the MAIL FROM domain.
+
+Keeping the envelope domain separate from the visible From domain protects the
+main domain's reputation.
+
+## 3. DMARC
+
+Start at `_dmarc.contact.get-on.tech` with:
+
 ```
-v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.example; adkim=r; aspf=r
+v=DMARC1; p=none; rua=mailto:dmarc@get-on.tech; adkim=r; aspf=r
 ```
-Monitor reports, then move to `p=quarantine` and eventually `p=reject` when stable.
 
-## 4) Request production access
-If in the SES sandbox, request production access in **Account dashboard → Request production access**. Include a short use-case description (transactional emails for a website builder platform: contact form notifications, auth emails, support/demo emails).
+Move to `p=quarantine` and then `p=reject` only after the reports are clean.
+Keep DMARC on the parent `get-on.tech` consistent with the subdomain policy.
 
-## 5) Configuration set and SNS events
-1. Create a configuration set (e.g. `get-on-emails`).
-2. Create an SNS topic for SES events.
-3. Add an event destination in the configuration set for `Bounce`, `Complaint`, `Delivery`, `Reject` publishing to the SNS topic.
-4. Create an HTTPS subscription to `https://your-app-domain.com/api/webhooks/ses` (or your app origin). Confirm the subscription via the confirmation URL.
+## 4. Request production access
 
-## 6) IAM user (least privilege)
-Create an IAM user with a policy allowing `ses:SendEmail`, `ses:SendRawEmail` restricted to the verified identity and configuration set.
+If the account is in the SES sandbox, request production access from **Account
+dashboard → Request production access**. Describe transactional website
+notifications, account email, billing and opt-in product updates.
 
-## 7) SMTP credentials for Supabase Auth
-In SES, go to **SMTP settings → Create SMTP credentials**. Use these in Supabase Auth → SMTP Settings with sender `team@get-on.tech` and display name `Get-On`.
+## 5. Three configuration sets
 
-## 8) Receive mail at team@get-on.tech
-Use Cloudflare Email Routing to forward `team@get-on.tech` to a real mailbox. Ensure SPF does not conflict between routing and SES sending; use the MAIL FROM domain to manage sending identity separately.
+Create one configuration set per stream. They keep reputation and event data
+separate.
 
-## 8b) Verify billing@contact.get-on.tech
-1. Verify `contact.get-on.tech` as an SES identity (or add it to the verified `get-on.tech` domain setup).
-2. Confirm the address can send through the same configuration set.
-3. Set `BILLING_EMAIL=billing@contact.get-on.tech` in production. Billing receipts, renewal reminders and payment failure notices use this address with Reply-To `team@get-on.tech`; every other email keeps `team@get-on.tech`.
+| Configuration set | Stream | From |
+|---|---|---|
+| `gs-transactional` | Service and account email | `no-reply@contact.get-on.tech` |
+| `gs-billing` | Invoices, receipts, payment issues | `billing@contact.get-on.tech` |
+| `gs-marketing` | Opt-in campaigns | `no-reply@contact.get-on.tech` |
 
-## 9) Testing
-Use SES mailbox simulator addresses to test bounces/complaints: `bounce@simulator.amazonses.com`, `complaint@simulator.amazonses.com`, `success@simulator.amazonses.com`.
+For each set:
 
-## Environment variables
-See `.env.example` for required values.
+1. Add an event destination for **Delivery**, **Bounce**, **Complaint** and
+   **Reject**.
+2. Publish the events to the same SNS topic used by
+   `/api/webhooks/ses`.
+3. Keep the destination enabled for both success and failure events.
 
-## App environment variables
+The app sends the set name in `ConfigurationSetName`. The environment names are
+`SES_CONFIGURATION_SET_TRANSACTIONAL`, `SES_CONFIGURATION_SET_BILLING` and
+`SES_CONFIGURATION_SET_MARKETING`. The values above are the defaults, so the
+variables are optional unless the names differ.
+
+## 6. SNS topic and webhook
+
+1. Create one SNS topic for SES events.
+2. Add an HTTPS subscription to
+   `https://{APP_ORIGIN}/api/webhooks/ses`.
+3. Confirm the subscription. The route checks the SNS signature and certificate
+   URL before confirming.
+4. Set `SES_SNS_TOPIC_ARN` in the app so messages from another topic are
+   rejected.
+
+The route:
+
+- verifies the SNS envelope in `apps/web/lib/email/sns.ts`;
+- stores Delivery/Bounce/Complaint/Reject in `email_events`;
+- suppresses permanent bounces and complaints;
+- marks the matching `email_log` row failed;
+- answers quickly and ignores duplicates.
+
+## 7. IAM user
+
+Create a least-privilege IAM user that can call `ses:SendEmail` and
+`ses:SendRawEmail` for the verified identity and the three configuration sets.
+Do not give the app console access or identity-management rights.
+
+Store `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` only in the server
+environment.
+
+## 8. Supabase Auth SMTP
+
+Use SES SMTP credentials in Supabase Auth → SMTP Settings:
+
+- From: `no-reply@contact.get-on.tech`
+- Sender name: `Get-On`
+- Reply-To: `team@get-on.tech` when the Supabase project supports it
+
+Supabase Auth uses the `auth`, `password_reset`, `email_verification` and
+`magic_link` kinds. They belong to the transactional stream even though
+Supabase sends them.
+
+## 9. Human mailboxes
+
+Use Cloudflare Email Routing (or another mailbox provider) for
+`team@get-on.tech`, `billing@contact.get-on.tech` and the legal/abuse addresses.
+These addresses receive mail; they are not the sending identity.
+
+`team@get-on.tech` is the Reply-To for transactional and marketing mail.
+`billing@contact.get-on.tech` is both From and Reply-To for billing mail.
+
+## 10. Testing
+
+Use the SES mailbox simulator:
+
+- `success@simulator.amazonses.com`
+- `bounce@simulator.amazonses.com`
+- `complaint@simulator.amazonses.com`
+
+Check that:
+
+- `/admin/email` shows the sent or failed row;
+- the bounce or complaint creates an `email_suppressions` row;
+- a repeat send to that address is suppressed;
+- the marketing pause switch prevents new marketing claims;
+- the unsubscribe function turns marketing off.
+
+## 11. Environment
+
 | Variable | Purpose |
 |---|---|
-| `TEAM_EMAIL` | Default From address. Defaults to `team@get-on.tech`. |
-| `BILLING_EMAIL` | Billing From address. Defaults to `billing@contact.get-on.tech`. Billing emails also use the display name `Get-On Billing`. |
-| `EMAIL_TRANSPORT` | `ses`, `console` or `memory`. When unset, SES is used if `AWS_ACCESS_KEY_ID` exists, otherwise console. |
-| `AWS_REGION` | SES region, e.g. `eu-west-1`. |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | IAM user credentials. Keep them server-side only. |
-| `SES_CONFIGURATION_SET` | Configuration set that publishes Delivery/Bounce/Complaint events. |
-| `SES_SNS_TOPIC_ARN` | Optional check that incoming webhook messages came from this topic. |
-| `SES_DAILY_LIMIT` | Maximum sends per day before the 90% guard stops non-critical mail. |
-| `APP_ORIGIN` | Public app origin used for unsubscribe/confirmation links and the webhook URL. |
+| `EMAIL_PROVIDER` | Preferred transport switch: `ses`, `log`/`console`, `memory`/`fake`. |
+| `EMAIL_TRANSPORT` | Older name still read by `readTransport()`; use `EMAIL_PROVIDER` for new setups. |
+| `AWS_REGION` | SES region, for example `eu-west-1`. |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | SES API credentials. Server only. |
+| `SES_CONFIGURATION_SET_TRANSACTIONAL` | Transactional configuration set. |
+| `SES_CONFIGURATION_SET_BILLING` | Billing configuration set. |
+| `SES_CONFIGURATION_SET_MARKETING` | Marketing configuration set. |
+| `SES_SNS_TOPIC_ARN` | Reject messages from any other SNS topic. |
+| `SES_DAILY_LIMIT` | Direct-send daily guard. |
+| `EMAIL_LOGO_URL` / `EMAIL_LOGO_2X_URL` | Public logo URLs for templates. |
+| `APP_ORIGIN` | Base for links and the SNS webhook. |
+| `EMAIL_TRACKING_BASE` | Base for tracked links when tracking is enabled. |
+| `MARKETING_TOKEN_SECRET` | Secret for signed marketing values where needed. |
 
-`EMAIL_TRANSPORT=console` logs the subject and recipient instead of sending. `EMAIL_TRANSPORT=memory` keeps messages in `memorySender.messages` for tests and `/api/dev/outbox` in development.
+`TEAM_EMAIL` remains the human contact address and the fallback for support and
+legal pages. It is not the From address.
 
-## Delivery behaviour
-- The app sends immediately with an 8 second timeout. A transient SES failure is queued, then retried after 1, 5, 30 and 60 minutes (at most 4 attempts).
-- Every attempt is written to `email_log`. Hard failures and suppressed addresses are not retried.
-- Addresses that bounce or complain are added to `email_suppressions` and skipped until an operator removes them.
-- At 90% of `SES_DAILY_LIMIT`, only critical mail is sent: `auth`, `recipient_verification` and `admin_alert`.
-- Run `pnpm job:email` once for a single pass, or leave it running as a worker (`EMAIL_QUEUE_INTERVAL_MS`, default 60000). It processes queued rows and prints a count.
-- Admin overview links to `/admin/email`, which lists recent attempts and blocked addresses.
+## 12. Pre-launch checks
 
-## Webhook
-- The SNS subscription is confirmed through `https://{APP_ORIGIN}/api/webhooks/ses`.
-- The route verifies the SNS signature and certificate chain, the topic ARN when set, and handles Delivery, Bounce, Complaint and Reject events idempotently.
-- A bounce or complaint writes a suppression row. The handler always answers SNS quickly with 200 once a message is understood.
-
-## Site Worker variables
-The published-site Worker needs these so the no-JS form pipeline can sign requests to the app:
-| Variable | Purpose |
-|---|---|
-| `APP_ORIGIN` | The app origin that receives `POST /api/public/forms/{formId}`. |
-| `WORKER_SHARED_SECRET` | Shared secret used to sign `x-gs-*` headers. Must match the app. |
-| `FORM_TOKEN_SECRET` | Signs the form token embedded in published pages. Rotate with `FORM_TOKEN_SECRET_PREVIOUS` so old pages keep working. |
-
-Set secrets with `wrangler secret put` for `WORKER_SHARED_SECRET` and `FORM_TOKEN_SECRET`; keep the app values identical. `ROOT_DOMAIN` must match the Worker's zone.
-
-## Smoke test
-1. Send a demo request in development with `EMAIL_TRANSPORT=console`; confirm it logs once.
-2. Set `EMAIL_TRANSPORT=ses` and send to a verified mailbox.
-3. Use the SES simulator (`success@`, `bounce@`, `complaint@simulator.amazonses.com`) and confirm `/admin/email` shows the sent row and any suppression.
-4. Publish a site with a contact form, submit it, and confirm the notification, the Messages inbox and the thank-you page.
+- All three configuration sets exist and publish to the SNS topic.
+- `contact.get-on.tech` DKIM, SPF and DMARC pass.
+- `SES_SNS_TOPIC_ARN` matches the live topic.
+- `EMAIL_PROVIDER=ses` in production.
+- `marketing_settings.physical_address` and `unsubscribe_base` are set before
+  the first campaign.
+- The public unsubscribe page is deployed before any marketing send.
+- Bounce and complaint events reach `/api/webhooks/ses` and write suppressions.

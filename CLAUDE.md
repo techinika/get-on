@@ -109,6 +109,14 @@ The site design system is prepared for a future "dark-mode" plugin:
 ## See also
 - docs/settings.md
 - docs/ui-spec-settings.md
+- docs/admin.md
+- docs/ui-spec-admin.md
+- docs/email-system.md
+- docs/marketing-email.md
+- docs/approvals.md
+- docs/support-cases.md
+- docs/reports.md
+- docs/ses-setup.md
 
 
 ## Website settings core rules
