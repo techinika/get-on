@@ -46,6 +46,49 @@ export function welcomeEmail(name?: string | null) {
   });
 }
 
+export function passwordResetEmail(input: { url: string; minutes: number }) {
+  return simpleEmail({
+    title: "Choose a new password",
+    preheader: "Use this link to choose a new password for your Get-On account.",
+    paragraphs: [
+      "Someone asked to reset the password for your Get-On account.",
+      `Open the link below to choose a new password. It works once and expires in ${input.minutes} minutes.`,
+      "If you did not ask for this, you can ignore this email. Your password has not changed.",
+    ],
+    action: { label: "Choose a new password", url: input.url },
+    reason: "You receive this email because someone asked to reset the password on your Get-On account.",
+  });
+}
+
+export function passwordChangedEmail(input: { when: string }) {
+  return simpleEmail({
+    title: "Your password was changed",
+    preheader: "Your Get-On password was changed and every device was signed out.",
+    paragraphs: [
+      `Your password was changed on ${input.when}.`,
+      "We signed you out on every device, including this one. Log in again with your new password.",
+      "If you did not change it, reset your password now and write to team@get-on.tech so we can help.",
+    ],
+    reason: "You receive this email because the password on your Get-On account was changed.",
+  });
+}
+
+export function accountSecuredEmail(input: { when: string; resetSent: boolean }) {
+  return simpleEmail({
+    title: "Your account was secured",
+    preheader: "We signed out every device on your Get-On account.",
+    paragraphs: [
+      `You told us that a sign-in you did not make happened on ${input.when}.`,
+      "We signed out every device on your account.",
+      input.resetSent
+        ? "We also sent you a link to choose a new password. Open it to finish securing your account."
+        : "Please choose a new password now.",
+      "If this was you after all, log in with your new password and continue as usual.",
+    ],
+    reason: "You receive this email because you secured your Get-On account.",
+  });
+}
+
 export function newDeviceEmail(input: { device: string; when: string; country?: string | null }) {
   return simpleEmail({
     title: "New sign-in to your Get-On account",

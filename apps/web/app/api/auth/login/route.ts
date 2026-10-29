@@ -22,6 +22,7 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 import { peekRateLimit, rateLimit } from "@/lib/security/rate-limit";
 import { POLICIES } from "@/lib/security/policies";
 import { hashBrowserBinding, newBindingValue } from "@/lib/security/otp";
+import { TOKEN_TTL, appOrigin, issueAuthToken } from "@/lib/auth/recovery";
 import { signToken, tokenSecret } from "@/lib/security/tokens";
 import { recordSecurityEvent } from "@/lib/security/events";
 import { getSecuritySettings } from "@/lib/security/settings";
@@ -150,6 +151,21 @@ export async function POST(request: Request) {
   await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
   await touchDevice({ userId, deviceIdHash: deviceHash, label: ua });
 
+  // The code email carries a "secure my account" link, so a sign-in the owner
+  // did not make can be stopped from the email itself.
+  let notMeUrl: string | null = null;
+  try {
+    const notMe = await issueAuthToken({
+      userId,
+      purpose: "not_me",
+      ttlSeconds: TOKEN_TTL.notMe,
+      meta: { sessionId },
+    });
+    notMeUrl = `${appOrigin(request)}/security/not-me?t=${encodeURIComponent(notMe.token)}`;
+  } catch {
+    notMeUrl = null;
+  }
+
   let challenge;
   try {
     challenge = await emailOtpProvider.challenge("login", {
@@ -159,6 +175,7 @@ export async function POST(request: Request) {
       browserBindingHash: bindingHash,
       ipHash,
       uaFamily: ua,
+      notMeBaseUrl: notMeUrl,
     });
   } catch {
     return loginFailed(request, "SOMETHING_WRONG", next);
