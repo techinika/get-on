@@ -16,6 +16,12 @@ export async function proxy(request: NextRequest) {
     });
   }
 
+  // Email verification gate: a session without a verified email cannot reach
+  // the dashboard; send them to the code-entry page instead.
+  const verified = Boolean((user as { email_confirmed_at?: string | null } | null)?.email_confirmed_at);
+  if (user && !verified && path.startsWith("/dashboard")) {
+    return NextResponse.redirect(new URL("/verify-email", request.url));
+  }
   if (!user && path.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
