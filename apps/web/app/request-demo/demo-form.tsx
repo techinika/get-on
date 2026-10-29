@@ -14,7 +14,7 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea } from "@/components/ui/input";
 import { submitDemoRequest } from "@/app/request-demo/actions";
-import { Turnstile } from "@/app/request-demo/turnstile";
+import { Turnstile } from "@/components/turnstile";
 import {
   MEETING_METHOD_OPTIONS,
   PREFERRED_TIME_OPTIONS,

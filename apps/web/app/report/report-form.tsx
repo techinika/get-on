@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input, Label, Textarea, FieldError } from "@/components/ui/input";
-import { Turnstile } from "@/app/request-demo/turnstile";
+import { Turnstile } from "@/components/turnstile";
 import { submitReport, type ReportResult } from "@/app/report/actions";
 import { REPORT_REASONS } from "@/lib/report";
 import { cn } from "@/lib/utils";

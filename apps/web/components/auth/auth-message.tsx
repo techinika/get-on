@@ -2,6 +2,7 @@
 
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
+import { SECURITY_MESSAGES } from "@/lib/security/messages";
 
 export function AuthMessage() {
   const searchParams = useSearchParams();
@@ -9,13 +10,14 @@ export function AuthMessage() {
   const message = searchParams.get("message");
 
   if (error) {
+    const text = (SECURITY_MESSAGES as Record<string, string>)[error] ?? error;
     return (
       <div
         role="alert"
         className="mt-6 flex items-start gap-2.5 rounded-input border border-danger-border bg-danger-soft px-3.5 py-3 text-sm text-danger-text"
       >
         <AlertCircle size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-danger" />
-        <span>{error}</span>
+        <span>{text}</span>
       </div>
     );
   }

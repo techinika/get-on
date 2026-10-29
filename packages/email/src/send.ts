@@ -20,7 +20,8 @@ export function readTransport(): EmailTransport {
   if (value === 'ses') return 'ses';
   if (value === 'log' || value === 'console') return 'console';
   if (value === 'memory' || value === 'fake') return 'memory';
-  return process.env.AWS_ACCESS_KEY_ID ? 'ses' : 'console';
+  // Fall back to SES only if AWS creds are explicitly present
+  return process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY && process.env.AWS_REGION ? 'ses' : 'console';
 }
 
 export function getSender(transport: EmailTransport = readTransport()): EmailSender {
