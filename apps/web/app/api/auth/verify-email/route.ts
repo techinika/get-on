@@ -19,6 +19,7 @@ import { enqueueEmail } from "@/lib/email/enqueue";
 import { welcomeEmail } from "@/lib/email/account-emails";
 import { newBindingValue, hashBrowserBinding } from "@/lib/security/otp";
 import { tokenSecret } from "@/lib/security/tokens";
+import { grantFreeEntitlements } from "@/lib/provisioning";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +145,9 @@ export async function POST(request: Request) {
     dedupeKey: `welcome:${result.userId}`,
     payload: { subject: welcome.subject, text: welcome.text, html: welcome.html },
   });
+
+  // Grant free plan entitlements (25 AI credits, plan defaults, etc.) synchronously
+  await grantFreeEntitlements(result.userId);
 
   await recordSecurityEvent({
     userId: result.userId,

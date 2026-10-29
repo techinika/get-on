@@ -1,3 +1,4 @@
+See `docs/ui-spec-analytics-capacity.md` for platform analytics, SEO, capacity and dashboard UI; it wins where it conflicts with earlier specs for the Visitors page, website cards, team dashboard and admin AI Models and Capacity pages.
 See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.
 See `docs/ui-spec-billing.md` for Plan and billing, checkout, invoices and renewal; it wins where it conflicts.
 See `docs/ui-spec-settings.md` for the Settings area.

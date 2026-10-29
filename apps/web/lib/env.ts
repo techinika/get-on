@@ -14,6 +14,7 @@ interface Env {
   supabaseUrl: string;
   supabaseAnonKey: string;
   siteUrl: string;
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: string;
   FIELD_KEYS: string;
   FIELD_KEY_CURRENT: number;
   HEARTBEAT_URL: string;

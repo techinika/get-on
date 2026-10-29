@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { LegalPage } from "@/components/legal/legal-page";
 import { legalDocument } from "@/lib/legal-content";
+import { AnalyticsLoader, GaConsentBanner } from "@/components/analytics";
 
 const document = legalDocument("terms");
 
@@ -16,5 +17,11 @@ export const metadata: Metadata = {
 };
 
 export default function TermsPage() {
-  return <LegalPage document={document} />;
+  return (
+    <>
+      <LegalPage document={document} />
+      <AnalyticsLoader />
+      <GaConsentBanner />
+    </>
+  );
 }

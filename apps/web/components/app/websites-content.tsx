@@ -20,6 +20,7 @@ import { Section } from "@/components/app/section";
 import { AppCard } from "@/components/app/card";
 import { AppEmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Sparkline, TrendBadge } from "@/components/analytics/sparkline";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
@@ -354,6 +355,11 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
                 Edited {relativeTime(website.updatedAt)}
               </span>
             )}
+            {/* Growth sparkline and trend badge */}
+            <div className="mt-3 flex items-baseline gap-2">
+              <Sparkline projectId={website.id} sparklineDays={30} />
+              <TrendBadge projectId={website.id} />
+            </div>
             <div className="relative z-10">
               <ShareMenu url={website.primaryHost ? primaryAddress(readPublishConfig(), website.subdomain, website.primaryHost) : `https://${website.subdomain}.get-on.tech`} label={website.name} />
               <button

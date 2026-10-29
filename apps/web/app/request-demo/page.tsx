@@ -5,6 +5,7 @@ import { DemoEyebrow, DemoForm, DemoReassuranceChips, DemoSteps } from "./demo-f
 import { createTimeToken } from "@/lib/spam";
 import { createClient } from "@/lib/supabase/server";
 import env from "@/lib/env";
+import { AnalyticsLoader, GaConsentBanner } from "@/components/analytics";
 
 export const metadata: Metadata = {
   title: "Request a demo",
@@ -102,6 +103,8 @@ export default async function RequestDemoPage({
         </section>
       </main>
       <LandingFooter />
+      <AnalyticsLoader />
+      <GaConsentBanner />
     </>
   );
 }
