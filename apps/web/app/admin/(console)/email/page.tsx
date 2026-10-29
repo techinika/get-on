@@ -83,29 +83,29 @@ export default async function AdminEmailPage({
   }, []);
 
   useEffect(() => {
-    if (selectedProvider !== "smtp") return;
-
-    async function loadSmtpSettings() {
-      try {
-        const supabase = createAdminClient();
-        const { data } = await supabase
-          .from("email_settings")
-          .select("*")
-          .eq("id", true)
-          .maybeSingle();
-        if (data) {
-          setSmtpHost(data.smtp_host || "");
-          setSmtpPort(data.smtp_port ?? 587);
-          setSmtpSecure(data.smtp_secure ?? false);
-          setSmtpUser(data.smtp_user || "");
-          setSmtpFrom(data.smtp_from || "");
-          setSmtpName(data.smtp_name || "Get-On");
+    if (selectedProvider === "smtp") {
+      async function loadSmtpSettings() {
+        try {
+          const supabase = createAdminClient();
+          const { data } = await supabase
+            .from("email_settings")
+            .select("*")
+            .eq("id", true)
+            .maybeSingle();
+          if (data) {
+            setSmtpHost(data.smtp_host || "");
+            setSmtpPort(data.smtp_port ?? 587);
+            setSmtpSecure(data.smtp_secure ?? false);
+            setSmtpUser(data.smtp_user || "");
+            setSmtpFrom(data.smtp_from || "");
+            setSmtpName(data.smtp_name || "Get-On");
+          }
+        } catch (error) {
+          console.error("[admin] failed to load SMTP settings", error);
         }
-      } catch (error) {
-        console.error("[admin] failed to load SMTP settings", error);
       }
+      loadSmtpSettings();
     }
-    loadSmtpSettings();
   }, [selectedProvider]);
 
   const handleSave = async (e: React.FormEvent) => {
