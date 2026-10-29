@@ -110,13 +110,13 @@ begin
 
   v_domain := split_part(lower(v_email), '@', 2);
   if exists (select 1 from public.blocked_email_domains where domain = v_domain) then
-    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_BLOCKED', 'http_code': 400));
+    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_BLOCKED', 'http_code', 400));
   end if;
   if exists (select 1 from public.disposable_email_domains where domain = v_domain) then
-    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_DISPOSABLE', 'http_code': 400));
+    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_DISPOSABLE', 'http_code', 400));
   end if;
   if exists (select 1 from public.profiles where email_canonical = v_canonical and duplicate_of is null) then
-    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_EXISTS', 'http_code': 400));
+    return jsonb_build_object('error', jsonb_build_object('message', 'AUTH_EMAIL_EXISTS', 'http_code', 400));
   end if;
 
   return jsonb_build_object('decision', 'continue');
