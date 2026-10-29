@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getEmailSummary, listEmailLog, listEmailSuppressions } from "@/lib/admin";
 import { relativeTime } from "@/lib/relative-time";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { useEffect, useState } from "react";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +37,7 @@ function statusVariant(status: EmailRow["status"]) {
 }
 
 const FILTERS = ["all", "queued", "sent", "failed", "suppressed"] as const;
+const PROVIDERS = ["ses", "smtp", "console", "memory"] as const;
 
 export default async function AdminEmailPage({
   searchParams,
@@ -52,6 +55,103 @@ export default async function AdminEmailPage({
     : "all";
   const rows = active === "all" ? logs : logs.filter((row) => row.status === active);
 
+  const [selectedProvider, setSelectedProvider] = useState<typeof PROVIDERS[number]>("console");
+  const [smtpHost, setSmtpHost] = useState<string>("");
+  const [smtpPort, setSmtpPort] = useState<number>(587);
+  const [smtpSecure, setSmtpSecure] = useState<string>("false");
+  const [smtpUser, setSmtpUser] = useState<string>("");
+  const [smtpFrom, setSmtpFrom] = useState<string>("");
+  const [smtpName, setSmtpName] = useState<string>("");
+
+  useEffect(() => {
+    async function loadSettings() {
+      try {
+        const supabase = createAdminClient();
+        const { data } = await supabase
+          .from("email_settings")
+          .select("email_provider")
+          .eq("id", true)
+          .maybeSingle();
+        if (data?.email_provider && PROVIDERS.includes(data.email_provider)) {
+          setSelectedProvider(data.email_provider as typeof PROVIDERS[number]);
+        }
+      } catch (error) {
+        console.error("[admin] failed to load email settings", error);
+      }
+    }
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    if (selectedProvider !== "smtp") return;
+
+    async function loadSmtpSettings() {
+      try {
+        const supabase = createAdminClient();
+        const { data } = await supabase
+          .from("email_settings")
+          .select("*")
+          .eq("id", true)
+          .maybeSingle();
+        if (data) {
+          setSmtpHost(data.smtp_host || "");
+          setSmtpPort(data.smtp_port ?? 587);
+          setSmtpSecure(data.smtp_secure ?? false);
+          setSmtpUser(data.smtp_user || "");
+          setSmtpFrom(data.smtp_from || "");
+          setSmtpName(data.smtp_name || "Get-On");
+        }
+      } catch (error) {
+        console.error("[admin] failed to load SMTP settings", error);
+      }
+    }
+    loadSmtpSettings();
+  }, [selectedProvider]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const supabase = createAdminClient();
+      await supabase.rpc("admin_set_email_provider", {
+        p_provider: selectedProvider,
+      });
+
+      if (selectedProvider === "smtp") {
+        await supabase.rpc("admin_set_smtp_settings", {
+          p_host: smtpHost,
+          p_port: smtpPort,
+          p_secure: smtpSecure === "true",
+          p_user: smtpUser,
+          p_from: smtpFrom,
+          p_name: smtpName,
+        });
+      }
+
+      // Reload settings
+      setSelectedProvider(selectedProvider);
+      if (selectedProvider === "smtp") {
+        setSmtpHost(smtpHost);
+        setSmtpPort(smtpPort);
+        setSmtpSecure(smtpSecure);
+        setSmtpUser(smtpUser);
+        setSmtpFrom(smtpFrom);
+        setSmtpName(smtpName);
+      }
+    } catch (error) {
+      console.error("[admin] failed to save email settings", error);
+    }
+  };
+
+  const resetForm = () => {
+    setSelectedProvider("console");
+    setSmtpHost("");
+    setSmtpPort(587);
+    setSmtpSecure("false");
+    setSmtpUser("");
+    setSmtpFrom("");
+    setSmtpName("Get-On");
+  };
+
   return (
     <AppPage width="wide">
       <PageHeader
@@ -64,7 +164,112 @@ export default async function AdminEmailPage({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-4">
+      <form
+        className="mt-6 space-y-4 max-w-2xl"
+        onSubmit={handleSave}
+      >
+        <div>
+          <label className="text-sm font-medium text-text">Email provider</label>
+          <select
+            value={selectedProvider}
+            onChange={(e) => setSelectedProvider(e.target.value as typeof PROVIDERS[number])}
+            className="mt-1 block w-full rounded-md border-input p-2"
+          >
+            {PROVIDERS.map((provider) => (
+              <option key={provider} value={provider}>
+                {provider[0].toUpperCase() + provider.slice(1)}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {selectedProvider === "smtp" && (
+          <div>
+            <div>
+              <label className="text-sm font-medium text-text">SMTP Host</label>
+              <input
+                type="text"
+                value={smtpHost}
+                onChange={(e) => setSmtpHost(e.target.value)}
+                className="mt-1 block w-full rounded-md border-input p-2"
+                placeholder="smtp.example.com"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4 mt-4">
+              <div>
+                <label className="text-sm font-medium text-text">SMTP Port</label>
+                <input
+                  type="number"
+                  value={smtpPort}
+                  onChange={(e) => setSmtpPort(Number(e.target.value))}
+                  className="mt-1 block w-full rounded-md border-input p-2"
+                  min="1"
+                  placeholder="587"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-text">SMTP Secure</label>
+                <select
+                  value={smtpSecure}
+                  onChange={(e) => setSmtpSecure((e.target as HTMLSelectElement).value)}
+                  className="mt-1 block w-full rounded-md border-input p-2"
+                >
+                  <option value="true">True (SSL/TLS)</option>
+                  <option value="false">False (STARTTLS)</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text">SMTP User</label>
+              <input
+                type="text"
+                value={smtpUser}
+                onChange={(e) => setSmtpUser(e.target.value)}
+                className="mt-1 block w-full rounded-md border-input p-2"
+                placeholder="user@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text">SMTP From</label>
+              <input
+                type="text"
+                value={smtpFrom}
+                onChange={(e) => setSmtpFrom(e.target.value)}
+                className="mt-1 block w-full rounded-md border-input p-2"
+                placeholder="no-reply@example.com"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text">SMTP Name</label>
+              <input
+                type="text"
+                value={smtpName}
+                onChange={(e) => setSmtpName(e.target.value)}
+                className="mt-1 block w-full rounded-md border-input p-2"
+                placeholder="Get-On"
+              />
+            </div>
+          </div>
+        )}
+
+        <div className="mt-6">
+          <button
+            type="submit"
+            className="rounded-md bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary/90"
+          >
+            Save email provider
+          </button>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="ml-2 rounded-md bg-secondary px-4 py-2 text-sm font-semibold text-secondary hover:bg-secondary/90"
+          >
+            Reset
+          </button>
+        </div>
+      </form>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <AppCard className="p-5">
           <p className="text-sm text-text-muted">Queued</p>
           <p className="text-stat-number mt-1 text-text">{summary.queued ?? 0}</p>

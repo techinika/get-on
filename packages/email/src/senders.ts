@@ -1,5 +1,8 @@
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { EMAIL_STREAMS, streamForKind, type EmailStream } from "./streams";
+// nodemailer is provided at runtime; this package currently does not expose TypeScript declarations.
+// @ts-expect-error -- no declaration file is available for nodemailer in this workspace.
+import nodemailer from "nodemailer";
 import type { EmailMessage, EmailSender, EmailSendResult } from "./types";
 
 const runtimeEnv = (
@@ -78,6 +81,60 @@ export class SesSender implements EmailSender {
 
     const res = await this.client.send(command);
     return { id: res.MessageId || "" };
+  }
+}
+
+export class SmtpSender implements EmailSender {
+  private transporter: nodemailer.Transporter;
+  private from: string;
+  private name: string;
+  private configurationSet?: string;
+
+  constructor(opts: {
+    host: string;
+    port: number;
+    secure: boolean;
+    auth: { user: string; pass: string };
+    from?: string;
+    name?: string;
+    configurationSet?: string;
+  }) {
+    const {
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+      from,
+      name,
+      configurationSet,
+    } = opts;
+    this.transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: { user, pass },
+    });
+    this.from = from || "noreply@contact.get-on.tech";
+    this.name = name || "Get-On";
+    this.configurationSet = configurationSet;
+  }
+
+  async send(message: EmailMessage): Promise<EmailSendResult> {
+    const stream = streamForMessage(message);
+    const definition = EMAIL_STREAMS[stream];
+
+    const fromEmail = `"${safeFromName(this.name ?? definition.fromName)}" <${safeHeader(this.from || definition.from, 254)}>`;
+
+    const info = await this.transporter.sendMail({
+      from: fromEmail,
+      to: message.to,
+      subject: safeHeader(message.subject, 180),
+      text: message.text,
+      html: message.html,
+      replyTo: message.replyTo,
+    });
+
+    return { id: info.messageId };
   }
 }
 
