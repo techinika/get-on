@@ -56,7 +56,8 @@
     "job:rebuild-published": "tsx scripts/jobs/rebuild-published.ts",
     "art:templates": "tsx scripts/generate-template-art.ts",
     "staff:docs": "tsx scripts/generate-staff-permissions.ts",
-    "admin:bootstrap": "tsx scripts/admin-bootstrap.ts"
+    "admin:bootstrap": "tsx scripts/admin-bootstrap.ts",
+    "security:gen-rls": "tsx scripts/security-gen-rls.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
