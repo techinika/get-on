@@ -75,6 +75,19 @@ describe("approval summaries", () => {
     expect(lines.some((line) => line.label === "nested")).toBe(false);
   });
 
+  it("summarises a credit adjustment", () => {
+    const credit = {
+      kind: "credit_adjust",
+      target_type: "team",
+      target_id: "12345678-abcd-4000-8000-123456789012",
+      payload: { amount_cents: 15000, team_name: "Acme" },
+    };
+    expect(approvalAmount(credit)).toBe("$150.00");
+    expect(approvalSummary(credit)).toBe(
+      "Adjust the credit balance for Acme by $150.00.",
+    );
+  });
+
   it("explains dual control and single-operator mode", () => {
     expect(
       approvalThreshold({
@@ -113,11 +126,12 @@ describe("approval summaries", () => {
     expect(approvalHasExecutor("credits_limit")).toBe(true);
     expect(approvalHasExecutor("domain_plan_lapse")).toBe(true);
     expect(approvalHasExecutor("manual_payment")).toBe(true);
+    expect(approvalHasExecutor("credit_adjust")).toBe(true);
     expect(approvalHasExecutor("grace_extend")).toBe(true);
     expect(approvalHasExecutor("billing_hold")).toBe(true);
     expect(approvalHasExecutor("website_plan_pause")).toBe(true);
     expect(approvalHasExecutor("template_publish")).toBe(true);
-    expect(approvalHasExecutor("account_delete")).toBe(false);
+    expect(approvalHasExecutor("account_delete")).toBe(true);
   });
 
   it("names the template and version being published", () => {

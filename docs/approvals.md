@@ -134,6 +134,7 @@ are connected:
 |---|---|
 | `refund` | Re-reads the payment, checks the remaining amount, then calls `refundPayment` with the approval id. |
 | `manual_payment` | Re-reads the invoice, checks it is open and the amount equals the total, then records a `manual` payment through `billing_confirm_payment`. |
+| `credit_adjust` | Re-reads the team and adjustment amount, then calls `adjustBillingCredit` with the approval id. |
 | `access_grant` / `free_access` | Creates a plan grant through `admin_billing_create_grant`. |
 | `invoice_void` | Calls `admin_billing_void_invoice`. |
 | `plan_change` | Calls `admin_set_team_plan`. |
@@ -147,6 +148,7 @@ are connected:
 | `domain_review` | Approves, or rejects with the request reason. |
 | `domain_remove` | Removes the domain and its provider hostnames through the domain service. |
 | `domain_plan_lapse` | Re-checks the live domain, then pauses it with reason `plan` and writes `planLapsed` host pointers. |
+| `account_delete` | Deletes the team, all billing data and the owner's auth account through `admin_delete_account`. |
 | `template_publish` | Re-reads the system template and version, checks the package hash, then makes that version live through `admin_template_publish`. |
 
 The other kinds return a plain "not connected yet" error and change nothing.
@@ -220,8 +222,6 @@ rebuild permission.
 
 - Free access and AI credit requests are still started from New request with a
   pasted team id. The other record screens prefill the target.
-- The executor does not cover `credit_adjust` or `account_delete`, so those
-  kinds are hidden from New request.
 - "Request changes" closes the request as rejected. The requester must send a
   new request with the change.
 - Billing settings, discounts and other super-admin-only forms are still shown

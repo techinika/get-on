@@ -174,12 +174,16 @@ export function NewApprovalRequestForm({
           </div>
         ) : null}
 
-        {config.extra === "refund_amount" || config.extra === "payment_amount" ? (
+        {config.extra === "refund_amount" ||
+        config.extra === "payment_amount" ||
+        config.extra === "credit_amount" ? (
           <div>
             <Label htmlFor="request-amount">
               {config.extra === "refund_amount"
                 ? "Refund amount (USD)"
-                : "Payment amount (USD)"}
+                : config.extra === "payment_amount"
+                  ? "Payment amount (USD)"
+                  : "Credit amount (USD)"}
             </Label>
             <Input
               id="request-amount"

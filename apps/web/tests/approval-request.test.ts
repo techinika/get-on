@@ -17,11 +17,12 @@ describe("approval request builder", () => {
     expect(kinds).toContain("credits_limit");
     expect(kinds).toContain("domain_plan_lapse");
     expect(kinds).toContain("manual_payment");
+    expect(kinds).toContain("credit_adjust");
     expect(kinds).toContain("grace_extend");
     expect(kinds).toContain("billing_hold");
     expect(kinds).toContain("website_plan_pause");
     expect(kinds).toContain("template_publish");
-    expect(kinds).not.toContain("account_delete");
+    expect(kinds).toContain("account_delete");
     expect(approvalRequestKind("refund")?.targetType).toBe("payment");
     expect(approvalRequestKind("credits_limit")?.targetType).toBe("ai");
     expect(approvalRequestKind("template_publish")?.targetType).toBe("template");
@@ -97,6 +98,47 @@ describe("approval request builder", () => {
         reason,
         payload: { invoice_id: target, amount_cents: 7999 },
         amountUsd: 79.99,
+        amountCredits: null,
+      },
+    });
+  });
+
+  it("builds a credit adjustment with cents", () => {
+    const credit = buildApprovalRequest({
+      kind: "credit_adjust",
+      targetId: target,
+      reason,
+      amountUsd: "150",
+    });
+    expect(credit).toEqual({
+      ok: true,
+      value: {
+        kind: "credit_adjust",
+        targetType: "team",
+        targetId: target,
+        reason,
+        payload: { team_id: target, amount_cents: 15000 },
+        amountUsd: 150,
+        amountCredits: null,
+      },
+    });
+  });
+
+  it("builds an account deletion request", () => {
+    const result = buildApprovalRequest({
+      kind: "account_delete",
+      targetId: target,
+      reason,
+    });
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        kind: "account_delete",
+        targetType: "team",
+        targetId: target,
+        reason,
+        payload: {},
+        amountUsd: null,
         amountCredits: null,
       },
     });
@@ -260,6 +302,14 @@ describe("approval request builder", () => {
     expect(
       buildApprovalRequest({
         kind: "manual_payment",
+        targetId: target,
+        reason,
+        amountUsd: "0",
+      }).ok,
+    ).toBe(false);
+    expect(
+      buildApprovalRequest({
+        kind: "credit_adjust",
         targetId: target,
         reason,
         amountUsd: "0",

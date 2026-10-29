@@ -4,6 +4,7 @@ import type { ApprovalKind } from "@get-on/permissions";
 export type ApprovalRequestExtra =
   | "refund_amount"
   | "payment_amount"
+  | "credit_amount"
   | "credits"
   | "ai_limit"
   | "plan"
@@ -49,6 +50,15 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     targetLabel: "Invoice ID",
     targetHint: "Copy the invoice ID from the team's billing screen.",
     extra: "payment_amount",
+  },
+  {
+    kind: "credit_adjust",
+    label: "Adjust a credit balance",
+    description: "Add or remove account credit.",
+    targetType: "team",
+    targetLabel: "Team ID",
+    targetHint: "Copy the team ID from the team's billing screen.",
+    extra: "credit_amount",
   },
   {
     kind: "access_grant",
@@ -165,6 +175,15 @@ export const APPROVAL_REQUEST_KINDS: ApprovalRequestKind[] = [
     targetType: "domain",
     targetLabel: "Domain ID",
     targetHint: "Copy the domain ID from the domains list.",
+    extra: "none",
+  },
+  {
+    kind: "account_delete",
+    label: "Delete an account",
+    description: "Delete a customer account and everything in it.",
+    targetType: "team",
+    targetLabel: "Team ID",
+    targetHint: "Copy the team ID from the team's account screen.",
     extra: "none",
   },
   {
@@ -311,6 +330,21 @@ export function buildApprovalRequest(
     ) {
       return { ok: false, error: "The end date must be after the start date." };
     }
+  }
+
+  if (config.extra === "credit_amount") {
+    const raw = clean(input.amountUsd);
+    const amount = Number(raw);
+    const cents = Math.round(amount * 100);
+    if (!Number.isFinite(cents) || cents === 0 || Math.abs(cents) > 100_000_000) {
+      return {
+        ok: false,
+        error: "Add a credit amount between $0.01 and $1,000,000.",
+      };
+    }
+    amountUsd = Math.abs(cents / 100);
+    payload.team_id = targetId;
+    payload.amount_cents = cents;
   }
 
   if (config.extra === "credits") {

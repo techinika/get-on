@@ -260,6 +260,7 @@ export function approvalThreshold(
 const EXECUTABLE_KINDS = new Set<ApprovalKind>([
   "refund",
   "manual_payment",
+  "credit_adjust",
   "access_grant",
   "free_access",
   "invoice_void",
@@ -274,6 +275,7 @@ const EXECUTABLE_KINDS = new Set<ApprovalKind>([
   "domain_review",
   "domain_remove",
   "domain_plan_lapse",
+  "account_delete",
   "template_publish",
 ]);
 

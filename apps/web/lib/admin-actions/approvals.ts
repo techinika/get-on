@@ -15,7 +15,7 @@ import {
   setTeamPlan,
 } from "@/lib/admin/access";
 import { createBillingGrant, voidBillingInvoice } from "@/lib/admin/screens";
-import { BillingError, refundPayment } from "@/lib/billing/service";
+import { adjustBillingCredit, BillingError, refundPayment } from "@/lib/billing/service";
 import {
   approveDomain,
   pauseDomainForPlan,
@@ -244,6 +244,46 @@ async function runManualPayment(request: ApprovalRequest, staffId: string) {
       team_id: invoice.team_id,
       amount_cents: amountCents,
       provider_reference: reference,
+    },
+  }).catch(() => undefined);
+}
+
+async function runCreditAdjust(request: ApprovalRequest, staffId: string) {
+  if (request.target_type !== "team") unsupported();
+  const teamId = uuid(request.target_id, "team");
+  const payloadTeam = text(request.payload, "team_id");
+  if (payloadTeam && payloadTeam !== teamId) {
+    throw new ApprovalActionError(
+      "The team in this request no longer matches the target.",
+    );
+  }
+  const amountCents = integer(request.payload, ["amount_cents"]);
+  if (amountCents === null || amountCents === 0 || Math.abs(amountCents) > 100_000_000) {
+    throw new ApprovalActionError(
+      "This request needs a credit amount between $0.01 and $1,000,000.",
+    );
+  }
+
+  const result = await adjustBillingCredit({
+    teamId,
+    amountCents,
+    source: `approval:${request.id}`,
+    note: request.reason,
+    approvalId: request.id,
+    createdBy: staffId,
+  });
+  if (result.duplicate) return;
+
+  await recordStaffAction({
+    action: "billing.credit_adjusted",
+    targetType: "team",
+    targetId: teamId,
+    reason: request.reason,
+    approvalId: request.id,
+    details: {
+      team_id: teamId,
+      amount_cents: amountCents,
+      balance_cents: result.balanceCents,
     },
   }).catch(() => undefined);
 }
@@ -541,6 +581,52 @@ async function runDomainRemove(request: ApprovalRequest) {
   if (!result.ok) throw new ApprovalActionError(result.error);
 }
 
+async function runAccountDelete(request: ApprovalRequest, staffId: string) {
+  if (request.target_type !== "team") unsupported();
+  const teamId = uuid(request.target_id, "team");
+  const payloadTeam = text(request.payload, "team_id");
+  if (payloadTeam && payloadTeam !== teamId) {
+    throw new ApprovalActionError(
+      "The team in this request no longer matches the target.",
+    );
+  }
+
+  const admin = createAdminClient();
+  const { data: team } = await admin
+    .from("teams")
+    .select("id, owner_id, name")
+    .eq("id", teamId)
+    .maybeSingle();
+  if (!team) throw new ApprovalActionError("We could not find that team.");
+
+  const { data, error } = await admin.rpc("admin_delete_account", {
+    p_team: teamId,
+    p_reason: request.reason,
+  });
+  if (error) {
+    if (error.message.includes("ACCOUNT_IS_STAFF")) {
+      throw new ApprovalActionError(
+        "That account belongs to a staff member and cannot be deleted here.",
+      );
+    }
+    throw new ApprovalActionError("We could not delete that account.");
+  }
+
+  const ownerId = String((data as { owner_id?: unknown } | null)?.owner_id ?? "");
+  if (ownerId) {
+    await admin.auth.admin.deleteUser(ownerId).catch(() => undefined);
+  }
+
+  await recordStaffAction({
+    action: "account.deleted",
+    targetType: "team",
+    targetId: teamId,
+    reason: request.reason,
+    approvalId: request.id,
+    details: { team_id: teamId, owner_id: ownerId },
+  }).catch(() => undefined);
+}
+
 async function runTemplatePublish(request: ApprovalRequest) {
   if (request.target_type !== "template") unsupported();
   const templateId = uuid(request.target_id, "template");
@@ -616,6 +702,8 @@ async function dispatch(
       return runRefund(request, staffId);
     case "manual_payment":
       return runManualPayment(request, staffId);
+    case "credit_adjust":
+      return runCreditAdjust(request, staffId);
     case "access_grant":
     case "free_access":
       return runFreeAccess(request);
@@ -643,6 +731,8 @@ async function dispatch(
       return runDomainRemove(request);
     case "domain_plan_lapse":
       return runDomainPlanLapse(request);
+    case "account_delete":
+      return runAccountDelete(request, staffId);
     case "template_publish":
       return runTemplatePublish(request);
     default:

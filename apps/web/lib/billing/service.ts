@@ -169,6 +169,44 @@ export async function refreshTeamBilling(teamId: string): Promise<BillingAccess>
   return normalizeAccess((data ?? {}) as Row);
 }
 
+export async function getBillingAccountCredit(teamId: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("admin_credit_balance", {
+    p_team: teamId,
+  });
+  if (error) throw new BillingError("BILLING_CREDIT_FAILED", error.message);
+  return Number(data ?? 0);
+}
+
+export async function adjustBillingCredit(input: {
+  teamId: string;
+  amountCents: number;
+  source?: string;
+  note?: string;
+  approvalId?: string | null;
+  createdBy?: string | null;
+}): Promise<{ balanceCents: number; duplicate?: boolean }> {
+  const admin = createAdminClient();
+  const { data, error } = await admin.rpc("admin_credit_adjust", {
+    p_team: input.teamId,
+    p_amount_cents: input.amountCents,
+    p_currency: "USD",
+    p_source: input.source ?? "admin",
+    p_note: input.note ?? "Account credit",
+    p_approval_id: input.approvalId ?? null,
+    p_created_by: input.createdBy ?? null,
+  });
+  if (error) throw new BillingError("BILLING_CREDIT_FAILED", error.message);
+  const result = (data ?? {}) as Row;
+  if (result.ok !== true) {
+    throw new BillingError("BILLING_CREDIT_FAILED", "The credit adjustment did not complete.");
+  }
+  return {
+    balanceCents: Number(result.balance_cents ?? 0),
+    duplicate: result.duplicate === true,
+  };
+}
+
 export async function getBillingSettings(): Promise<BillingSettings> {
   const admin = createAdminClient();
   const { data } = await admin
@@ -446,6 +484,7 @@ export type CheckoutQuote = {
   chargeDiscountCents: number;
   chargeTaxCents: number;
   chargeTotalCents: number;
+  accountCreditCents: number;
   coverageStart: string;
   coverageEnd: string;
   couponMessage: string | null;
@@ -551,6 +590,11 @@ export async function buildCheckoutQuote(input: {
   const chargeTaxCents = Math.round(priced.taxCents * exchangeRate);
   const chargeTotalCents =
     chargeSubtotalCents - chargeDiscountCents + chargeTaxCents;
+  const accountCreditCents = Math.min(
+    Math.max(0, await getBillingAccountCredit(input.teamId)),
+    chargeTotalCents,
+  );
+  const chargeTotalAfterCredit = chargeTotalCents - accountCreditCents;
 
   const termLabel =
     termOptions.find((term) => term.months === input.months)?.label ??
@@ -568,7 +612,8 @@ export async function buildCheckoutQuote(input: {
     chargeSubtotalCents,
     chargeDiscountCents,
     chargeTaxCents,
-    chargeTotalCents,
+    chargeTotalCents: chargeTotalAfterCredit,
+    accountCreditCents,
     coverageStart: start.toISOString(),
     coverageEnd: end.toISOString(),
     couponMessage,
