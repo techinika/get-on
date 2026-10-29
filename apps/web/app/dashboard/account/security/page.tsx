@@ -2,18 +2,11 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 
 export default function SecurityPage() {
   const searchParams = useSearchParams();
-  const [email, setEmail] = React.useState("");
-
-  // Initialize email from URL params once on mount
-  useEffect(() => {
-    const emailFromParam = searchParams.get("email") || "";
-    setEmail(emailFromParam);
-  }, []);
+  const email = searchParams.get("email") || "";
 
   return (
     <div className="space-y-4">
