@@ -82,7 +82,7 @@ amount_usd, amount_credits)`:
   email through the outbox.
 
 Target types are `team`, `project`, `website`, `domain`, `invoice`, `payment`,
-`ai`, `staff` and `account`.
+`ai`, `staff`, `account` and `template`.
 
 The payload is data, not code. The executor must validate it again and must not
 trust it just because it was approved.
@@ -133,14 +133,23 @@ are connected:
 | Kind | What the executor does |
 |---|---|
 | `refund` | Re-reads the payment, checks the remaining amount, then calls `refundPayment` with the approval id. |
+| `manual_payment` | Re-reads the invoice, checks it is open and the amount equals the total, then records a `manual` payment through `billing_confirm_payment`. |
+| `credit_adjust` | Re-reads the team and adjustment amount, then calls `adjustBillingCredit` with the approval id. |
 | `access_grant` / `free_access` | Creates a plan grant through `admin_billing_create_grant`. |
 | `invoice_void` | Calls `admin_billing_void_invoice`. |
 | `plan_change` | Calls `admin_set_team_plan`. |
 | `ai_credits` | Adds an admin credit bucket through `grant_credits`, keyed by the approval id. |
+| `credits_limit` | Re-checks the active member, then sets `credit_member_caps.monthly_credits` through `admin_ai_set_member_limit`. |
+| `grace_extend` | Adds days to the team's grace window through `admin_billing_extend_grace`; the extension is stored per team and overlays the global setting. |
+| `billing_hold` | Places or releases a team billing hold through `admin_billing_set_hold`; the billing job still refreshes access but skips reminder emails while the hold is active. |
+| `website_plan_pause` | Keeps the live version in place, sets `planLapsed` on the site and live custom hosts, stores `projects.plan_paused_at`, and blocks new publishes with `PLAN_PAUSED`. |
 | `website_takedown` | Rebuilds the pointer as suspended and records a site flag. |
 | `website_reinstate` | Restores the last publish and resolves the suspension flag. |
 | `domain_review` | Approves, or rejects with the request reason. |
 | `domain_remove` | Removes the domain and its provider hostnames through the domain service. |
+| `domain_plan_lapse` | Re-checks the live domain, then pauses it with reason `plan` and writes `planLapsed` host pointers. |
+| `account_delete` | Deletes the team, all billing data and the owner's auth account through `admin_delete_account`. |
+| `template_publish` | Re-reads the system template and version, checks the package hash, then makes that version live through `admin_template_publish`. |
 
 The other kinds return a plain "not connected yet" error and change nothing.
 They need their own service function before they can be switched on.
@@ -213,10 +222,6 @@ rebuild permission.
 
 - Free access and AI credit requests are still started from New request with a
   pasted team id. The other record screens prefill the target.
-- The executor does not cover `manual_payment`, `credit_adjust`,
-  `grace_extend`, `billing_hold`, `credits_limit`, `website_plan_pause`,
-  `domain_plan_lapse`, `account_delete` or `template_publish`, so those kinds are
-  hidden from New request.
 - "Request changes" closes the request as rejected. The requester must send a
   new request with the change.
 - Billing settings, discounts and other super-admin-only forms are still shown

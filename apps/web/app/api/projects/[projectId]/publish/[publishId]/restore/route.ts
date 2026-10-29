@@ -36,7 +36,8 @@ export async function POST(_request: Request, { params }: Params) {
       const status =
         error.code === "PUBLISH_NOT_FOUND"
           ? 404
-          : error.code === "PUBLISH_NOT_RESTORABLE"
+          : error.code === "PUBLISH_NOT_RESTORABLE" ||
+              error.code === "PLAN_PAUSED"
             ? 409
             : error.code === "PUBLISH_NOT_CONFIGURED"
               ? 503

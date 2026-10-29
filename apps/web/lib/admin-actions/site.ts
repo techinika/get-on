@@ -20,7 +20,9 @@ async function projectRow(projectId: string) {
   const admin = createAdminClient();
   const { data } = await admin
     .from("projects")
-    .select("id, name, subdomain, team_id, suspended_at, review_state")
+    .select(
+      "id, name, subdomain, team_id, suspended_at, review_state, plan_paused_at",
+    )
     .eq("id", projectId)
     .maybeSingle();
   return { admin, project: data };
@@ -90,6 +92,57 @@ export async function takeSiteOffline(
     kind: "suspension",
     reason,
   });
+
+  return { ok: true };
+}
+
+export async function pauseSiteForPlan(
+  siteId: string,
+  reason: string,
+): Promise<SiteResult> {
+  const { admin, project } = await projectRow(siteId);
+  if (!project) return { ok: false, code: "NOT_FOUND" };
+  if (project.plan_paused_at) return { ok: true };
+  if (project.suspended_at) return { ok: false, code: "SUSPENDED" };
+
+  const publish = await latestSuccessfulPublish(admin, project.id);
+  if (!publish) return { ok: false, code: "NO_LIVE_VERSION" };
+
+  const config = readPublishConfig();
+  const store = createPublishStore(config);
+  const hostname = siteHostname(config, String(project.subdomain));
+  const existing = await store.getPointer(hostname);
+  if (!existing) return { ok: false, code: "NO_LIVE_VERSION" };
+
+  await store.writePointer(hostname, { ...existing, planLapsed: true });
+
+  const { data: domains } = await admin
+    .from("domains")
+    .select("id")
+    .eq("project_id", project.id)
+    .not("status", "in", "(removed,failed)");
+  const domainIds = (domains ?? []).map((domain) => String(domain.id));
+  if (domainIds.length > 0) {
+    const { data: hosts } = await admin
+      .from("domain_hostnames")
+      .select("hostname")
+      .in("domain_id", domainIds)
+      .eq("status", "live");
+    for (const host of hosts ?? []) {
+      await store.writeHostPointer(String(host.hostname), project.id, {
+        planLapsed: true,
+      });
+    }
+  }
+
+  const now = new Date().toISOString();
+  await admin
+    .from("projects")
+    .update({
+      plan_paused_at: now,
+      plan_paused_reason: reason,
+    })
+    .eq("id", project.id);
 
   return { ok: true };
 }

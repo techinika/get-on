@@ -150,6 +150,7 @@ export type ShellSidebarProps = {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   role?: "owner" | "admin" | "editor" | "viewer";
 };
 
@@ -161,6 +162,7 @@ export function ShellSidebar({
   collapsed,
   onToggleCollapsed,
   isAdmin = false,
+  isSuperAdmin = false,
   role = "viewer",
 }: ShellSidebarProps) {
   const pathname = usePathname();
@@ -538,6 +540,21 @@ export function ShellSidebar({
                   Approvals
                 </span>
               </Link>
+              {isSuperAdmin ? (
+                <Link
+                  href="/admin/templates"
+                  title={collapsed ? "Admin templates" : undefined}
+                  className={cn(
+                    "group relative flex h-11 items-center gap-3 rounded-input px-3 text-text transition-colors hover:bg-row-hover",
+                    collapsed && "mx-auto w-12 justify-center px-0",
+                  )}
+                >
+                  <LayoutTemplate size={20} strokeWidth={1.75} aria-hidden className="shrink-0" />
+                  <span className={cn("min-w-0 flex-1 truncate", collapsed ? "sr-only" : undefined)}>
+                    Templates
+                  </span>
+                </Link>
+              ) : null}
               <Link
                 href="/admin/referrals"
                 title={collapsed ? "Admin referrals" : undefined}

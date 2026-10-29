@@ -34,6 +34,21 @@ describe("approval summaries", () => {
     expect(approvalSummary(request)).toBe("Refund $240.00 to Acme.");
   });
 
+  it("describes placing and releasing a billing hold", () => {
+    const base = {
+      kind: "billing_hold",
+      target_type: "team",
+      target_id: "12345678-abcd-4000-8000-123456789012",
+      payload: { team_name: "Acme" },
+    };
+    expect(approvalSummary({ ...base, payload: { ...base.payload, action: "place" } })).toBe(
+      "Place a billing hold on Acme.",
+    );
+    expect(
+      approvalSummary({ ...base, payload: { ...base.payload, action: "release" } }),
+    ).toBe("Release a billing hold on Acme.");
+  });
+
   it("shows credits and plan names without raw JSON", () => {
     const credits = {
       kind: "ai_credits",
@@ -58,6 +73,19 @@ describe("approval summaries", () => {
     expect(lines).toContainEqual({ label: "Member reference", value: "12345678…" });
     expect(lines.some((line) => line.value.includes("secret"))).toBe(false);
     expect(lines.some((line) => line.label === "nested")).toBe(false);
+  });
+
+  it("summarises a credit adjustment", () => {
+    const credit = {
+      kind: "credit_adjust",
+      target_type: "team",
+      target_id: "12345678-abcd-4000-8000-123456789012",
+      payload: { amount_cents: 15000, team_name: "Acme" },
+    };
+    expect(approvalAmount(credit)).toBe("$150.00");
+    expect(approvalSummary(credit)).toBe(
+      "Adjust the credit balance for Acme by $150.00.",
+    );
   });
 
   it("explains dual control and single-operator mode", () => {
@@ -95,6 +123,27 @@ describe("approval summaries", () => {
   it("only reports executors that exist", () => {
     expect(approvalHasExecutor("refund")).toBe(true);
     expect(approvalHasExecutor("ai_credits")).toBe(true);
-    expect(approvalHasExecutor("manual_payment")).toBe(false);
+    expect(approvalHasExecutor("credits_limit")).toBe(true);
+    expect(approvalHasExecutor("domain_plan_lapse")).toBe(true);
+    expect(approvalHasExecutor("manual_payment")).toBe(true);
+    expect(approvalHasExecutor("credit_adjust")).toBe(true);
+    expect(approvalHasExecutor("grace_extend")).toBe(true);
+    expect(approvalHasExecutor("billing_hold")).toBe(true);
+    expect(approvalHasExecutor("website_plan_pause")).toBe(true);
+    expect(approvalHasExecutor("template_publish")).toBe(true);
+    expect(approvalHasExecutor("account_delete")).toBe(true);
+  });
+
+  it("names the template and version being published", () => {
+    const request = {
+      kind: "template_publish",
+      target_type: "template",
+      target_id: "12345678-abcd-4000-8000-123456789012",
+      payload: { template_name: "Starter", version: 3 },
+    };
+    expect(approvalTarget(request)).toBe("Starter");
+    expect(approvalSummary(request)).toBe(
+      "Publish Starter version 3 for new websites.",
+    );
   });
 });

@@ -11,6 +11,21 @@ import { paymentProviderName } from "../../lib/billing/provider";
 import { getPaymentProvider } from "../../lib/billing";
 import { createAdminClient } from "../../lib/supabase/admin";
 
+async function teamOnHold(
+  admin: ReturnType<typeof createAdminClient>,
+  teamId: string,
+  now: Date,
+): Promise<boolean> {
+  const { data: holds } = await admin
+    .from("billing_holds")
+    .select("ends_at")
+    .eq("team_id", teamId)
+    .is("released_at", null);
+  return (holds ?? []).some(
+    (hold) => !hold.ends_at || new Date(String(hold.ends_at)) > now,
+  );
+}
+
 async function main() {
   const admin = createAdminClient();
   const now = new Date();
@@ -70,11 +85,13 @@ async function main() {
       .eq("invoice_id", invoice.id)
       .eq("status", "reserved");
     expired += 1;
-    await notifyInvoiceExpired({
-      teamId: String(invoice.team_id),
-      invoiceId: String(invoice.id),
-      number: String(invoice.number),
-    }).catch(() => undefined);
+    if (!(await teamOnHold(admin, String(invoice.team_id), now))) {
+      await notifyInvoiceExpired({
+        teamId: String(invoice.team_id),
+        invoiceId: String(invoice.id),
+        number: String(invoice.number),
+      }).catch(() => undefined);
+    }
   }
 
   let from = 0;
@@ -93,6 +110,8 @@ async function main() {
       try {
         const access = await refreshTeamBilling(teamId);
         refreshed += 1;
+
+        if (await teamOnHold(admin, teamId, now)) continue;
 
         if (access.status === "active" && access.paidThrough) {
           const left = daysUntil(new Date(access.paidThrough), now);

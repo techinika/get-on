@@ -3,7 +3,7 @@ import {
   contactDigestEmail,
   contactNotificationEmail,
 } from "@get-on/email";
-import { sendEmail, type SendEmailResult } from "@/lib/email/send";
+import { enqueueEmail, type EnqueueEmailResult } from "@/lib/email/enqueue";
 import { parseContactSettings } from "@/lib/contact/settings";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import type { PlanId } from "@/lib/plans";
@@ -30,14 +30,6 @@ export type NotifyMessage = {
 
 function siteName(subdomain: string): string {
   return `${subdomain}.get-on.tech`;
-}
-
-function cleanBusinessName(value: string): string {
-  return value
-    .replace(/[^\p{L}\p{N} .,'&!?-]/gu, "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 60) || "A Get-On website";
 }
 
 async function ownerEmail(admin: Admin, teamId: string): Promise<string | null> {
@@ -102,7 +94,7 @@ async function notifyRecipients(
   admin: Admin,
   message: NotifyMessage,
   recipients: string[],
-): Promise<SendEmailResult[]> {
+): Promise<EnqueueEmailResult[]> {
   const address = primaryAddress(
     readPublishConfig(),
     message.subdomain,
@@ -117,19 +109,21 @@ async function notifyRecipients(
     message: message.message,
     messagesUrl: messagesUrl(message.projectId),
   });
-  const results: SendEmailResult[] = [];
+  const results: EnqueueEmailResult[] = [];
   for (const to of recipients) {
     results.push(
-      await sendEmail({
-        to,
-        replyTo: message.email,
-        fromName: "Get-On",
+      await enqueueEmail({
         kind: "contact_notification",
+        toEmail: to,
         relatedType: "contact_project",
         relatedId: message.projectId,
-        subject: rendered.subject,
-        text: `${rendered.text}\n\nFrom: ${address}${message.pagePath ?? ""}`,
-        html: rendered.html,
+        dedupeKey: `contact:${message.id}:${to}`,
+        payload: {
+          subject: rendered.subject,
+          text: `${rendered.text}\n\nFrom: ${address}${message.pagePath ?? ""}`,
+          html: rendered.html,
+          replyTo: message.email,
+        },
       }),
     );
   }
@@ -186,18 +180,23 @@ export async function notifyNewMessage(admin: Admin, message: NotifyMessage): Pr
           messagesUrl: messagesUrl(message.projectId),
         });
         for (const to of allowed) {
-          await sendEmail({
-            to,
+          await enqueueEmail({
             kind: "contact_digest",
+            toEmail: to,
             relatedType: "contact_project",
             relatedId: message.projectId,
-            ...digest,
+            dedupeKey: `digest:${message.projectId}:${to}`,
+            payload: {
+              subject: digest.subject,
+              text: digest.text,
+              html: digest.html,
+            },
           });
         }
       }
     } else {
       const results = await notifyRecipients(admin, message, allowed);
-      const anySent = results.some((result) => result.status === "sent" || result.status === "queued");
+      const anySent = results.some((result) => result.ok);
       await updateMessage(admin, message.id, {
         notify_state: anySent ? "sent" : "failed",
         notified_at: anySent ? new Date().toISOString() : null,
@@ -246,16 +245,18 @@ async function maybeAutoReply(
     (await ownerEmail(admin, message.teamId)) ??
     undefined;
 
-  await sendEmail({
-    to: message.email,
-    replyTo,
-    fromName: `${cleanBusinessName(message.projectName)} via Get-On`,
+  await enqueueEmail({
     kind: "contact_autoreply",
+    toEmail: message.email,
     relatedType: "contact_project",
     relatedId: message.projectId,
-    subject: rendered.subject,
-    text: rendered.text,
-    html: rendered.html,
+    dedupeKey: `autoreply:${message.id}`,
+    payload: {
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html,
+      replyTo,
+    },
   });
 }
 

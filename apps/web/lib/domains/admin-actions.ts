@@ -100,6 +100,13 @@ async function setPlanLapse(domainId: string, lapse: boolean): Promise<DomainAct
   return { ok: true };
 }
 
+export async function pauseDomainForPlan(domainId: string): Promise<DomainActionResult> {
+  const { admin, domain } = await domainRow(domainId);
+  if (!domain) return { ok: false, error: "We could not find that domain." };
+  await new DomainService({ supabase: admin }).pauseDomainForPlan(domainId);
+  return { ok: true };
+}
+
 export function simulatePlanLapse(domainId: string): Promise<DomainActionResult> {
   return setPlanLapse(domainId, true);
 }

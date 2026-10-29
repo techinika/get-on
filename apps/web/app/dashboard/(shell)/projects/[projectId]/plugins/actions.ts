@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTeam } from "@/lib/team";
 import { can } from "@/lib/permissions";
-import { sendEmail, isSuppressed } from "@/lib/email/send";
+import { isSuppressed } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { parseContactSettings, type ContactSettings } from "@/lib/contact/settings";
 import { invalidateQuickFind } from "@/lib/project-activity";
 
@@ -117,16 +118,19 @@ async function sendVerification(
     ownerName: project?.name ?? "The website owner",
     confirmUrl: confirmUrl(token),
   });
-  const result = await sendEmail({
-    to: email,
+  const result = await enqueueEmail({
     kind: "recipient_verification",
+    toEmail: email,
     relatedType: "contact_project",
     relatedId: projectId,
-    subject: rendered.subject,
-    text: rendered.text,
-    html: rendered.html,
+    dedupeKey: `verify:${projectId}:${email}`,
+    payload: {
+      subject: rendered.subject,
+      text: rendered.text,
+      html: rendered.html,
+    },
   });
-  if (result.status === "failed") return { ok: false, error: "UNKNOWN" };
+  if (!result.ok) return { ok: false, error: "UNKNOWN" };
   return { ok: true };
 }
 
@@ -260,16 +264,19 @@ export async function sendTestAutoreply(projectId: string): Promise<PluginResult
     subject: settings.autoReply.subject,
     body: settings.autoReply.body,
   });
-  const result = await sendEmail({
-    to,
+  const result = await enqueueEmail({
     kind: "contact_autoreply",
+    toEmail: to,
     relatedType: "contact_project",
     relatedId: projectId,
-    subject: `[Test] ${rendered.subject}`,
-    text: rendered.text,
-    html: rendered.html,
+    dedupeKey: `test-autoreply:${projectId}:${Date.now()}`,
+    payload: {
+      subject: `[Test] ${rendered.subject}`,
+      text: rendered.text,
+      html: rendered.html,
+    },
   });
-  return result.status === "failed" ? { ok: false, error: "UNKNOWN" } : { ok: true };
+  return result.ok ? { ok: true } : { ok: false, error: "UNKNOWN" };
 }
 
 export async function deleteAllMessages(projectId: string, word: string): Promise<PluginResult> {

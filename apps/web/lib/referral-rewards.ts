@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { teamNoticeEmail } from "@get-on/email";
 import env from "@/lib/env";
 import { logTeamActivity } from "@/lib/activity/log";
@@ -250,14 +250,17 @@ export async function qualifyDueReferrals(
             actionLabel: "See my rewards",
             footer: "You choose when to claim each reward.",
           });
-          await sendEmail({
-            to: profile.email,
-            subject: mail.subject,
-            text: mail.text,
-            html: mail.html,
+          await enqueueEmail({
             kind: "referral_reward",
+            toEmail: profile.email,
             relatedType: "referral",
             relatedId: referral.id,
+            dedupeKey: `referral:${referral.id}:${referral.referrer_user_id}`,
+            payload: {
+              subject: mail.subject,
+              text: mail.text,
+              html: mail.html,
+            },
           }).catch((error) => console.error("[referrals] reward email failed", error));
         }
       }

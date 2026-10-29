@@ -29,7 +29,10 @@ export function NewApprovalRequestForm({
     kind?: string;
     targetId?: string;
     amountUsd?: string;
+    teamId?: string;
+    monthlyCredits?: string;
     planId?: string;
+    versionId?: string;
     decision?: string;
   };
 }) {
@@ -40,6 +43,11 @@ export function NewApprovalRequestForm({
   const [reason, setReason] = useState("");
   const [amountUsd, setAmountUsd] = useState(initial?.amountUsd ?? "");
   const [amountCredits, setAmountCredits] = useState("");
+  const [teamId, setTeamId] = useState(initial?.teamId ?? "");
+  const [monthlyCredits, setMonthlyCredits] = useState(initial?.monthlyCredits ?? "");
+  const [versionId, setVersionId] = useState(initial?.versionId ?? "");
+  const [days, setDays] = useState("");
+  const [holdAction, setHoldAction] = useState("place");
   const [planId, setPlanId] = useState(
     initial?.planId ??
       plans.find((plan) => plan.id === "basic")?.id ??
@@ -60,6 +68,11 @@ export function NewApprovalRequestForm({
     setTargetId("");
     setAmountUsd("");
     setAmountCredits("");
+    setTeamId("");
+    setMonthlyCredits("");
+    setVersionId("");
+    setDays("");
+    setHoldAction("place");
     setStartsAt("");
     setEndsAt("");
     setExpiresAt("");
@@ -77,6 +90,11 @@ export function NewApprovalRequestForm({
       reason,
       amountUsd,
       amountCredits,
+      teamId,
+      monthlyCredits,
+      versionId,
+      days,
+      holdAction,
       planId,
       startsAt: localToIso(startsAt),
       endsAt: localToIso(endsAt),
@@ -136,9 +154,37 @@ export function NewApprovalRequestForm({
           <p className="mt-1.5 text-[13px] text-text-muted">{config.targetHint}</p>
         </div>
 
-        {config.extra === "refund_amount" ? (
+        {config.extra === "template_version" ? (
           <div>
-            <Label htmlFor="request-amount">Refund amount (USD)</Label>
+            <Label htmlFor="request-version">Template version ID</Label>
+            <Input
+              id="request-version"
+              value={versionId}
+              onChange={(event) => setVersionId(event.target.value)}
+              className="mt-2 font-mono text-[13px]"
+              placeholder="00000000-0000-0000-0000-000000000000"
+              maxLength={200}
+              autoComplete="off"
+              spellCheck={false}
+              required
+            />
+            <p className="mt-1.5 text-[13px] text-text-muted">
+              Choose the saved version from the template record.
+            </p>
+          </div>
+        ) : null}
+
+        {config.extra === "refund_amount" ||
+        config.extra === "payment_amount" ||
+        config.extra === "credit_amount" ? (
+          <div>
+            <Label htmlFor="request-amount">
+              {config.extra === "refund_amount"
+                ? "Refund amount (USD)"
+                : config.extra === "payment_amount"
+                  ? "Payment amount (USD)"
+                  : "Credit amount (USD)"}
+            </Label>
             <Input
               id="request-amount"
               type="number"
@@ -152,6 +198,105 @@ export function NewApprovalRequestForm({
               placeholder="0.00"
               required
             />
+          </div>
+        ) : null}
+
+        {config.extra === "ai_limit" ? (
+          <div className="grid gap-4 min-[640px]:grid-cols-2">
+            <div>
+              <Label htmlFor="request-team">Team ID</Label>
+              <Input
+                id="request-team"
+                value={teamId}
+                onChange={(event) => setTeamId(event.target.value)}
+                className="mt-2 font-mono text-[13px]"
+                placeholder="00000000-0000-0000-0000-000000000000"
+                maxLength={200}
+                autoComplete="off"
+                spellCheck={false}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="request-monthly-credits">Monthly credits</Label>
+              <Input
+                id="request-monthly-credits"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                max="1000000"
+                step="1"
+                value={monthlyCredits}
+                onChange={(event) => setMonthlyCredits(event.target.value)}
+                className="mt-2"
+                placeholder="400"
+                required
+              />
+              <p className="mt-1.5 text-[13px] text-text-muted">
+                0 means this member cannot use AI.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
+        {config.extra === "days" ? (
+          <div>
+            <Label htmlFor="request-days">Extra days</Label>
+            <Input
+              id="request-days"
+              type="number"
+              inputMode="numeric"
+              min="1"
+              max="365"
+              step="1"
+              value={days}
+              onChange={(event) => setDays(event.target.value)}
+              className="mt-2"
+              placeholder="14"
+              required
+            />
+            <p className="mt-1.5 text-[13px] text-text-muted">
+              Added after the normal grace window.
+            </p>
+          </div>
+        ) : null}
+
+        {config.extra === "hold" ? (
+          <div className="grid gap-4 min-[640px]:grid-cols-2">
+            <div>
+              <Label htmlFor="request-hold-action">Hold</Label>
+              <select
+                id="request-hold-action"
+                value={holdAction}
+                onChange={(event) => setHoldAction(event.target.value)}
+                className={`mt-2 ${selectClass}`}
+              >
+                <option value="place">Place a hold</option>
+                <option value="release">Release the hold</option>
+              </select>
+            </div>
+            {holdAction === "place" ? (
+              <div>
+                <Label htmlFor="request-days" optional>
+                  Days
+                </Label>
+                <Input
+                  id="request-days"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  max="365"
+                  step="1"
+                  value={days}
+                  onChange={(event) => setDays(event.target.value)}
+                  className="mt-2"
+                  placeholder="No end"
+                />
+                <p className="mt-1.5 text-[13px] text-text-muted">
+                  Leave empty to keep the hold until someone releases it.
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
 

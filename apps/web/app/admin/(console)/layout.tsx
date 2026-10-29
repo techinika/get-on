@@ -37,6 +37,7 @@ export default async function AdminLayout({ children }: { children: ReactNode })
         usage={data.usage}
         sidebar={sidebar}
         isAdmin
+        isSuperAdmin={staff.role === "super_admin"}
       >
         {children}
       </AppShell>

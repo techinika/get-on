@@ -27,6 +27,7 @@ export type AppShellProps = {
   /** Server-rendered sidebar state (from the `gs_sidebar` cookie). */
   sidebar: "expanded" | "collapsed";
   isAdmin?: boolean;
+  isSuperAdmin?: boolean;
   children: React.ReactNode;
 };
 
@@ -48,6 +49,7 @@ export function AppShell({
   usage,
   sidebar,
   isAdmin = false,
+  isSuperAdmin = false,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
@@ -134,6 +136,7 @@ export function AppShell({
         collapsed={collapsed}
         onToggleCollapsed={toggleSidebar}
         isAdmin={isAdmin}
+        isSuperAdmin={isSuperAdmin}
         role={currentTeam.role}
       />
 

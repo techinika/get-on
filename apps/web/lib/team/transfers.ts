@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { teamNoticeEmail } from "@get-on/email";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import env from "@/lib/env";
 
 export const TRANSFER_DAYS = 7;
@@ -86,14 +86,17 @@ export async function sendTransferEmail(input: {
       year: "numeric",
     })}. If you do not want it, ignore this email.`,
   });
-  const result = await sendEmail({
-    to: input.to,
-    subject: template.subject,
-    text: template.text,
-    html: template.html,
+  const result = await enqueueEmail({
     kind: "website_transfer",
+    toEmail: input.to,
     relatedType: "ownership_transfer",
     relatedId: input.transferId,
+    dedupeKey: `transfer:${input.transferId}`,
+    payload: {
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    },
   });
-  return result.status;
+  return result.ok ? ("queued" as const) : ("failed" as const);
 }

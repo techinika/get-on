@@ -1,6 +1,6 @@
 import { createHmac, randomBytes } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { teamInviteEmail } from "@get-on/email";
 import env from "@/lib/env";
 import { logTeamActivity } from "@/lib/activity/log";
@@ -68,16 +68,19 @@ export async function sendInviteEmail(input: {
     }),
     abilities: roleAbilities(input.role),
   });
-  const result = await sendEmail({
-    to: input.to,
-    subject: template.subject,
-    text: template.text,
-    html: template.html,
+  const result = await enqueueEmail({
     kind: "team_invite",
+    toEmail: input.to,
     relatedType: "team_invitation",
     relatedId: input.invitationId,
+    dedupeKey: `invite:${input.invitationId}`,
+    payload: {
+      subject: template.subject,
+      text: template.text,
+      html: template.html,
+    },
   });
-  return result.status;
+  return result.ok ? ("queued" as const) : ("failed" as const);
 }
 
 export async function recordInviteEmailState(

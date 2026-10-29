@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getCurrentTeam } from "@/lib/team";
 import { can, type Action, type Role } from "@/lib/permissions";
 import { logTeamActivity } from "@/lib/activity/log";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { teamNoticeEmail } from "@get-on/email";
 import env from "@/lib/env";
 import {
@@ -86,14 +86,18 @@ async function notifyMember(
     actionUrl: `${base}/dashboard/team`,
     actionLabel: "Open the team",
   });
-  await sendEmail({
-    to: profile.email,
-    subject: mail.subject,
-    text: mail.text,
-    html: mail.html,
+  await enqueueEmail({
     kind,
+    userId,
+    toEmail: profile.email,
     relatedType: "user",
     relatedId: userId,
+    dedupeKey: `team-notice:${kind}:${userId}`,
+    payload: {
+      subject: mail.subject,
+      text: mail.text,
+      html: mail.html,
+    },
   });
 }
 

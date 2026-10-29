@@ -9,6 +9,7 @@ export function RequestApprovalLink({
   targetId,
   amountUsd,
   planId,
+  versionId,
   decision,
   label = "Request approval",
   variant = "secondary",
@@ -19,6 +20,7 @@ export function RequestApprovalLink({
   targetId?: string;
   amountUsd?: number;
   planId?: string;
+  versionId?: string;
   decision?: "approve" | "reject";
   label?: string;
   variant?: "primary" | "secondary" | "ghost" | "danger" | "danger-outline";
@@ -27,7 +29,7 @@ export function RequestApprovalLink({
 }) {
   return (
     <Link
-      href={requestApprovalHref({ kind, targetId, amountUsd, planId, decision })}
+      href={requestApprovalHref({ kind, targetId, amountUsd, planId, versionId, decision })}
       className={cn(buttonVariants({ variant, size }), className)}
     >
       {label}

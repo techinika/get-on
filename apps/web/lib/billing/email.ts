@@ -1,5 +1,6 @@
 import { emailLayout, button } from "@get-on/email";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { formatMoney } from "./format";
 
 const BILLING_REPLY_TO = "team@get-on.tech";
@@ -73,7 +74,6 @@ async function sendBillingEmail(input: {
   body: string[];
   action?: { label: string; href: string };
 }): Promise<void> {
-  const { sendEmail } = await import("@/lib/email/send");
   const claimed = await claimNotification(input.teamId, input.kind, input.dedupeKey);
   if (!claimed) return;
   const to = await billingAddress(input.teamId, input.invoiceId);
@@ -85,19 +85,22 @@ async function sendBillingEmail(input: {
   const action = input.action
     ? button(input.action.href, input.action.label)
     : "";
-  await sendEmail({
-    to,
+  await enqueueEmail({
     kind: input.kind,
-    subject: input.subject,
-    text: [input.heading, "", ...input.body, input.action?.href ?? ""].join("\n"),
-    html: emailLayout({
-      title: input.heading,
-      body: `<h1 style="margin:0 0 16px 0;font-size:24px;line-height:1.25;">${input.heading}</h1>${paragraphs}${action}`,
-    }),
-    replyTo: BILLING_REPLY_TO,
-    fromName: "Get-On Billing",
+    toEmail: to,
+    teamId: input.teamId,
     relatedType: input.invoiceId ? "invoice" : "team",
     relatedId: input.invoiceId ?? input.teamId,
+    dedupeKey: `billing:${input.dedupeKey}`,
+    payload: {
+      subject: input.subject,
+      text: [input.heading, "", ...input.body, input.action?.href ?? ""].join("\n"),
+      html: emailLayout({
+        title: input.heading,
+        body: `<h1 style="margin:0 0 16px 0;font-size:24px;line-height:1.25;">${input.heading}</h1>${paragraphs}${action}`,
+      }),
+      replyTo: BILLING_REPLY_TO,
+    },
   });
   await markNotificationSent(input.teamId, input.dedupeKey);
 }

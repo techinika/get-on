@@ -36,3 +36,20 @@ See `packages/templates/sample.ts`.
 
 ## Art pipeline
 `pnpm build:template-art` generates original WebP artwork into `packages/templates/assets/{template}/`.
+
+## Staff console release flow
+
+`/admin/templates` lists the platform-owned templates and their saved versions.
+Both actions require `template.system.manage` (Super admin).
+
+- **Sync from code** validates every package in `packages/templates`, writes
+  the current package as a new draft version when its canonical hash changed,
+  and leaves the live version untouched. Identical packages are skipped.
+- **Request publish** opens an approval for `template_publish` with the
+  template id and version id. Another Super admin must approve it, then the
+  request runs `admin_template_publish` and makes that version live. Starter is
+  kept as the default template.
+
+The versions in the database are an immutable release history. Customer
+websites still read the code registry at runtime; publishing records which
+code version was approved and keeps the admin view honest.
