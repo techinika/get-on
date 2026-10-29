@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { normalizeTotpCode, totpQrSource } from "@/lib/admin/mfa";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -12,37 +13,105 @@ type Enrollment = {
   svg: string;
 };
 
+type PrepareResult =
+  | { ok: true; enrollment: Enrollment }
+  | { ok: false; message: string };
+
+let pending: Promise<PrepareResult> | null = null;
+
+async function prepareEnrollment(): Promise<PrepareResult> {
+  const supabase = createClient();
+  const { data: factors, error: factorsError } =
+    await supabase.auth.mfa.listFactors();
+  if (factorsError || !factors) {
+    return {
+      ok: false,
+      message: "We could not check your sign-in settings. Refresh and try again.",
+    };
+  }
+
+  const totp = factors.all.filter((factor) => factor.factor_type === "totp");
+  if (totp.some((factor) => factor.status === "verified")) {
+    return {
+      ok: false,
+      message:
+        "This account already has an authenticator. Sign in again to use it.",
+    };
+  }
+
+  for (const factor of totp) {
+    const { error: removeError } = await supabase.auth.mfa.unenroll({
+      factorId: factor.id,
+    });
+    if (removeError) {
+      return {
+        ok: false,
+        message:
+          "We could not clear an unfinished setup. Refresh the page and try again.",
+      };
+    }
+  }
+
+  const { data, error } = await supabase.auth.mfa.enroll({
+    factorType: "totp",
+    friendlyName: "Get-On staff",
+  });
+  if (error || !data) {
+    return {
+      ok: false,
+      message:
+        "We could not start setup. Refresh the page and try again. If it keeps failing, sign out and back in.",
+    };
+  }
+
+  return {
+    ok: true,
+    enrollment: {
+      factorId: data.id,
+      secret: data.totp.secret,
+      svg: data.totp.qr_code,
+    },
+  };
+}
+
 export function MfaSetupForm() {
   const router = useRouter();
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    async function start() {
-      const supabase = createClient();
-      const { data, error: enrollError } = await supabase.auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: "Get-On staff",
-      });
+    pending ??= prepareEnrollment().finally(() => {
+      pending = null;
+    });
+    pending.then((result) => {
       if (cancelled) return;
-      if (enrollError || !data) {
-        setError("We could not start setup. Refresh the page and try again.");
-        return;
+      if (result.ok) {
+        setEnrollment(result.enrollment);
+        setError(null);
+      } else {
+        setError(result.message);
       }
-      setEnrollment({
-        factorId: data.id,
-        secret: data.totp.secret,
-        svg: data.totp.qr_code,
-      });
-    }
-    start();
+    });
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [attempt]);
+
+  async function restart() {
+    const current = enrollment;
+    setEnrollment(null);
+    setCode("");
+    setError(null);
+    if (current) {
+      const supabase = createClient();
+      await supabase.auth.mfa.unenroll({ factorId: current.factorId });
+    }
+    setAttempt((value) => value + 1);
+  }
 
   async function verify(event: React.FormEvent) {
     event.preventDefault();
@@ -50,9 +119,10 @@ export function MfaSetupForm() {
     setBusy(true);
     setError(null);
     const supabase = createClient();
-    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({
-      factorId: enrollment.factorId,
-    });
+    const { data: challenge, error: challengeError } =
+      await supabase.auth.mfa.challenge({
+        factorId: enrollment.factorId,
+      });
     if (challengeError || !challenge) {
       setError("We could not check the code. Try again.");
       setBusy(false);
@@ -61,10 +131,12 @@ export function MfaSetupForm() {
     const { error: verifyError } = await supabase.auth.mfa.verify({
       factorId: enrollment.factorId,
       challengeId: challenge.id,
-      code: code.trim(),
+      code: normalizeTotpCode(code),
     });
     if (verifyError) {
-      setError("That code did not work. Check the time on your phone and try the new code.");
+      setError(
+        "That code did not work. Check the time on your phone and try the new code.",
+      );
       setBusy(false);
       return;
     }
@@ -73,7 +145,14 @@ export function MfaSetupForm() {
   }
 
   if (error && !enrollment) {
-    return <p className="mt-6 text-sm text-danger-text">{error}</p>;
+    return (
+      <div className="mt-6 space-y-3">
+        <p className="text-sm text-danger-text">{error}</p>
+        <Button type="button" variant="secondary" onClick={restart}>
+          Try setup again
+        </Button>
+      </div>
+    );
   }
 
   if (!enrollment) {
@@ -82,29 +161,44 @@ export function MfaSetupForm() {
 
   return (
     <form className="mt-6 space-y-4" onSubmit={verify}>
-      <div
-        className="w-48 rounded-xl border border-border bg-surface p-3"
-        dangerouslySetInnerHTML={{ __html: enrollment.svg }}
-      />
+      <div className="mx-auto aspect-square w-full max-w-56 overflow-hidden rounded-xl border border-border bg-white p-3">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={totpQrSource(enrollment.svg)}
+          alt="QR code for your authenticator app"
+          className="block h-full w-full"
+        />
+      </div>
       <div>
-        <label htmlFor="mfa-code" className="text-sm font-medium text-text">Six-digit code</label>
+        <label htmlFor="mfa-code" className="text-sm font-medium text-text">
+          Six-digit code
+        </label>
         <Input
           id="mfa-code"
           inputMode="numeric"
           autoComplete="one-time-code"
           value={code}
-          onChange={(event) => setCode(event.target.value)}
-          placeholder="123 456"
-          maxLength={7}
+          onChange={(event) => setCode(normalizeTotpCode(event.target.value))}
+          placeholder="123456"
+          maxLength={6}
         />
       </div>
-      <p className="text-xs text-text-muted">
-        Can&apos;t scan? Add this secret by hand: <code>{enrollment.secret}</code>
+      <p className="break-all text-xs text-text-muted">
+        Can&apos;t scan? Add this secret by hand:{" "}
+        <code className="font-mono">{enrollment.secret}</code>
       </p>
       {error ? <p className="text-sm text-danger-text">{error}</p> : null}
-      <Button type="submit" disabled={busy || code.replace(/\s/g, "").length < 6}>
-        {busy ? "Checking…" : "Turn on two-step sign-in"}
-      </Button>
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="submit"
+          disabled={busy || normalizeTotpCode(code).length < 6}
+        >
+          {busy ? "Checking…" : "Turn on two-step sign-in"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={restart} disabled={busy}>
+          Show a new code
+        </Button>
+      </div>
     </form>
   );
 }
