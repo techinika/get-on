@@ -2,6 +2,12 @@ import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { EMAIL_STREAMS, streamForKind, type EmailStream } from "./streams";
 import type { EmailMessage, EmailSender, EmailSendResult } from "./types";
 
+const runtimeEnv = (
+  globalThis as unknown as {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env;
+
 /** Removes anything that could start a new header. */
 export function safeHeader(value: string, max = 998): string {
   return String(value)
@@ -25,10 +31,14 @@ export class SesSender implements EmailSender {
   private client: SESv2Client;
 
   constructor(
-    opts: { region?: string; configurationSetName?: string; teamEmail?: string } = {},
+    opts: {
+      region?: string;
+      configurationSetName?: string;
+      teamEmail?: string;
+    } = {},
   ) {
     this.client = new SESv2Client({
-      region: opts.region || process.env.AWS_REGION || "eu-west-1",
+      region: opts.region || runtimeEnv?.AWS_REGION || "eu-west-1",
     });
   }
 
@@ -41,12 +51,15 @@ export class SesSender implements EmailSender {
     }
 
     const configurationSetName =
-      process.env[definition.configurationSetEnv] || definition.configurationSet;
+      runtimeEnv?.[definition.configurationSetEnv] ||
+      definition.configurationSet;
 
     const command = new SendEmailCommand({
       FromEmailAddress: `"${safeFromName(definition.fromName)}" <${safeHeader(definition.from, 254)}>`,
       Destination: { ToAddresses: [safeHeader(message.to, 254)] },
-      ReplyToAddresses: [safeHeader(message.replyTo || definition.replyTo, 254)],
+      ReplyToAddresses: [
+        safeHeader(message.replyTo || definition.replyTo, 254),
+      ],
       Content: {
         Simple: {
           Subject: { Data: safeHeader(message.subject, 180), Charset: "UTF-8" },
@@ -92,4 +105,4 @@ export class MemorySender implements EmailSender {
 }
 
 export const memorySender = new MemorySender();
-export const TEAM_EMAIL = process.env.TEAM_EMAIL || "team@get-on.tech";
+export const TEAM_EMAIL = runtimeEnv?.TEAM_EMAIL || "team@get-on.tech";
