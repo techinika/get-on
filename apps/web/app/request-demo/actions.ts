@@ -3,7 +3,7 @@
 import { headers } from "next/headers";
 import { demoRequestSchema, RATE_LIMIT_PER_DAY, RATE_LIMIT_PER_HOUR } from "@/lib/demo-request";
 import { demoRequestAckEmail, demoRequestAlertEmail } from "@get-on/email";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
 import { createAdminClient } from "@/lib/supabase/admin";
 import env from "@/lib/env";
@@ -162,25 +162,29 @@ export async function submitDemoRequest(form: FormData): Promise<DemoRequestResu
   ];
 
   const alert = demoRequestAlertEmail({ businessName: input.businessName, fields: rows });
-  await sendEmail({
-    to: supportEmail,
-    replyTo: input.email,
-    fromName: "Get-On",
+  await enqueueEmail({
     kind: "demo_request_alert",
-    subject: alert.subject,
-    text: alert.text,
-    html: alert.html,
+    toEmail: supportEmail,
+    dedupeKey: `demo-alert:${Date.now()}`,
+    payload: {
+      subject: alert.subject,
+      text: alert.text,
+      html: alert.html,
+      replyTo: input.email,
+    },
   });
 
   const ack = demoRequestAckEmail({ firstName: firstName(input.fullName), email: input.email });
-  await sendEmail({
-    to: input.email,
-    replyTo: supportEmail,
-    fromName: "Get-On",
+  await enqueueEmail({
     kind: "demo_request_ack",
-    subject: ack.subject,
-    text: `${ack.text}\n\nYou asked us to contact you, so we will only use your details to arrange your demo. Read our Privacy Policy: ${env.siteUrl}/privacy`,
-    html: ack.html,
+    toEmail: input.email,
+    dedupeKey: `demo-ack:${input.email}:${Date.now()}`,
+    payload: {
+      subject: ack.subject,
+      text: `${ack.text}\n\nYou asked us to contact you, so we will only use your details to arrange your demo. Read our Privacy Policy: ${env.siteUrl}/privacy`,
+      html: ack.html,
+      replyTo: supportEmail,
+    },
   });
 
   return { ok: true };

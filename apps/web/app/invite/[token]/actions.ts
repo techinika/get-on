@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { hashInviteToken } from "@/lib/team/invitations";
 import { TEAM_COOKIE } from "@/lib/dashboard";
 import { logTeamActivity } from "@/lib/activity/log";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { teamNoticeEmail } from "@get-on/email";
 import env from "@/lib/env";
 
@@ -72,14 +72,17 @@ export async function acceptInvitation(token: string): Promise<InviteActionResul
             actionUrl: `${base}/dashboard/team`,
             actionLabel: "See the team",
           });
-          await sendEmail({
-            to: inviter.email,
-            subject: mail.subject,
-            text: mail.text,
-            html: mail.html,
+          await enqueueEmail({
             kind: "invite_accepted",
+            toEmail: inviter.email,
             relatedType: "team",
             relatedId: teamId,
+            dedupeKey: `invite-accepted:${teamId}:${invitation.email}`,
+            payload: {
+              subject: mail.subject,
+              text: mail.text,
+              html: mail.html,
+            },
           });
         }
       }
@@ -125,14 +128,17 @@ export async function declineInvitation(token: string): Promise<InviteActionResu
           intro: `${invitation.email} declined the invitation to ${team?.name ?? "your team"}.`,
           details: [{ label: "Team", value: team?.name ?? "Your team" }],
         });
-        await sendEmail({
-          to: inviter.email,
-          subject: mail.subject,
-          text: mail.text,
-          html: mail.html,
+        await enqueueEmail({
           kind: "invite_declined",
+          toEmail: inviter.email,
           relatedType: "team",
           relatedId: invitation.team_id,
+          dedupeKey: `invite-declined:${invitation.id}`,
+          payload: {
+            subject: mail.subject,
+            text: mail.text,
+            html: mail.html,
+          },
         });
       }
     }

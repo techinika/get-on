@@ -2,7 +2,7 @@
 
 import { headers } from "next/headers";
 import { abuseReportAlertEmail } from "@get-on/email";
-import { sendEmail } from "@/lib/email/send";
+import { enqueueEmail } from "@/lib/email/enqueue";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeSiteName, reportSchema, REPORT_REASON_LABELS } from "@/lib/report";
@@ -165,14 +165,18 @@ export async function submitReport(form: FormData): Promise<ReportResult> {
       { label: "Reports from different people in 24 hours", value: String(distinctReporters.size) },
     ],
   });
-  await sendEmail({
-    to: abuseEmail,
-    replyTo: parsed.data.email || undefined,
-    fromName: "Get-On",
+  await enqueueEmail({
     kind: "abuse_report_alert",
-    subject: alert.subject,
-    text: alert.text,
-    html: alert.html,
+    toEmail: abuseEmail,
+    relatedType: "abuse_report",
+    relatedId: project.id,
+    dedupeKey: `abuse:${project.id}:${Date.now()}`,
+    payload: {
+      subject: alert.subject,
+      text: alert.text,
+      html: alert.html,
+      replyTo: parsed.data.email || undefined,
+    },
   });
 
   return { ok: true };

@@ -155,8 +155,9 @@ enforces `SES_DAILY_LIMIT`: at 90% of the limit, only critical kinds are sent
 immediately.
 
 Critical kinds include auth, invites, billing receipts and payment failures.
-The direct path is kept for code that has not moved to the outbox yet. New
-business events should use the outbox.
+The direct path is kept only for code that has not moved to the outbox yet;
+all business call sites now enqueue through `email_enqueue` and are sent by
+`scripts/jobs/notifications.ts`.
 
 ## 8. Jobs and commands
 
@@ -207,9 +208,6 @@ business events should use the outbox.
 
 ## 11. Current gaps
 
-- Most business call sites still use `sendEmail()` rather than
-  `email_enqueue()`. The outbox worker and schema exist; the event-by-event
-  retrofit is the remaining work.
 - Marketing links and opens are tracked only when `EMAIL_TRACKING_BASE` or
   `marketing_settings.tracking_base` is set. The endpoints do not store IP
   addresses. The marketing report view is still to be built.
