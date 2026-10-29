@@ -27,6 +27,14 @@ export async function rateLimit(key: string, policy: RateLimitPolicy): Promise<R
 
   return result;
 }
+/** Reads the current bucket without counting a new attempt (used to escalate Turnstile). */
+export async function peekRateLimit(key: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("rate_limits").select("window_start,count").eq("key", key).maybeSingle();
+  if (!data) return 0;
+  return Number(data.count ?? 0);
+}
+
 export type RateLimitPolicy = {
   limit: number;
   windowSeconds: number;

@@ -106,6 +106,15 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Permissions: `billing.invoices` (owner/admin), `billing.pay` (owner), `billing.notices` (owner/admin), plus `plan.view`/`plan.manage`.
 - See `docs/pesapal-spike.md`, `docs/entitlements.md`, `docs/ui-spec-billing.md`, `docs/credits.md` and `docs/legal.md`.
 
+## Security core rules (tested; see docs/security.md)
+1. No access without a verified email **and** an accepted emailed code for that session (`session_security.verified_at`). Enforced in `proxy.ts`, server helpers and the database.
+2. One person, one account per canonical email. `POST /api/auth/register` is the only signup path; the auth service's public signup and its own emails must stay off.
+3. Authentication codes are hashed (HMAC with `OTP_PEPPER`), single use, bound to purpose, subject, browser and session. Never log or store a plain code.
+4. A page view never consumes anything: verification links do not exist here, and reset/confirm actions are `POST` only.
+5. Signup, login, verify and resend responses are identical for existing and unknown accounts except the signup duplicate message.
+6. Everything security-relevant goes through `recordSecurityEvent()`.
+7. Fetch a user-influenced URL only with `safeFetch`.
+
 ## See also
 - docs/settings.md
 - docs/ui-spec-settings.md
@@ -117,6 +126,8 @@ The site design system is prepared for a future "dark-mode" plugin:
 - docs/support-cases.md
 - docs/reports.md
 - docs/ses-setup.md
+- docs/security.md
+- docs/ui-spec-security.md
 
 
 ## Website settings core rules

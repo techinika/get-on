@@ -5,7 +5,7 @@ describe("rate-limit decide", () => {
   const policy = { limit: 3, windowSeconds: 60, blockSeconds: 60 };
 
   it("allows up to limit", () => {
-    let state = null as any;
+    let state: Parameters<typeof decide>[1] = null;
     const now = 1000;
     for (let i = 0; i < 3; i++) {
       const r = decide(now + i, state, policy);
@@ -15,7 +15,7 @@ describe("rate-limit decide", () => {
   });
 
   it("blocks after limit", () => {
-    let state = null as any;
+    let state: Parameters<typeof decide>[1] = null;
     const now = 1000;
     for (let i = 0; i < 3; i++) {
       const r = decide(now, state, policy);
@@ -27,7 +27,7 @@ describe("rate-limit decide", () => {
   });
 
   it("resets after window", () => {
-    let state = null as any;
+    let state: Parameters<typeof decide>[1] = null;
     const now = 1000;
     for (let i = 0; i < 3; i++) {
       const r = decide(now, state, policy);
@@ -38,7 +38,7 @@ describe("rate-limit decide", () => {
   });
 
   it("honours active block", () => {
-    let state = null as any;
+    let state: Parameters<typeof decide>[1] = null;
     const now = 1000;
     for (let i = 0; i < 4; i++) {
       const r = decide(now, state, policy);

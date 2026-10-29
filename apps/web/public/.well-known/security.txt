@@ -1,0 +1,8 @@
+Contact: mailto:team@get-on.tech
+Expires: 2027-10-29T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://get-on.tech/.well-known/security.txt
+
+# Please include what you found, the page or address involved, and how to
+# reproduce it. We reply within 3 working days. Do not test against customer
+# websites or accounts that are not yours.

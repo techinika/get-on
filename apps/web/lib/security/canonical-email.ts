@@ -6,7 +6,7 @@ const DOT_COLLAPSING_PROVIDERS = new Set(["yahoo.com", "ymail.com", "rocketmail.
 export function canonicalEmail(input: string): string {
   if (typeof input !== "string") return "";
   // NFKC normalise, trim, lowercase.
-  let value = input.normalize("NFKC").trim().toLowerCase();
+  const value = input.normalize("NFKC").trim().toLowerCase();
   if (!value) return "";
   // Split local/domain at the last "@" (local parts cannot contain unquoted @).
   const at = value.lastIndexOf("@");

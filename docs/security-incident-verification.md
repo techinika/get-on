@@ -64,3 +64,18 @@ After signup, verifying the email shows an error that the code/link is expired, 
 
 ## Decision recorded
 Replace link-based verification entirely with typed 6-digit email codes (Section 5.1/6.1 of the task prompt): no verification link anywhere, Supabase confirmation emails disabled for the project, confirm-email setting stays ON as defence in depth, and verification is enforced in middleware, server helpers and the database (restrictive RLS).
+
+## Resolution (what changed in the code)
+
+| Cause | Fix |
+| --- | --- |
+| (1) and (8) scanners/prefetch consume a one-time link | Links no longer exist. `/verify-email` renders a typed six-box code; the state change is `POST /api/auth/verify-email`. A page view can never consume a code. |
+| (2) link expiry or stale redirect | No links and no auth-service redirects. Lifetimes come from `security_settings` and are stated in the email. |
+| (3) older code still works after a resend | A new code invalidates the previous row (`invalidated_at`), and consumption is a conditional update so parallel requests cannot both win. |
+| (4) unverified accounts get sessions | `auth.admin.createUser({ email_confirm: false })`; a session is only created after the code is accepted. `proxy.ts` also redirects an unconfirmed session to `/verify-email`. |
+| (5) verification checked on some routes only | `proxy.ts` requires a verified `session_security` row for `/dashboard` and `/onboarding`; server helpers `requireVerifiedSession()`; the database function `session_verified()` is the source of truth. |
+| (6) OAuth without a verified email | OAuth still relies on the provider; the proxy gate and `session_verified()` block an unverified account, and the duplicate rules run in `registerAccount` for password signup. OAuth-specific duplicate handling is still open. |
+| (7) clock mismatch | Not applicable; all expiry uses server time and is compared server side. |
+
+Regression tests live in `tests/security-verification.test.ts`, `tests/otp.test.ts`,
+`tests/password-policy.test.ts` and `tests/auth-request.test.ts`.
