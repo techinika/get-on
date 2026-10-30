@@ -19,12 +19,10 @@ export function Sparkline({ projectId, sparklineDays }: SparklineProps) {
 
     const fetchSparklines = async () => {
       try {
-        const result = await getSparklines(
-          [projectId],
-          sparklineDays
-        ) as { projectId: string; points: number[]; trend: "up" | "down" | "steady" | "new" } | null;
+        const results = await getSparklines([projectId], sparklineDays);
+        const result = results.find((item) => item.projectId === projectId);
 
-        if (result && result.projectId === projectId) {
+        if (result) {
           setPoints(result.points);
           setTrend(result.trend);
         }
@@ -55,14 +53,15 @@ export function Sparkline({ projectId, sparklineDays }: SparklineProps) {
     const chartHeight = height - margin.top - margin.bottom;
 
     // Calculate y scale
-    const values = points.filter((p) => p !== null && !isNaN(p));
+    const values = points.filter((p): p is number => p !== null && !Number.isNaN(p));
     const min = values.length > 0 ? Math.min(...values) : 0;
     const max = values.length > 0 ? Math.max(...values) : 1;
     const range = Math.max(max - min, 1);
+    const lastValue = values[values.length - 1];
 
     let d = "";
     points.forEach((point, i) => {
-      if (point === null || isNaN(point)) return;
+      if (point === null || Number.isNaN(point)) return;
       const x = margin.left + (i / (points.length - 1)) * chartWidth;
       const y =
         margin.top +
@@ -76,16 +75,12 @@ export function Sparkline({ projectId, sparklineDays }: SparklineProps) {
 
     return `
       <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img"
-        aria-label="Visits for the last ${sparklineDays} days: ${points.filter(
-          (p) => p !== null && !isNaN(p)
-        ).length} visits, ${trend}"/>
+        aria-label="Visits for the last ${sparklineDays} days: ${values.length} visits, ${trend}"/>
         <path d="${d}" stroke="var(--primary)" stroke-width="2" fill="var(--primary) at 12%" />
-        ${points
-          .filter((p) => p !== null && !isNaN(p))
-          .slice(-1)[0] !== undefined
+        ${lastValue !== undefined
           ? `<circle
-            cx="${margin.left + ((points.length - 1) / (points.length - 1)) * chartWidth}"
-            cy="${margin.top + ((max - points[points.length - 1]) / range) * chartHeight}"
+            cx="${margin.left + chartWidth}"
+            cy="${margin.top + ((max - lastValue) / range) * chartHeight}"
             r="4" fill="var(--primary)" />
           ` : ""}
       </svg>`
@@ -102,6 +97,7 @@ type TrendBadgeProps = {
 };
 
 export function TrendBadge({ projectId }: TrendBadgeProps) {
+  const [points, setPoints] = useState<number[]>([]);
   const [trend, setTrend] = useState<"up" | "down" | "steady" | "new" | "collecting">(
     "collecting"
   );
@@ -111,12 +107,11 @@ export function TrendBadge({ projectId }: TrendBadgeProps) {
 
     const checkTrend = async () => {
       try {
-        const result = await getSparklines(
-          [projectId],
-          30
-        ) as { projectId: string; points: number[]; trend: "up" | "down" | "steady" | "new" } | null;
+        const results = await getSparklines([projectId], 30);
+        const result = results.find((item) => item.projectId === projectId);
 
-        if (result && result.projectId === projectId) {
+        if (result) {
+          setPoints(result.points);
           setTrend(result.trend);
         }
       } catch (e) {

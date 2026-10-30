@@ -13,18 +13,19 @@ export default async function VisitorsPage({ params }: Params) {
   const current = await getCurrentTeam();
   let published = false;
   let counting = true;
-  let planHistoryMonths = 0;
+  let planHistoryMonths: number | null = 0;
   let plan = "Free";
 
   if (current) {
     const supabase = await createClient();
-    const [{ data: project }, { data: settings }, { data: planRow }] = await Promise.all([
-      supabase
-        .from("projects")
-        .select("status, plan_id")
-        .eq("id", projectId)
-        .eq("team_id", current.team.teamId)
-        .maybeSingle(),
+    const { data: project } = await supabase
+      .from("projects")
+      .select("status, plan_id")
+      .eq("id", projectId)
+      .eq("team_id", current.team.teamId)
+      .maybeSingle();
+
+    const [{ data: settings }, { data: planRow }] = await Promise.all([
       supabase
         .from("project_settings")
         .select("stats_enabled")
@@ -42,13 +43,13 @@ export default async function VisitorsPage({ params }: Params) {
 
     if (planRow) {
       plan = planRow.name;
-      const historyMap: Record<string, number> = {
+      const historyMap: Record<string, number | null> = {
         free: 90,
         basic: 365,
         pro: 730,
         enterprise: null,
       };
-      planHistoryMonths = historyMap[planRow.priority_class] || 90;
+      planHistoryMonths = historyMap[planRow.priority_class] ?? 90;
     }
   }
 

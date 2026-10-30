@@ -3,6 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/toast";
+import { notifyConsentChange, readConsent, subscribeConsent } from "@/lib/analytics/consent";
 
 /**
  * Google Analytics consent banner shown on public marketing pages only.
@@ -16,47 +17,6 @@ import { useToast } from "@/components/ui/toast";
  * - Mirrors state in __Host-gs_consent cookie and localStorage gs_consent_v1
  * - Global Privacy Control / Do Not Track => banner hidden, state "off"
  */
-type ConsentDecision = "accepted" | "declined" | null;
-
-const CONSENT_EVENT = "gs-consent-change";
-
-function readCookie(name: string): string {
-  const match = document.cookie.match(
-    new RegExp("(^|;)\\s*" + name + "=\\s*([^;]+)")
-  );
-  return match ? match[2] : "";
-}
-
-function readConsent(): ConsentDecision {
-  if (typeof document === "undefined") return null;
-
-  // Read __Host-gs_consent cookie (value a1=accepted, a0=declined)
-  const cookieValue = readCookie("__Host-gs_consent");
-  let lsValue: string | null = null;
-  try {
-    lsValue = localStorage.getItem("gs_consent_v1");
-  } catch {
-    // localStorage can be unavailable in private browsing
-  }
-
-  if (cookieValue === "a1" || lsValue === "a1") return "accepted";
-  if (cookieValue === "a0" || lsValue === "a0") return "declined";
-  return null;
-}
-
-function subscribeConsent(callback: () => void) {
-  window.addEventListener("storage", callback);
-  window.addEventListener(CONSENT_EVENT, callback);
-  return () => {
-    window.removeEventListener("storage", callback);
-    window.removeEventListener(CONSENT_EVENT, callback);
-  };
-}
-
-function notifyConsentChange() {
-  window.dispatchEvent(new Event(CONSENT_EVENT));
-}
-
 export function GaConsentBanner() {
   const { toast } = useToast();
   const decision = React.useSyncExternalStore(

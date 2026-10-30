@@ -212,7 +212,7 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
 
   if (websites.length === 0) {
     return (
-      <InfoBox info>
+      <InfoBox>
         <div className="flex items-center gap-3">
           <span className="iconify text-[20px]" data-icon="layout-template" aria-hidden />
           <span>Your websites will show up here.</span>
@@ -239,7 +239,10 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
     const minDate = allDates[0];
     const maxDate = allDates[allDates.length - 1];
     const today = new Date();
-    const xDomain = [minDate, Math.max(maxDate, today)];
+    const xDomain: [Date, Date] = [
+      minDate,
+      new Date(Math.max(maxDate.getTime(), today.getTime())),
+    ];
 
     // Y scale: integers for active count
     const maxCount = Math.max(...activeOverTime.map((d) => d.count), 1);
@@ -354,7 +357,7 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
   };
 
   return (
-    <InfoBox info padding={20}>
+    <InfoBox className="p-5">
       <div>
         <h3 className="text-[18px] font-semibold text-text">Your websites over time</h3>
         <p className="text-[14px] text-text-muted mt-1">
@@ -371,7 +374,7 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
           />
         </ChartContainer>
       ) : (
-        <InfoBox info>
+        <InfoBox>
           <div className="text-center py-8">
             <span className="iconify text-[32px]" data-icon="layout-template" aria-hidden />
             <p className="text-[14px] text-text-muted mt-2">Your websites will show up here.</p>
