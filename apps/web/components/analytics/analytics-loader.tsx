@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { isAnalyticsRoute } from "@/lib/analytics/routes";
-import { GaConsentBanner } from "@/components/legal/ga-consent-banner";
 
 /**
  * AnalyticsLoader - loads Google Analytics only on allowed routes after consent.
@@ -44,8 +43,8 @@ export function AnalyticsLoader() {
       // No prior consent: define dataLayer and gtag with all denied,
       // then load Google script (will wait for consent)
       window.dataLayer = window.dataLayer || [];
-      function gtag() {
-        window.dataLayer.push(arguments);
+      function gtag(...args: unknown[]) {
+        window.dataLayer.push(args);
       }
       gtag("js", new Date());
       gtag("consent", "default", {

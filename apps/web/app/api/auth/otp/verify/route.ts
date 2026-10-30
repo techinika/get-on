@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { emailOtpProvider } from "@/lib/auth/second-factor";
 import { BINDING_COOKIE, DEVICE_COOKIE, PENDING_COOKIE } from "@/lib/auth/cookies";
 import {

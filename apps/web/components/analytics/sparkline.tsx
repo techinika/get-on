@@ -9,7 +9,6 @@ type SparklineProps = {
 };
 
 export function Sparkline({ projectId, sparklineDays }: SparklineProps) {
-  const PointsTuple = [number, number] as const;
   const [points, setPoints] = useState<Array<number | null>>([]);
   const [trend, setTrend] = useState<"up" | "down" | "steady" | "new" | "collecting">(
     "collecting"

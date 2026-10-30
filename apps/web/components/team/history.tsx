@@ -1,41 +1,52 @@
 "use client";
 
 import * as React from "react";
-import { createClient } from "@/lib/supabase/server";
-import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { InfoBox } from "@/components/app/info-box";
-import { Sparkline } from "@/components/analytics/sparkline";
-import { TrendBadge } from "@/components/analytics/sparkline";
 
 type TeamHistoryCardProps = {
   teamId: string;
 };
 
+type ActivityRow = {
+  project_id: string | null;
+  action: string;
+  created_at: string;
+  website_name: string | null;
+  website_views: number | null;
+};
+
+type ProjectRow = {
+  id: string;
+  name: string;
+  subdomain: string | null;
+  status: string;
+  created_at: string;
+};
+
+type WebsiteSummary = {
+  id: string;
+  name: string;
+  subdomain: string | null;
+  status: string;
+  createdAt: Date;
+  publishedFirstAt: Date | null;
+  deletedAt: Date | null;
+  restoredAt: Date | null;
+  views: number;
+};
+
+type TimelineEvent = {
+  date: Date;
+  title: string;
+  type: "created" | "deleted" | "restored";
+  websiteName: string;
+};
+
 export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
-  const [websites, setWebsites] = useState<
-    Array<{
-      id: string;
-      name: string;
-      subdomain: string;
-      status: string;
-      createdAt: Date;
-      publishedFirstAt: Date | null;
-      deletedAt: Date | null;
-      restoredAt: Date | null;
-      views: number;
-    }>
-  >(null as unknown as Array<{
-    id: string;
-    name: string;
-    subdomain: string;
-    status: string;
-    createdAt: Date;
-    publishedFirstAt: Date | null;
-    deletedAt: Date | null;
-    restoredAt: Date | null;
-    views: number;
-  }>);
+  const [websites, setWebsites] = useState<WebsiteSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
@@ -57,17 +68,12 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
       if (!team) return;
 
       // Group activity by project
-      const projectActivity: Record<string, Array<{ action: string; created_at: string; website_name: string; website_views: number }>> = {};
-      (activity ?? []).forEach((row: any) => {
+      const projectActivity: Record<string, ActivityRow[]> = {};
+      ((activity ?? []) as ActivityRow[]).forEach((row) => {
         const pid = row.project_id;
         if (!pid) return;
         if (!projectActivity[pid]) projectActivity[pid] = [];
-        projectActivity[pid].push({
-          action: row.action,
-          created_at: row.created_at,
-          website_name: row.website_name,
-          website_views: row.website_views,
-        });
+        projectActivity[pid].push(row);
       });
 
       // Fetch all projects in the team
@@ -81,36 +87,26 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
         return;
       }
 
-      const websiteSummaries = projects.map((proj: any) => {
+      const websiteSummaries = (projects as ProjectRow[]).map((proj) => {
         const activity = projectActivity[proj.id] ?? [];
-        const created = activity.filter((a: any) => a.action === "create");
-        const deleted = activity.filter((a: any) => a.action === "delete");
-        const restored = activity.filter((a: any) => a.action === "restore");
+        const created = activity.filter((a) => a.action === "create");
+        const deleted = activity.filter((a) => a.action === "delete");
+        const restored = activity.filter((a) => a.action === "restore");
 
         const firstCreated = created.length > 0
           ? new Date(created[0].created_at)
           : null;
         const lastDeleted = deleted.length > 0
-          ? new Date(Math.max(...deleted.map((d: any) => new Date(d.created_at).getTime())))
+          ? new Date(Math.max(...deleted.map((d) => new Date(d.created_at).getTime())))
           : null;
         const lastRestored = restored.length > 0
-          ? new Date(Math.max(...restored.map((r: any) => new Date(r.created_at).getTime())))
+          ? new Date(Math.max(...restored.map((r) => new Date(r.created_at).getTime())))
           : null;
 
-        let totalViews = 0;
-        let livedDays = 0;
-
-        // Calculate views and lifetime
-        activity.forEach((a: any) => {
-          totalViews += a.website_views ?? 0;
-        });
-
-        // If there's a deleted website, show lifetime summary
-        if (lastDeleted) {
-          livedDays = Math.ceil(
-            (lastDeleted.getTime() - (firstCreated?.getTime() ?? lastDeleted.getTime())) / (1000 * 60 * 60 * 24)
-          );
-        }
+        const totalViews = activity.reduce(
+          (sum, a) => sum + (a.website_views ?? 0),
+          0
+        );
 
         return {
           id: proj.id,
@@ -132,34 +128,9 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
     fetchWebsites();
   }, [teamId]);
 
-  if (!loaded) {
-    return <p className="text-[12px] text-text-muted">Loading...</p>;
-  }
-
-  if (websites.length === 0) {
-    return (
-      <InfoBox info>
-        <div className="flex items-center gap-3">
-          <span className="iconify text-[20px]" data-icon="layout-template" aria-hidden />
-          <span>Your websites will show up here.</span>
-        </div>
-      </InfoBox>
-    );
-  }
-
   // Chart: stepped area for active websites over time
   // We'll replay created/deleted/restored events to compute active count over time
-  const [activeOverTime, setActiveOverTime] = useState<Array<{ date: Date; count: number }>>([]);
-  const [timelineEvents, setTimelineEvents] = useState<Array<{
-    date: Date;
-    title: string;
-    type: "created" | "deleted" | "restored";
-    websiteName: string;
-  }>>([]);
-
-  useEffect(() => {
-    if (websites.length === 0 || loaded === false) return;
-
+  const { activeOverTime, timelineEvents } = useMemo(() => {
     // Replay events to compute active websites over time
     const allEvents: Array<{ date: Date; type: "create" | "delete" | "restore"; websiteId: string; websiteName: string }> = [];
 
@@ -198,40 +169,57 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
 
     // Compute active count at each event point
     let activeCount = 0;
-    const points: Array<{ date: Date; count: number }> = [];
-    const eventRecords: Array<{ date: Date; title: string; type: "created" | "deleted" | "restored"; websiteName: string }> = [];
+    const points: Array<{ date: Date; count: number; type: "created" | "deleted" | "restored" }> = [];
+    const eventRecords: TimelineEvent[] = [];
 
     allEvents.forEach((event) => {
       if (event.type === "create") {
         activeCount++;
-        points.push({ date: event.date, count: activeCount });
+        points.push({ date: event.date, count: activeCount, type: "created" });
         eventRecords.push({
           date: event.date,
           title: `${event.websiteName} was created`,
           type: "created",
+          websiteName: event.websiteName,
         });
       } else if (event.type === "delete") {
         activeCount--;
-        points.push({ date: event.date, count: activeCount });
+        points.push({ date: event.date, count: activeCount, type: "deleted" });
         eventRecords.push({
           date: event.date,
           title: `${event.websiteName} was deleted`,
           type: "deleted",
+          websiteName: event.websiteName,
         });
       } else if (event.type === "restore") {
         activeCount++;
-        points.push({ date: event.date, count: activeCount });
+        points.push({ date: event.date, count: activeCount, type: "restored" });
         eventRecords.push({
           date: event.date,
           title: `${event.websiteName} was restored`,
           type: "restored",
+          websiteName: event.websiteName,
         });
       }
     });
 
-    setActiveOverTime(points);
-    setTimelineEvents(eventRecords);
+    return { activeOverTime: points, timelineEvents: eventRecords };
   }, [websites]);
+
+  if (!loaded) {
+    return <p className="text-[12px] text-text-muted">Loading...</p>;
+  }
+
+  if (websites.length === 0) {
+    return (
+      <InfoBox info>
+        <div className="flex items-center gap-3">
+          <span className="iconify text-[20px]" data-icon="layout-template" aria-hidden />
+          <span>Your websites will show up here.</span>
+        </div>
+      </InfoBox>
+    );
+  }
 
   // Render the chart
   const renderChart = () => {
@@ -256,10 +244,6 @@ export function TeamHistoryCard({ teamId }: TeamHistoryCardProps) {
     // Y scale: integers for active count
     const maxCount = Math.max(...activeOverTime.map((d) => d.count), 1);
     const yDomain = [0, maxCount];
-
-    // Format dates for labels
-    const formatDate = (d: Date) =>
-      d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
 
     // Generate SVG path for stepped area
     const generateSteppedArea = (): string => {

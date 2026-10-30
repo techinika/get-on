@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Copy, QrCode, Mail, MessageCircle, Facebook, Linkedin } from "lucide-react";
+import { Copy, QrCode, Mail, MessageCircle } from "lucide-react";
 
 export function ShareMenu({
   url,
-  label,
 }: {
   url: string;
   label?: string;

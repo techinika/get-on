@@ -581,7 +581,7 @@ async function runDomainRemove(request: ApprovalRequest) {
   if (!result.ok) throw new ApprovalActionError(result.error);
 }
 
-async function runAccountDelete(request: ApprovalRequest, staffId: string) {
+async function runAccountDelete(request: ApprovalRequest) {
   if (request.target_type !== "team") unsupported();
   const teamId = uuid(request.target_id, "team");
   const payloadTeam = text(request.payload, "team_id");
@@ -732,7 +732,7 @@ async function dispatch(
     case "domain_plan_lapse":
       return runDomainPlanLapse(request);
     case "account_delete":
-      return runAccountDelete(request, staffId);
+      return runAccountDelete(request);
     case "template_publish":
       return runTemplatePublish(request);
     default:

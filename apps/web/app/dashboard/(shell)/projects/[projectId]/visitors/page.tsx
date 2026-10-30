@@ -4,8 +4,7 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
-import { isAnalyticsRoute } from "@/lib/analytics/routes";
-import { useEffect, useState } from "react";
+import { VisitorStats } from "./visitor-stats";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -53,18 +52,6 @@ export default async function VisitorsPage({ params }: Params) {
     }
   }
 
-  // Fetch stats data from the API
-  const [statsData, isLoading] = useState(
-    fetch(`/api/projects/${projectId}/stats?range=30d`).then((r) => r.json())
-  );
-
-  useEffect(() => {
-    // Prevent analytics from loading on non-allowed routes
-    if (!isAnalyticsRoute(window.location.pathname)) {
-      // Still show the page, just don't load GA
-    }
-  }, []);
-
   return (
     <AppPage width="wide">
       <PageHeader
@@ -81,7 +68,7 @@ export default async function VisitorsPage({ params }: Params) {
           <div className="flex flex-col items-start gap-3">
             <h2 className="text-[17px] font-semibold text-text">Publish your website to start counting</h2>
             <p className="text-[15px] text-text-muted">
-              Visitor numbers appear after your website is live. We never store IP addresses, and we respect "Do Not Track".
+              Visitor numbers appear after your website is live. We never store IP addresses, and we respect &ldquo;Do Not Track&rdquo;.
             </p>
             <Link
               href={`/dashboard/projects/${projectId}/publish`}
@@ -117,22 +104,7 @@ export default async function VisitorsPage({ params }: Params) {
               </p>
             </div>
 
-            {/* Live stats card */}
-            {statsData && !isLoading && (
-              <div className="mt-6">
-                <h3 className="text-[15px] font-medium text-text">Last 30 days</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-[24px] font-bold text-text"> {statsData.visitors || 0} </p>
-                    <p className="text-[12px] text-text-muted">Visitors</p>
-                  </div>
-                  <div>
-                    <p className="text-[24px] font-bold text-text"> {statsData.views || 0} </p>
-                    <p className="text-[12px] text-text-muted">Views</p>
-                  </div>
-                </div>
-              </div>
-            )}
+            <VisitorStats projectId={projectId} />
 
             {/* Plan history strip at bottom */}
             {planHistoryMonths !== null && (

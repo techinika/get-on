@@ -4,7 +4,7 @@ async function main() {
   // Hourly rollup: read recent events (last 48 hours) and aggregate.
   // In a real deployment, events are stored in a durable event table or Analytics Engine.
   // This skeleton verifies the rollup path exists and updates daily tables if needed.
-  const admin = createAdminClient();
+  createAdminClient();
   console.log("[link-stats-rollup] rollup started.");
 }
 

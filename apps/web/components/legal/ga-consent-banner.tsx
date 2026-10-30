@@ -16,50 +16,76 @@ import { useToast } from "@/components/ui/toast";
  * - Mirrors state in __Host-gs_consent cookie and localStorage gs_consent_v1
  * - Global Privacy Control / Do Not Track => banner hidden, state "off"
  */
+type ConsentDecision = "accepted" | "declined" | null;
+
+const CONSENT_EVENT = "gs-consent-change";
+
+function readCookie(name: string): string {
+  const match = document.cookie.match(
+    new RegExp("(^|;)\\s*" + name + "=\\s*([^;]+)")
+  );
+  return match ? match[2] : "";
+}
+
+function readConsent(): ConsentDecision {
+  if (typeof document === "undefined") return null;
+
+  // Read __Host-gs_consent cookie (value a1=accepted, a0=declined)
+  const cookieValue = readCookie("__Host-gs_consent");
+  let lsValue: string | null = null;
+  try {
+    lsValue = localStorage.getItem("gs_consent_v1");
+  } catch {
+    // localStorage can be unavailable in private browsing
+  }
+
+  if (cookieValue === "a1" || lsValue === "a1") return "accepted";
+  if (cookieValue === "a0" || lsValue === "a0") return "declined";
+  return null;
+}
+
+function subscribeConsent(callback: () => void) {
+  window.addEventListener("storage", callback);
+  window.addEventListener(CONSENT_EVENT, callback);
+  return () => {
+    window.removeEventListener("storage", callback);
+    window.removeEventListener(CONSENT_EVENT, callback);
+  };
+}
+
+function notifyConsentChange() {
+  window.dispatchEvent(new Event(CONSENT_EVENT));
+}
+
 export function GaConsentBanner() {
   const { toast } = useToast();
-  const [accepted, setAccepted] = React.useState(false);
-  const declinedRef = React.useRef(false);
+  const decision = React.useSyncExternalStore(
+    subscribeConsent,
+    readConsent,
+    () => null
+  );
+
+  // Apply the consent update to gtag if this visitor already accepted
+  React.useEffect(() => {
+    if (decision === "accepted" && window.gtag) {
+      window.gtag("consent", "update", {
+        analytics_storage: "granted",
+      });
+    }
+  }, [decision]);
 
   // Check for Global Privacy Control or Do Not Track
-  const honorGpc = typeof navigator !== "undefined" && navigator.globalPrivacyControl;
+  const honorGpc =
+    typeof navigator !== "undefined" &&
+    Boolean((navigator as Navigator & { globalPrivacyControl?: boolean }).globalPrivacyControl);
   const honorDnt = typeof navigator !== "undefined" && navigator.doNotTrack === "1";
 
-  if (honorGpc || honorDnt) {
-    // Banner not shown; state is "off"
+  // No banner for GPC/DNT visitors, or once a choice has been stored
+  if (honorGpc || honorDnt || decision !== null) {
     return null;
   }
 
-  // Read current state from cookie/localStorage
-  React.useEffect(() => {
-    let mounted = true;
-
-    // Read __Host-gs_consent cookie (value a1=accepted, a0=declined)
-    function readCookie(name: string): string {
-      const match = document.cookie.match(
-        new RegExp("(^|;)\\s*" + name + "=\\s*([^;]+)")
-      );
-      return match ? match[2] : "";
-    }
-
-    const cookieValue = readCookie("__Host-gs_consent");
-    const lsValue = localStorage.getItem("gs_consent_v1");
-
-    if (mounted) {
-      if (cookieValue === "a1" || lsValue === "a1") {
-        setAccepted(true);
-      } else if (cookieValue === "a0" || lsValue === "a0") {
-        setAccepted(false);
-      }
-    }
-
-    return () => {
-      mounted = false;
-    }
-  }, []);
-
   const onAccept = () => {
-    setAccepted(true);
     // Set __Host-gs_consent cookie (12 months, Secure, SameSite=Lax)
     const oneYearMs = 365 * 24 * 60 * 60 * 1000;
     const date = new Date(Date.now() + oneYearMs);
@@ -71,14 +97,15 @@ export function GaConsentBanner() {
         analytics_storage: "granted",
       });
     }
+    notifyConsentChange();
     toast("Analytics enabled");
   };
 
   const onDecline = () => {
-    setAccepted(false);
-    // Remove __Host-gs_consent cookie
-    document.cookie = `__Host-gs_consent=; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax`;
-    localStorage.removeItem("gs_consent_v1");
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    const date = new Date(Date.now() + oneYearMs);
+    document.cookie = `__Host-gs_consent=a0; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
+    localStorage.setItem("gs_consent_v1", "a0");
     // Update gtag consent
     if (window.gtag) {
       window.gtag("consent", "update", {
@@ -90,20 +117,8 @@ export function GaConsentBanner() {
       document.cookie =
         "_ga_*=; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax";
     }
+    notifyConsentChange();
   };
-
-  // If already accepted, don't show banner, just return null (caller handles)
-  if (accepted) {
-    // Still apply the consent update to gtag in case state got out of sync
-    React.useEffect(() => {
-      if (window.gtag) {
-        window.gtag("consent", "update", {
-          analytics_storage: "granted",
-        });
-      }
-    }, [accepted]);
-    return null;
-  }
 
   return (
     <div

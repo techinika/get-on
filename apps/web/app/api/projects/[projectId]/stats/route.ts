@@ -1,6 +1,18 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
+type DailyStatRow = {
+  day: string;
+  views: number | null;
+  visitors: number | null;
+};
+
+type DailyStat = {
+  day: string;
+  views: number;
+  visitors: number;
+};
+
 export async function GET(request: Request, { params }: { params: { projectId: string } }) {
   const { projectId } = await params;
 
@@ -26,9 +38,9 @@ export async function GET(request: Request, { params }: { params: { projectId: s
       return NextResponse.json({ views: 0, visitors: 0, daily: [], state });
     }
 
-    let daily = [];
+    let daily: DailyStat[] = [];
     if (dailyStats && Array.isArray(dailyStats)) {
-      daily = dailyStats.map((row: any) => ({
+      daily = (dailyStats as DailyStatRow[]).map((row) => ({
         day: row.day,
         views: row.views || 0,
         visitors: row.visitors || 0,
@@ -48,7 +60,12 @@ export async function GET(request: Request, { params }: { params: { projectId: s
       }
     }
 
-    return NextResponse.json({ views: daily.reduce((sum: number, r: any) => sum + r.views, 0), visitors: daily.reduce((sum: number, r: any) => sum + r.visitors, 0), daily, status });
+    return NextResponse.json({
+      views: daily.reduce((sum, row) => sum + row.views, 0),
+      visitors: daily.reduce((sum, row) => sum + row.visitors, 0),
+      daily,
+      status,
+    });
   } catch {
     return NextResponse.json({ views: 0, visitors: 0, daily: [], status: "error" }, { status: 500 });
   }

@@ -3,7 +3,7 @@
 import { useRef, useState } from "react";
 import { AppCard } from "@/components/app/card";
 import { Button } from "@/components/ui/button";
-import { Input, Label } from "@/components/ui/input";
+import { Label } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 
 export function ExportImportForm({ projectId }: { projectId: string }) {
