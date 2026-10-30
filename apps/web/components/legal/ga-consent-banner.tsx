@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { useToast } from "@/components/ui/toast";
 import { notifyConsentChange, readConsent, subscribeConsent } from "@/lib/analytics/consent";
 
 /**
@@ -18,7 +17,6 @@ import { notifyConsentChange, readConsent, subscribeConsent } from "@/lib/analyt
  * - Global Privacy Control / Do Not Track => banner hidden, state "off"
  */
 export function GaConsentBanner() {
-  const { toast } = useToast();
   const decision = React.useSyncExternalStore(
     subscribeConsent,
     readConsent,
@@ -58,7 +56,6 @@ export function GaConsentBanner() {
       });
     }
     notifyConsentChange();
-    toast("Analytics enabled");
   };
 
   const onDecline = () => {

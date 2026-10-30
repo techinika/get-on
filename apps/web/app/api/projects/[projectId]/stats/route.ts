@@ -13,7 +13,10 @@ type DailyStat = {
   visitors: number;
 };
 
-export async function GET(request: Request, { params }: { params: { projectId: string } }) {
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ projectId: string }> }
+) {
   const { projectId } = await params;
 
   const admin = createAdminClient();

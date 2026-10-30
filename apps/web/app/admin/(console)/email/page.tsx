@@ -5,9 +5,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getEmailSummary, listEmailLog, listEmailSuppressions } from "@/lib/admin";
 import { relativeTime } from "@/lib/relative-time";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { getEmailSettings } from "@/lib/platform/email-settings";
 import { EmailSettingsForm } from "@/components/admin/email-settings-form";
-import type { EmailTransport } from "@get-on/email";
 
 export const dynamic = "force-dynamic";
 
@@ -55,21 +54,15 @@ export default async function AdminEmailPage({
     : "all";
   const rows = active === "all" ? logs : logs.filter((row) => row.status === active);
 
-  const supabase = createAdminClient();
-  const { data: emailSetting } = await supabase
-    .from("email_settings")
-    .select("*")
-    .eq("id", true)
-    .maybeSingle();
-
-  const initialProvider = (emailSetting?.email_provider ?? "console") as EmailTransport;
+  const emailSetting = await getEmailSettings();
+  const initialProvider = emailSetting.email_provider;
   const initialSmtp = {
-    host: emailSetting?.smtp_host ?? "",
-    port: emailSetting?.smtp_port ?? 587,
-    secure: emailSetting?.smtp_secure ?? false,
-    user: emailSetting?.smtp_user ?? "",
-    from: emailSetting?.smtp_from ?? "",
-    name: emailSetting?.smtp_name ?? "Get-On",
+    host: emailSetting.smtp_host ?? "",
+    port: emailSetting.smtp_port ?? 587,
+    secure: emailSetting.smtp_secure ?? false,
+    user: emailSetting.smtp_user ?? "",
+    from: emailSetting.smtp_from ?? "",
+    name: emailSetting.smtp_name ?? "Get-On",
   };
   return (
     <AppPage width="wide">

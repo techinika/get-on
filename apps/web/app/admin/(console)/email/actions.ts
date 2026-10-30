@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { StaffError, requireStaffAction } from "@/lib/admin/staff";
-import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  setEmailProvider,
+  setSmtpSettings,
+  type EmailTransport,
+} from "@/lib/platform/email-settings";
 
 export type EmailSettingsActionResult =
   | { ok: true }
@@ -27,27 +31,19 @@ export async function saveEmailProvider(input: {
 
   try {
     await requireStaffAction("platform.settings");
-    const supabase = createAdminClient();
 
-    const { error } = await supabase.rpc("admin_set_email_provider", {
-      p_provider: provider,
-    });
-    if (error) {
+    try {
+      await setEmailProvider(provider as EmailTransport);
+    } catch (error) {
       console.error("admin_set_email_provider failed", error);
       return { ok: false, error: "We could not save the email provider." };
     }
 
     if (provider === "smtp" && input.smtp) {
-      const { error: smtpError } = await supabase.rpc("admin_set_smtp_settings", {
-        p_host: input.smtp.host.trim(),
-        p_port: input.smtp.port,
-        p_secure: input.smtp.secure,
-        p_user: input.smtp.user.trim(),
-        p_from: input.smtp.from.trim(),
-        p_name: input.smtp.name.trim(),
-      });
-      if (smtpError) {
-        console.error("admin_set_smtp_settings failed", smtpError);
+      try {
+        await setSmtpSettings(input.smtp);
+      } catch (error) {
+        console.error("admin_set_smtp_settings failed", error);
         return { ok: false, error: "We could not save the SMTP settings." };
       }
     }
