@@ -31,7 +31,7 @@ import { createHash } from "node:crypto";
 export const dynamic = "force-dynamic";
 
 /** Same text and shape for unknown accounts and wrong passwords. */
-function loginFailed(request: Request, code: string, next: string, retryAfter?: number) {
+function loginFailed(request: Request, code: string, next: string) {
   const url = new URL("/login", request.url);
   url.searchParams.set("error", code);
   if (next && next !== "/dashboard") url.searchParams.set("next", next);
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
       uaFamily: ua,
       visibleToUser: false,
     });
-    return loginFailed(request, "AUTH_LOCKED", next, Math.max(perEmail.retryAfter, perIp.retryAfter));
+    return loginFailed(request, "AUTH_LOCKED", next);
   }
 
   const admin = createAdminClient();

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowRight, Link2 } from "lucide-react";
 
 export function LinkDialog({ open, onClose, defaultCampaign }: { open: boolean; onClose: () => void; defaultCampaign?: string }) {
   const [name, setName] = useState("My link");

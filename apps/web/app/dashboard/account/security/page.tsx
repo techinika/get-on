@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useSearchParams } from "next/navigation";
-import { Button } from "@/components/ui/button";
 
 export default function SecurityPage() {
   const searchParams = useSearchParams();

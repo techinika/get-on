@@ -14,6 +14,7 @@ interface Env {
   supabaseUrl: string;
   supabaseAnonKey: string;
   siteUrl: string;
+  NEXT_PUBLIC_GA_MEASUREMENT_ID: string;
   FIELD_KEYS: string;
   FIELD_KEY_CURRENT: number;
   HEARTBEAT_URL: string;
@@ -36,6 +37,7 @@ function getEnv(): Env {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",
     siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? process.env.APP_ORIGIN ?? "",
+    NEXT_PUBLIC_GA_MEASUREMENT_ID: process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID ?? "",
     FIELD_KEYS: process.env.FIELD_KEYS ?? '{"1": ""}',
     FIELD_KEY_CURRENT: Number(process.env.FIELD_KEY_CURRENT ?? 1),
     HEARTBEAT_URL: process.env.HEARTBEAT_URL ?? "",

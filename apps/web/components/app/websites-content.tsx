@@ -4,12 +4,14 @@ import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
+  Copy,
   Globe,
   LayoutTemplate,
   LifeBuoy,
   Mail,
   MoreVertical,
   Plus,
+  QrCode,
   Sparkles,
   TriangleAlert,
   Users,
@@ -20,6 +22,7 @@ import { Section } from "@/components/app/section";
 import { AppCard } from "@/components/app/card";
 import { AppEmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
+import { Sparkline, TrendBadge } from "@/components/analytics/sparkline";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
@@ -30,7 +33,7 @@ import { gradientFor } from "@/lib/gradient";
 import { relativeTime } from "@/lib/relative-time";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { cn } from "@/lib/utils";
-import { ShareMenu } from "@/components/app/share-menu";
+import { QrDialog } from "@/components/app/qr-dialog";
 
 export type WebsiteSummary = {
   id: string;
@@ -279,8 +282,22 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
   const [confirmText, setConfirmText] = React.useState("");
   const [deleting, setDeleting] = React.useState(false);
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [qrOpen, setQrOpen] = React.useState(false);
 
   const href = `/dashboard/projects/${website.id}`;
+  const shareUrl = website.primaryHost
+    ? primaryAddress(readPublishConfig(), website.subdomain, website.primaryHost)
+    : `https://${website.subdomain}.get-on.tech`;
+
+  async function copyLink() {
+    setMenuOpen(false);
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("Link copied", "success");
+    } catch {
+      toast(friendlyError("NETWORK_ERROR"), "error");
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true);
@@ -354,8 +371,12 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
                 Edited {relativeTime(website.updatedAt)}
               </span>
             )}
+            {/* Growth sparkline and trend badge */}
+            <div className="mt-3 flex items-baseline gap-2">
+              <Sparkline projectId={website.id} sparklineDays={30} />
+              <TrendBadge projectId={website.id} />
+            </div>
             <div className="relative z-10">
-              <ShareMenu url={website.primaryHost ? primaryAddress(readPublishConfig(), website.subdomain, website.primaryHost) : `https://${website.subdomain}.get-on.tech`} label={website.name} />
               <button
                 type="button"
                 aria-label={`More actions for ${website.name}`}
@@ -399,6 +420,28 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
                       className="flex h-11 w-full items-center rounded-[10px] px-3 text-left text-[15px] font-medium text-text transition-colors hover:bg-row-hover"
                     >
                       Preview
+                    </button>
+                    <div role="separator" className="my-1 h-px bg-border" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={copyLink}
+                      className="flex h-11 w-full items-center gap-2.5 rounded-[10px] px-3 text-left text-[15px] font-medium text-text transition-colors hover:bg-row-hover"
+                    >
+                      <Copy size={17} strokeWidth={1.75} aria-hidden />
+                      Copy link
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setQrOpen(true);
+                      }}
+                      className="flex h-11 w-full items-center gap-2.5 rounded-[10px] px-3 text-left text-[15px] font-medium text-text transition-colors hover:bg-row-hover"
+                    >
+                      <QrCode size={17} strokeWidth={1.75} aria-hidden />
+                      QR code
                     </button>
                     <div role="separator" className="my-1 h-px bg-border" />
                     <button
@@ -462,6 +505,8 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
           />
         </div>
       </Dialog>
+
+      <QrDialog open={qrOpen} url={shareUrl} onClose={() => setQrOpen(false)} />
     </>
   );
 }

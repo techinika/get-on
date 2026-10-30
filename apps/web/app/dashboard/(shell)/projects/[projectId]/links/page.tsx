@@ -13,11 +13,9 @@ export default function LinksPage({ params }: { params: Promise<{ projectId: str
   const [openQr, setOpenQr] = useState(false);
   const [links, setLinks] = useState<{ id: string; code: string; label: string | null; target_path: string; active: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projectId, setProjectId] = useState("");
 
   useEffect(() => {
     params.then(({ projectId }) => {
-      setProjectId(projectId);
       fetch(`/api/projects/${projectId}/links`)
         .then((r) => r.json())
         .then((data) => {

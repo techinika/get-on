@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
 import { getEmailSummary, listEmailLog, listEmailSuppressions } from "@/lib/admin";
 import { relativeTime } from "@/lib/relative-time";
+import { getEmailSettings } from "@/lib/platform/email-settings";
+import { EmailSettingsForm } from "@/components/admin/email-settings-form";
 
 export const dynamic = "force-dynamic";
 
@@ -52,6 +54,16 @@ export default async function AdminEmailPage({
     : "all";
   const rows = active === "all" ? logs : logs.filter((row) => row.status === active);
 
+  const emailSetting = await getEmailSettings();
+  const initialProvider = emailSetting.email_provider;
+  const initialSmtp = {
+    host: emailSetting.smtp_host ?? "",
+    port: emailSetting.smtp_port ?? 587,
+    secure: emailSetting.smtp_secure ?? false,
+    user: emailSetting.smtp_user ?? "",
+    from: emailSetting.smtp_from ?? "",
+    name: emailSetting.smtp_name ?? "Get-On",
+  };
   return (
     <AppPage width="wide">
       <PageHeader
@@ -64,7 +76,12 @@ export default async function AdminEmailPage({
         }
       />
 
-      <div className="grid grid-cols-1 gap-4 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-4">
+      <EmailSettingsForm
+        initialProvider={initialProvider}
+        initialSmtp={initialSmtp}
+      />
+
+      <div className="mt-6 grid grid-cols-1 gap-4 min-[640px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <AppCard className="p-5">
           <p className="text-sm text-text-muted">Queued</p>
           <p className="text-stat-number mt-1 text-text">{summary.queued ?? 0}</p>

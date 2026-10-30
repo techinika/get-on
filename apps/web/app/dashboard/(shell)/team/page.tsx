@@ -13,6 +13,7 @@ import { can } from "@/lib/permissions";
 import { matrix, type Role } from "@get-on/permissions";
 import matrixJson from "@get-on/permissions/matrix.json";
 import { TeamManager, type InvitationItem, type TeamMemberItem } from "./team-manager";
+import { TeamHistoryCard } from "@/components/team/history";
 
 const ROLE_LABEL: Record<Role, string> = {
   owner: "Owner",
@@ -193,6 +194,8 @@ export default async function TeamPage() {
           </SettingsSection>
         </AppCard>
       </Section>
+
+      <TeamHistoryCard teamId={data.currentTeam.id} />
     </AppPage>
   );
 }

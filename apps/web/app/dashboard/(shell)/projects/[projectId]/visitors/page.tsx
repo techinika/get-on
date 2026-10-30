@@ -4,6 +4,7 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { VisitorStats } from "./visitor-stats";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -12,23 +13,44 @@ export default async function VisitorsPage({ params }: Params) {
   const current = await getCurrentTeam();
   let published = false;
   let counting = true;
+  let planHistoryMonths: number | null = 0;
+  let plan = "Free";
+
   if (current) {
     const supabase = await createClient();
-    const [{ data: project }, { data: settings }] = await Promise.all([
-      supabase
-        .from("projects")
-        .select("status")
-        .eq("id", projectId)
-        .eq("team_id", current.team.teamId)
-        .maybeSingle(),
+    const { data: project } = await supabase
+      .from("projects")
+      .select("status, plan_id")
+      .eq("id", projectId)
+      .eq("team_id", current.team.teamId)
+      .maybeSingle();
+
+    const [{ data: settings }, { data: planRow }] = await Promise.all([
       supabase
         .from("project_settings")
         .select("stats_enabled")
         .eq("project_id", projectId)
         .maybeSingle(),
+      supabase
+        .from("plans")
+        .select("name, priority_class, priority_label")
+        .eq("id", project?.plan_id)
+        .maybeSingle(),
     ]);
+
     published = project?.status === "published";
     counting = settings?.stats_enabled !== false;
+
+    if (planRow) {
+      plan = planRow.name;
+      const historyMap: Record<string, number | null> = {
+        free: 90,
+        basic: 365,
+        pro: 730,
+        enterprise: null,
+      };
+      planHistoryMonths = historyMap[planRow.priority_class] ?? 90;
+    }
   }
 
   return (
@@ -39,7 +61,7 @@ export default async function VisitorsPage({ params }: Params) {
           { label: "Visitors" },
         ]}
         title="Visitors"
-        description="How many people visit your website."
+        description="How many people visit {project name}."
       />
 
       <AppCard className="max-w-[960px] p-6">
@@ -47,7 +69,7 @@ export default async function VisitorsPage({ params }: Params) {
           <div className="flex flex-col items-start gap-3">
             <h2 className="text-[17px] font-semibold text-text">Publish your website to start counting</h2>
             <p className="text-[15px] text-text-muted">
-              Visitor numbers appear after your website is live. We never store IP addresses, and we respect &quot;Do Not Track&quot;.
+              Visitor numbers appear after your website is live. We never store IP addresses, and we respect &ldquo;Do Not Track&rdquo;.
             </p>
             <Link
               href={`/dashboard/projects/${projectId}/publish`}
@@ -60,7 +82,7 @@ export default async function VisitorsPage({ params }: Params) {
           <div className="flex flex-col items-start gap-3">
             <h2 className="text-[17px] font-semibold text-text">Visitor counting is off</h2>
             <p className="text-[15px] text-text-muted">
-              Turn it on to see how many people visit your website. Numbers are kept for 90 days.
+              Turn it on to see how many people visit your website. Numbers are kept for {planHistoryMonths} months.
             </p>
             <Link
               href={`/dashboard/projects/${projectId}/settings/analytics`}
@@ -70,12 +92,35 @@ export default async function VisitorsPage({ params }: Params) {
             </Link>
           </div>
         ) : (
-          <div className="flex flex-col items-start gap-3">
-            <h2 className="text-[17px] font-semibold text-text">No visitors yet</h2>
-            <p className="text-[15px] text-text-muted">
-              When people visit your website, their visits show up here within a few minutes. Numbers are kept for 90 days and never include personal details.
-            </p>
-          </div>
+          <>
+            <div className="flex flex-col items-start gap-3">
+              <h2 className="text-[17px] font-semibold text-text">No visitors yet</h2>
+              <p className="text-[15px] text-text-muted">
+                When people visit your website, their visits show up here within a few minutes. Numbers are kept for {planHistoryMonths} months and never include personal details.
+                {planHistoryMonths !== null && (
+                  <p className="text-[14px] text-text-muted mt-2">
+                    Your {plan} plan shows {planHistoryMonths} months of history. Upgrade to see older numbers.
+                  </p>
+                )}
+              </p>
+            </div>
+
+            <VisitorStats projectId={projectId} />
+
+            {/* Plan history strip at bottom */}
+            {planHistoryMonths !== null && (
+              <div className="mt-8 pt-8 border-t border-border-strong text-[14px] text-text-muted">
+                Your {plan} plan shows {planHistoryMonths} months of history.
+                We keep your numbers, so older months appear when you upgrade.
+                <Link
+                  href={`/dashboard/plan`}
+                  className="font-semibold text-primary hover:underline"
+                >
+                  See plans
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </AppCard>
     </AppPage>

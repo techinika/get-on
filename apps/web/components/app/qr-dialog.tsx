@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { QrCode, Download, Check } from "lucide-react";
+import { QrCode } from "lucide-react";
 
-export function QrDialog({ open, url, onClose }: { open: boolean; url: string; onClose: () => void }) {
+export function QrDialog({ open, onClose }: { open: boolean; url: string; onClose: () => void }) {
   const [caption, setCaption] = useState("Scan to visit");
   if (!open) return null;
   return (

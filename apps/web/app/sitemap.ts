@@ -7,12 +7,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
     "/request-demo",
     "/signup",
     "/login",
-    "/forgot-password",
     "/terms",
     "/privacy",
     "/cookies",
     "/acceptable-use",
+    "/templates",
+    "/templates/category/software",
+    "/templates/category/law-firm",
+    "/templates/category/restaurant",
+    "/templates/category/developer-portfolio",
+    "/templates/category/software-company",
+    "/billing-policy",
+    "/report",
   ].map((path) => ({
     url: `${base}${path}`,
+    lastModified: new Date(),
   }));
 }

@@ -88,3 +88,35 @@ begin
   return jsonb_build_object('decision', 'continue');
 end;
 $$;
+
+-- Role check helpers for RLS policies
+
+create or replace function public.is_super_admin()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role = 'super_admin'
+  );
+$$;
+
+create or replace function public.is_customer_success()
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select exists (
+    select 1
+    from public.profiles p
+    where p.id = auth.uid()
+      and p.role in ('admin', 'owner', 'customer_success')
+  );
+$$;
