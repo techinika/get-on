@@ -13,9 +13,11 @@ import {
 import {
   compileStyles,
   findNode,
+  findParent,
   type PageContentV5,
   type Theme,
 } from "@get-on/blocks";
+import { ArrowDown, ArrowUp, Copy, CornerLeftUp, GripVertical, Trash2 } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
 
 export type CanvasBusiness = {
@@ -72,6 +74,9 @@ export function EditorCanvas({
   const hover = useEditorStore((state) => state.hover);
   const setEditing = useEditorStore((state) => state.setEditing);
   const updateProps = useEditorStore((state) => state.updateProps);
+  const moveSibling = useEditorStore((state) => state.moveSibling);
+  const duplicate = useEditorStore((state) => state.duplicate);
+  const remove = useEditorStore((state) => state.remove);
 
   const images = React.useMemo(() => new Map(media), [media]);
   const compiled = React.useMemo(() => compileStyles(content.root, { customCss: content.css }), [content]);
@@ -202,6 +207,44 @@ export function EditorCanvas({
   }, [doc, content, width]);
 
   const scale = zoom === "fit" ? Math.min(1, Math.max(0.25, (areaWidth - 48) / width)) : zoom / 100;
+  const [toolbar, setToolbar] = React.useState<{ left: number; top: number; width: number } | null>(null);
+
+  React.useEffect(() => {
+    if (!doc) return;
+    const update = () => {
+      if (!selectedId || selectedId === content.root.id || mode !== "edit") {
+        setToolbar(null);
+        return;
+      }
+      const element = doc.querySelector(`[data-gs-node="${CSS.escape(selectedId)}"]`);
+      const area = areaRef.current;
+      const frame = iframeRef.current;
+      if (!element || !area || !frame) {
+        setToolbar(null);
+        return;
+      }
+      const rect = element.getBoundingClientRect();
+      const areaRect = area.getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      setToolbar({
+        left: Math.max(8, frameRect.left - areaRect.left + rect.left * scale),
+        top: Math.max(8, frameRect.top - areaRect.top + rect.top * scale - 44),
+        width: rect.width * scale,
+      });
+    };
+    update();
+    const area = areaRef.current;
+    area?.addEventListener("scroll", update, { passive: true });
+    doc.addEventListener("scroll", update, true);
+    window.addEventListener("resize", update);
+    return () => {
+      area?.removeEventListener("scroll", update);
+      doc.removeEventListener("scroll", update, true);
+      window.removeEventListener("resize", update);
+    };
+  }, [doc, selectedId, content, mode, scale, frameHeight]);
+
+  const parent = selectedId ? findParent(content.root, selectedId) : null;
 
   const header = (
     <SiteHeader
@@ -308,6 +351,58 @@ export function EditorCanvas({
           </div>
         </div>
       ) : null}
+      {toolbar && mode === "edit" && selectedId ? (
+        <div
+          className="absolute z-20 flex h-10 items-center gap-0.5 rounded-[10px] border border-border bg-surface p-1 shadow-card"
+          style={{ left: toolbar.left, top: toolbar.top }}
+          role="toolbar"
+          aria-label="Selected element actions"
+        >
+          <span className="flex h-8 w-6 items-center justify-center text-text-muted" aria-hidden>
+            <GripVertical size={16} />
+          </span>
+          <ToolbarButton label="Move up" onClick={() => moveSibling(selectedId, -1)}>
+            <ArrowUp size={16} />
+          </ToolbarButton>
+          <ToolbarButton label="Move down" onClick={() => moveSibling(selectedId, 1)}>
+            <ArrowDown size={16} />
+          </ToolbarButton>
+          {parent ? (
+            <ToolbarButton label="Select parent" onClick={() => select(parent.parent.id)}>
+              <CornerLeftUp size={16} />
+            </ToolbarButton>
+          ) : null}
+          <span className="mx-0.5 h-5 w-px bg-border" aria-hidden />
+          <ToolbarButton label="Duplicate" onClick={() => duplicate(selectedId)}>
+            <Copy size={16} />
+          </ToolbarButton>
+          <ToolbarButton label="Delete" onClick={() => remove(selectedId)}>
+            <Trash2 size={16} />
+          </ToolbarButton>
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+function ToolbarButton({
+  label,
+  onClick,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex h-8 w-8 items-center justify-center rounded-input text-text-muted hover:bg-surface-muted hover:text-text"
+      aria-label={label}
+      title={label}
+    >
+      {children}
+    </button>
   );
 }
