@@ -13,16 +13,16 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
+  ArrowLeft,
   EyeOff,
   GripVertical,
 } from "lucide-react";
-import Link from "next/link";
 import { cloneNode, createNode, defaultSmartProps, findNode, findParent, validateContentV5, type ContentNode } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
 import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, PATTERNS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
 import { Box } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
-import { deleteEditorPattern, generateEditorSections, listEditorPatterns, recordEditorPatternUse, saveEditorPattern, type SavedPattern } from "./actions";
+import { deleteEditorPattern, generateEditorSections, getEditorTemplate, listEditorPatterns, listEditorTemplates, recordEditorPatternUse, saveEditorPattern, type EditorTemplateItem, type EditorTemplatePage, type SavedPattern } from "./actions";
 
 export function LeftPanel({ projectId }: { projectId: string }) {
   const tab = useEditorStore((state) => state.leftTab);
@@ -106,7 +106,7 @@ export function LeftPanel({ projectId }: { projectId: string }) {
       {tab === "add" ? (
         <AddTab projectId={projectId} />
       ) : tab === "patterns" ? (
-        <PatternsTab projectId={projectId} />
+        <PatternsTab />
       ) : (
         <LayersTab count={count} root={content.root} />
       )}
@@ -242,7 +242,7 @@ function AddTab({ projectId }: { projectId: string }) {
   );
 }
 
-function PatternsTab({ projectId }: { projectId: string }) {
+function PatternsTab() {
   const insertNodesAt = useEditorStore((state) => state.insertNodesAt);
   const content = useEditorStore((state) => state.content);
   const selectedId = useEditorStore((state) => state.selectedId);
@@ -252,6 +252,13 @@ function PatternsTab({ projectId }: { projectId: string }) {
   const [name, setName] = React.useState("");
   const [busy, setBusy] = React.useState(false);
   const [message, setMessage] = React.useState<string | null>(null);
+  const [templateModalOpen, setTemplateModalOpen] = React.useState(false);
+  const [templateBusy, setTemplateBusy] = React.useState(false);
+  const [templateItems, setTemplateItems] = React.useState<EditorTemplateItem[]>([]);
+  const [templateItemsState, setTemplateItemsState] = React.useState<"loading" | "ready" | "error">("loading");
+  const [selectedTemplate, setSelectedTemplate] = React.useState<EditorTemplateItem | null>(null);
+  const [templatePages, setTemplatePages] = React.useState<EditorTemplatePage[]>([]);
+  const [templateError, setTemplateError] = React.useState<string | null>(null);
   const categories = ["All", ...Array.from(new Set(PATTERNS.map((item) => item.category)))];
   const patterns = PATTERNS.filter((item) => category === "All" || item.category === category);
   const selected = selectedId ? findNode(content.root, selectedId) : null;
@@ -272,6 +279,41 @@ function PatternsTab({ projectId }: { projectId: string }) {
       alive = false;
     };
   }, []);
+
+  React.useEffect(() => {
+    if (!templateModalOpen) return;
+    let alive = true;
+    void listEditorTemplates().then((items) => {
+      if (!alive) return;
+      setTemplateItems(items);
+      setTemplateItemsState(items.length > 0 ? "ready" : "error");
+    });
+    return () => {
+      alive = false;
+    };
+  }, [templateModalOpen]);
+
+  async function openTemplate(item: EditorTemplateItem) {
+    setSelectedTemplate(item);
+    setTemplatePages([]);
+    setTemplateError(null);
+    setTemplateBusy(true);
+    const result = await getEditorTemplate({ slug: item.slug });
+    setTemplateBusy(false);
+    if (!result.ok) {
+      setTemplateError(result.message);
+      return;
+    }
+    setTemplatePages(result.template.pages);
+  }
+
+  function insertTemplatePage(page: EditorTemplatePage) {
+    insertNodesAt(page.nodes);
+    setTemplateModalOpen(false);
+    setSelectedTemplate(null);
+    setTemplatePages([]);
+    setMessage("Template added to your page.");
+  }
 
   async function save() {
     if (!selected || !canSave || busy) return;
@@ -300,7 +342,8 @@ function PatternsTab({ projectId }: { projectId: string }) {
   }
 
   return (
-    <div className="flex-1 overflow-auto p-3">
+    <>
+      <div className="flex-1 overflow-auto p-3">
       <div className="rounded-input border border-border bg-surface-muted p-2">
         <p className="text-xs font-semibold text-text">Save what you selected</p>
         {canSave ? (
@@ -418,16 +461,238 @@ function PatternsTab({ projectId }: { projectId: string }) {
         ))}
         <p className="mt-3 text-xs text-text-muted">
           Want a whole design instead?{" "}
-          <Link
-            href={`/dashboard/projects/${projectId}/templates`}
+          <button
+            type="button"
+            onClick={() => setTemplateModalOpen(true)}
             className="underline underline-offset-4 hover:text-primary"
-            target="_blank"
-            rel="noopener noreferrer"
           >
             Browse all templates
-          </Link>
+          </button>
           .
         </p>
+      </div>
+    </div>
+    {templateModalOpen ? (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="template-gallery-title">
+        <TemplateGalleryModal
+          open={templateModalOpen}
+          onClose={() => setTemplateModalOpen(false)}
+          items={templateItems}
+          itemsState={templateItemsState}
+          busy={templateBusy}
+          selectedTemplate={selectedTemplate ?? null}
+          pages={templatePages}
+          error={templateError ?? null}
+          onSelectTemplate={openTemplate}
+          onInsertPage={insertTemplatePage}
+          onBack={() => {
+            setSelectedTemplate(null);
+            setTemplatePages([]);
+          }}
+        />
+      </div>
+    ) : null}
+    </>
+  );
+}
+
+function TemplateGalleryModal({
+  open,
+  onClose,
+  items,
+  itemsState,
+  busy,
+  selectedTemplate,
+  pages,
+  error,
+  onSelectTemplate,
+  onInsertPage,
+  onBack,
+}: {
+  open: boolean;
+  onClose: () => void;
+  items: EditorTemplateItem[];
+  itemsState: "loading" | "ready" | "error";
+  busy: boolean;
+  selectedTemplate: EditorTemplateItem | null;
+  pages: EditorTemplatePage[];
+  error: string | null;
+  onSelectTemplate: (item: EditorTemplateItem) => void;
+  onInsertPage: (page: EditorTemplatePage) => void;
+  onBack: () => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div className="flex max-h-[90vh] w-full max-w-4xl flex-col rounded-card border border-border bg-surface p-4 shadow-card">
+      <div className="flex items-center justify-between gap-2 shrink-0">
+        <h2 id="template-gallery-title" className="text-h2">Choose a template</h2>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-9 rounded-input border border-border px-3 text-sm font-semibold text-text hover:bg-surface-muted"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="mt-3 min-h-0 flex-1 overflow-hidden flex flex-col">
+        {selectedTemplate === null ? (
+          <TemplateList
+            items={items}
+            itemsState={itemsState}
+            busy={busy}
+            onSelectTemplate={onSelectTemplate}
+          />
+        ) : (
+          <TemplatePages
+            template={selectedTemplate}
+            pages={pages}
+            error={error}
+            busy={busy}
+            onInsertPage={onInsertPage}
+            onBack={onBack}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TemplateList({
+  items,
+  itemsState,
+  busy,
+  onSelectTemplate,
+}: {
+  items: EditorTemplateItem[];
+  itemsState: "loading" | "ready" | "error";
+  busy: boolean;
+  onSelectTemplate: (item: EditorTemplateItem) => void;
+}) {
+  if (itemsState === "loading") {
+    return <div className="min-h-48 flex items-center justify-center text-xs text-text-muted">Loading templates…</div>;
+  }
+  if (itemsState === "error" || items.length === 0) {
+    return (
+      <div className="rounded-card border border-border bg-surface p-4 text-center text-xs text-text-muted">
+        No templates are available for your plan right now.
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      {items.map((item) => (
+        <button
+          key={item.slug}
+          type="button"
+          disabled={!item.available || busy}
+          onClick={() => void onSelectTemplate(item)}
+          className={cn(
+            "flex flex-col gap-2 rounded-card border p-3 text-left hover:border-primary hover:shadow-card transition-colors",
+            !item.available ? "border-dashed opacity-60" : "border-border bg-surface",
+          )}
+        >
+          <div className="flex items-start justify-between gap-2">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-input bg-surface-muted text-text-muted">
+              <Sparkles size={14} strokeWidth={1.6} aria-hidden />
+            </span>
+            {item.featured ? (
+              <span className="flex shrink-0 items-center rounded-full bg-primary-soft px-1.5 py-0.5 text-[10px] font-bold text-on-primary">
+                Popular
+              </span>
+            ) : null}
+          </div>
+          <h3 className="text-sm font-semibold text-text">{item.name}</h3>
+          <p className="text-xs text-text-muted line-clamp-2">{item.tagline}</p>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {item.tags.slice(0, 4).map((tag) => (
+              <span key={tag} className="rounded-full border px-1.5 py-0.5 text-[10px] font-semibold text-text-muted border-border">
+                {tag}
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center justify-between text-[11px]">
+            <span className="text-text-muted">{item.pageCount} pages</span>
+            {!item.available ? (
+              <span className="text-text-muted">Requires {item.requiredPlan}</span>
+            ) : (
+              <span className="text-accent-text">Free for your plan</span>
+            )}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function TemplatePages({
+  template,
+  pages,
+  error,
+  busy,
+  onInsertPage,
+  onBack,
+}: {
+  template: EditorTemplateItem;
+  pages: EditorTemplatePage[];
+  error: string | null;
+  busy: boolean;
+  onInsertPage: (page: EditorTemplatePage) => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex items-center justify-between gap-2 shrink-0 mb-2">
+        <button
+          type="button"
+          onClick={onBack}
+          className="flex h-8 items-center gap-1 rounded-input border border-border px-2 text-xs font-semibold text-text hover:bg-surface-muted"
+        >
+          <ArrowLeft size={13} strokeWidth={1.6} aria-hidden />
+          Back to templates
+        </button>
+        <span className="text-xs font-semibold text-text-muted">{template.name}</span>
+      </div>
+      <p className="text-[11px] text-text-muted mb-3">
+        Pick a page to add its sections to your current page. You can edit everything after inserting it.
+      </p>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {busy ? (
+          <div className="min-h-48 flex items-center justify-center text-xs text-text-muted">Loading pages…</div>
+        ) : error ? (
+          <div className="p-3 text-xs text-danger-text">{error}</div>
+        ) : pages.length === 0 ? (
+          <div className="p-3 text-xs text-text-muted">This template has no pages.</div>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            {pages.map((page) => (
+              <button
+                key={page.id}
+                type="button"
+                onClick={() => void onInsertPage(page)}
+                className="flex flex-col gap-2 rounded-card border p-3 text-left hover:border-primary hover:shadow-card"
+              >
+                <div className="flex h-24 shrink-0 items-end justify-between gap-2 rounded-input bg-surface-muted p-2">
+                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-soft text-[10px] font-bold text-on-primary">
+                    {page.position + 1}
+                  </span>
+                  {page.isHome ? (
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent-soft text-[10px] font-bold text-accent-text">
+                      Home
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="text-sm font-semibold text-text">{page.menuLabel || page.title}</h3>
+                <p className="text-xs text-text-muted line-clamp-2">{page.seoTitle || page.title}</p>
+                <span className="mt-auto text-[10px] font-semibold text-text-muted">
+                  {page.nodes.length} sections
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

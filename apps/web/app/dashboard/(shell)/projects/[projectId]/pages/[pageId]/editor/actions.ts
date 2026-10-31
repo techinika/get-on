@@ -1,11 +1,45 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { blockSchema, countNodes, customCodeLimits, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
+import { blockSchema, countNodes, customCodeLimits, migrateV4ToV5, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { publicMediaUrl } from "@/lib/media";
 import { generatePageWithAi, generateSectionsWithAi, writeWithAi } from "@/lib/ai/actions";
+import { materializeTemplate, requireSystemTemplate } from "@get-on/templates";
+import { templatesForPlan } from "@/lib/templates/catalog";
+
+export type EditorTemplateItem = {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  category: string;
+  tags: string[];
+  planMin: string;
+  requiredPlan: string | null;
+  available: boolean;
+  pageCount: number;
+  featured: boolean;
+};
+
+export async function listEditorTemplates(): Promise<EditorTemplateItem[]> {
+  const current = await getCurrentTeam();
+  if (!current) return [];
+  return templatesForPlan(current.team.planId).map((item) => ({
+    slug: item.slug,
+    name: item.name,
+    tagline: item.tagline,
+    description: item.description,
+    category: item.category,
+    tags: item.tags,
+    planMin: item.planMin,
+    requiredPlan: item.requiredPlan ?? null,
+    available: item.available,
+    pageCount: item.pageCount,
+    featured: item.featured,
+  }));
+}
 
 type SaveResult =
   | { ok: true; revision: number }
@@ -438,4 +472,61 @@ export async function deleteEditorPattern(id: string): Promise<{ ok: boolean; me
     .eq("team_id", current.team.teamId);
   if (error) return { ok: false, message: "That pattern could not be deleted." };
   return { ok: true };
+}
+
+export type EditorTemplatePage = {
+  id: string;
+  key: string;
+  title: string;
+  path: string;
+  position: number;
+  isHome: boolean;
+  showInMenu: boolean;
+  menuLabel: string;
+  seoTitle: string;
+  seoDescription: string;
+  nodes: ContentNode[];
+};
+
+export type EditorTemplateResult =
+  | { ok: true; template: { slug: string; name: string; theme: unknown; pages: EditorTemplatePage[] } }
+  | { ok: false; code: string; message: string };
+
+export async function getEditorTemplate(input: { slug: string }): Promise<EditorTemplateResult> {
+  const current = await getCurrentTeam();
+  if (!current) return { ok: false, code: "AUTH", message: "Please sign in again." };
+  if (!["owner", "admin", "editor"].includes(current.team.role)) {
+    return { ok: false, code: "FORBIDDEN", message: "Only editors, admins and the owner can use templates." };
+  }
+
+  const item = templatesForPlan(current.team.planId).find((template) => template.slug === input.slug);
+  if (!item) return { ok: false, code: "NOT_FOUND", message: "We could not find that template." };
+  if (!item.available) {
+    return { ok: false, code: "PLAN_LIMIT", message: `This template is available on ${item.requiredPlan ?? "Free"} and above.` };
+  }
+
+  const pkg = requireSystemTemplate(input.slug);
+  const materialized = materializeTemplate(pkg, { profile: {}, maxPages: null });
+
+  const pages: EditorTemplatePage[] = materialized.pages.map((page) => {
+    const v5 = migrateV4ToV5(page.blocks);
+    return {
+      id: page.id,
+      key: page.key,
+      title: page.title,
+      path: page.path,
+      position: page.position,
+      isHome: page.isHome,
+      showInMenu: page.showInMenu,
+      menuLabel: page.menuLabel,
+      seoTitle: page.seoTitle,
+      seoDescription: page.seoDescription,
+      nodes: v5.root.children ?? [],
+    };
+  });
+
+  return {
+    ok: true,
+    template: { slug: materialized.slug, name: materialized.name, theme: materialized.theme, pages },
+  };
 }
