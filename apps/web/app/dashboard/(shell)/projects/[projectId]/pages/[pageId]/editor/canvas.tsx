@@ -14,6 +14,7 @@ import {
   compileStyles,
   findNode,
   findParent,
+  richTextFromPlain,
   type PageContentV5,
   type Theme,
 } from "@get-on/blocks";
@@ -168,7 +169,9 @@ export function EditorCanvas({
       if (!id) return;
       const text = target.textContent ?? "";
       const found = findNode(content.root, id);
-      if (found && found.props?.text !== text) updateProps(id, { text });
+      if (found && found.props?.text !== text) {
+        updateProps(id, found.props?.rich ? { text, rich: richTextFromPlain(text) } : { text });
+      }
       setEditing(null);
     };
 

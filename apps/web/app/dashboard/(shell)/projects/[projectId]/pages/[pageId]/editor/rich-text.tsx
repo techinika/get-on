@@ -14,6 +14,7 @@ export function RichTextEditor({ node, compact = false }: { node: ContentNode; c
   const [initial] = React.useState(
     () => (node.props?.rich as object | undefined) ?? richTextFromPlain(String(node.props?.text ?? "")),
   );
+  const lastEmitted = React.useRef(JSON.stringify(initial));
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -33,9 +34,19 @@ export function RichTextEditor({ node, compact = false }: { node: ContentNode; c
     onUpdate: ({ editor: current }) => {
       const result = sanitizeRichText(current.getJSON());
       if (!result.ok) return;
+      lastEmitted.current = JSON.stringify(result.doc);
       updateProps(node.id, { rich: result.doc, text: result.text }, { group: `text:${node.id}` });
     },
   });
+
+  React.useEffect(() => {
+    if (!editor) return;
+    const next = (node.props?.rich as object | undefined) ?? richTextFromPlain(String(node.props?.text ?? ""));
+    const serialized = JSON.stringify(next);
+    if (serialized === lastEmitted.current) return;
+    lastEmitted.current = serialized;
+    editor.commands.setContent(next, false);
+  }, [editor, node.props?.rich, node.props?.text]);
 
   if (!editor) return <div className="h-20 rounded-input border border-border bg-surface-muted" />;
 
