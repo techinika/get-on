@@ -1,3 +1,5 @@
+> The editor is replaced by `docs/ui-spec-editor-v3.md`. Where they conflict, v3 wins.
+
 # Editor documentation
 
 ## Dark and light mode (future plugin)
