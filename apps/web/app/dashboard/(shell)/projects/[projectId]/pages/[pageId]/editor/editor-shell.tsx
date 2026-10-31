@@ -92,9 +92,26 @@ export function EditorShell({
   }, [initialContent, revision]);
 
   React.useEffect(() => {
+    const onOffline = () => useEditorStore.getState().setSaveState("offline");
+    const onOnline = () => {
+      if (useEditorStore.getState().saveState === "offline") useEditorStore.getState().setSaveState("unsaved");
+    };
+    window.addEventListener("offline", onOffline);
+    window.addEventListener("online", onOnline);
+    return () => {
+      window.removeEventListener("offline", onOffline);
+      window.removeEventListener("online", onOnline);
+    };
+  }, []);
+
+  React.useEffect(() => {
     if (!booted.current) return;
     const state = useEditorStore.getState();
     if (state.saveState !== "unsaved") return;
+    if (!navigator.onLine) {
+      state.setSaveState("offline");
+      return;
+    }
     const timer = window.setTimeout(async () => {
       const current = useEditorStore.getState();
       const snapshot = current.content;
@@ -112,6 +129,8 @@ export function EditorShell({
       } else if (result.code === "REVISION_CONFLICT") {
         setConflict(true);
         useEditorStore.getState().setSaveState("error", result.message);
+      } else if (!navigator.onLine) {
+        useEditorStore.getState().setSaveState("offline");
       } else {
         useEditorStore.getState().setSaveState("error", result.message);
       }
