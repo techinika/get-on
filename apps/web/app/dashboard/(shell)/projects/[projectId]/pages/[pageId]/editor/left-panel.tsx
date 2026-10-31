@@ -14,8 +14,9 @@ import {
   ArrowUp,
   ArrowDown,
   EyeOff,
+  GripVertical,
 } from "lucide-react";
-import { cloneNode, createNode, defaultSmartProps, findNode, validateContentV5, type ContentNode } from "@get-on/blocks";
+import { cloneNode, createNode, defaultSmartProps, findNode, findParent, validateContentV5, type ContentNode } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
 import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, PATTERNS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
 import { Box } from "lucide-react";
@@ -426,6 +427,26 @@ function LayersTab({ root, count }: { root: ContentNode; count: number }) {
   const moveSibling = useEditorStore((state) => state.moveSibling);
   const duplicate = useEditorStore((state) => state.duplicate);
   const remove = useEditorStore((state) => state.remove);
+  const move = useEditorStore((state) => state.move);
+  const [draggedId, setDraggedId] = React.useState<string | null>(null);
+
+  function dropOn(targetId: string) {
+    if (!draggedId || draggedId === targetId) return;
+    const target = findNode(root, targetId);
+    if (!target) return;
+    if (targetId === root.id) {
+      move(draggedId, root.id, (target.children?.length ?? 0));
+      setDraggedId(null);
+      return;
+    }
+    const parent = findParent(root, targetId);
+    const from = findParent(root, draggedId);
+    if (!parent) return;
+    let index = parent.index;
+    if (from && from.parent.id === parent.parent.id && from.index < parent.index) index -= 1;
+    move(draggedId, parent.parent.id, index);
+    setDraggedId(null);
+  }
 
   const toggle = (id: string) => {
     setOpen((current) => {
@@ -449,6 +470,9 @@ function LayersTab({ root, count }: { root: ContentNode; count: number }) {
           moveSibling={moveSibling}
           duplicate={duplicate}
           remove={remove}
+          draggedId={draggedId}
+          setDraggedId={setDraggedId}
+          onDrop={dropOn}
         />
       </div>
       <div className="border-t border-border px-3 py-2 text-xs text-text-muted">
@@ -468,6 +492,9 @@ function LayerRow({
   moveSibling,
   duplicate,
   remove,
+  draggedId,
+  setDraggedId,
+  onDrop,
 }: {
   node: ContentNode;
   depth: number;
@@ -478,12 +505,16 @@ function LayerRow({
   moveSibling: (id: string, direction: -1 | 1) => void;
   duplicate: (id: string) => void;
   remove: (id: string) => void;
+  draggedId: string | null;
+  setDraggedId: (id: string | null) => void;
+  onDrop: (id: string) => void;
 }) {
   const children = node.children ?? [];
   const isOpen = open.has(node.id);
   const Icon = NODE_ICONS[node.type] ?? Box;
   const selected = selectedId === node.id;
   const isRoot = node.type === "page";
+  const [over, setOver] = React.useState(false);
 
   return (
     <div role="treeitem" aria-expanded={children.length ? isOpen : undefined} aria-selected={selected}>
@@ -491,9 +522,36 @@ function LayerRow({
         className={cn(
           "group flex min-h-8 items-center gap-1 rounded-input pr-1 text-sm",
           selected ? "bg-primary-soft text-text" : "text-text hover:bg-surface-muted",
+          over && draggedId !== node.id ? "ring-2 ring-primary" : "",
         )}
         style={{ paddingLeft: depth * 14 + 4 }}
+        draggable={!isRoot}
+        onDragStart={(event) => {
+          if (isRoot) return;
+          event.dataTransfer.setData("text/plain", node.id);
+          event.dataTransfer.effectAllowed = "move";
+          setDraggedId(node.id);
+        }}
+        onDragEnd={() => {
+          setDraggedId(null);
+          setOver(false);
+        }}
+        onDragOver={(event) => {
+          if (!draggedId || draggedId === node.id) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+          setOver(true);
+        }}
+        onDragLeave={() => setOver(false)}
+        onDrop={(event) => {
+          event.preventDefault();
+          setOver(false);
+          onDrop(node.id);
+        }}
       >
+        {!isRoot ? (
+          <GripVertical size={12} className="shrink-0 text-text-muted opacity-40 group-hover:opacity-100" aria-hidden />
+        ) : null}
         {children.length > 0 ? (
           <button
             type="button"
@@ -546,6 +604,9 @@ function LayerRow({
               moveSibling={moveSibling}
               duplicate={duplicate}
               remove={remove}
+              draggedId={draggedId}
+              setDraggedId={setDraggedId}
+              onDrop={onDrop}
             />
           ))
         : null}
