@@ -16,6 +16,7 @@ import {
   EyeOff,
   GripVertical,
 } from "lucide-react";
+import Link from "next/link";
 import { cloneNode, createNode, defaultSmartProps, findNode, findParent, validateContentV5, type ContentNode } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
 import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, PATTERNS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
@@ -105,7 +106,7 @@ export function LeftPanel({ projectId }: { projectId: string }) {
       {tab === "add" ? (
         <AddTab projectId={projectId} />
       ) : tab === "patterns" ? (
-        <PatternsTab />
+        <PatternsTab projectId={projectId} />
       ) : (
         <LayersTab count={count} root={content.root} />
       )}
@@ -241,7 +242,7 @@ function AddTab({ projectId }: { projectId: string }) {
   );
 }
 
-function PatternsTab() {
+function PatternsTab({ projectId }: { projectId: string }) {
   const insertNodesAt = useEditorStore((state) => state.insertNodesAt);
   const content = useEditorStore((state) => state.content);
   const selectedId = useEditorStore((state) => state.selectedId);
@@ -415,6 +416,18 @@ function PatternsTab() {
             <span className="block text-xs text-text-muted">{pattern.description}</span>
           </button>
         ))}
+        <p className="mt-3 text-xs text-text-muted">
+          Want a whole design instead?{" "}
+          <Link
+            href={`/dashboard/projects/${projectId}/templates`}
+            className="underline underline-offset-4 hover:text-primary"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Browse all templates
+          </Link>
+          .
+        </p>
       </div>
     </div>
   );
