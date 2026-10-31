@@ -1,4 +1,4 @@
-import { describeEmailKind, getSender, readTransport, safeHeader, type EmailStream, type EmailTransport } from "@get-on/email";
+import { describeEmailKind, getSender, safeHeader, type EmailStream, type EmailTransport } from "@get-on/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EmailKind =
@@ -137,9 +137,9 @@ async function overDailyGuard(admin: AdminClient, kind: string): Promise<boolean
   return (await sentTodayCount(admin)) >= Math.floor(limit * 0.9);
 }
 
-export async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0], transport?: EmailTransport) {
+export async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0], overrideTransport?: EmailTransport | null) {
   return Promise.race([
-    getSender(transport).send(message),
+    getSender(message, overrideTransport).send(message),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Email timeout")), TIMEOUT_MS),
     ),
@@ -151,7 +151,7 @@ export function nextAttempt(attempts: number): string {
   return new Date(Date.now() + minutes * 60 * 1000).toISOString();
 }
 
-async function getEmailProvider(admin: ReturnType<typeof createAdminClient>): Promise<EmailTransport> {
+async function getEmailProvider(admin: ReturnType<typeof createAdminClient>): Promise<EmailTransport | null> {
   const { data, error } = await admin
     .from('email_settings')
     .select('email_provider')
@@ -160,7 +160,7 @@ async function getEmailProvider(admin: ReturnType<typeof createAdminClient>): Pr
   if (!error && data?.email_provider && ['ses', 'smtp', 'console', 'memory'].includes(data.email_provider)) {
     return data.email_provider as EmailTransport;
   }
-  return 'console';
+  return null;
 }
 
 /**
@@ -173,7 +173,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const subject = safeHeader(input.subject, 180);
   const stream = input.stream ?? describeEmailKind(input.kind).stream;
   const admin = adminOrNull();
-  const transport = admin ? await getEmailProvider(admin) : readTransport();
+  const transport = admin ? await getEmailProvider(admin) : null;
   const message = { ...input, to, subject, stream };
   if (!admin) {
     try {
@@ -261,7 +261,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 /** Sends emails that were queued, with backoff and a hard attempt limit. */
 export async function processEmailQueue(limit = 50): Promise<{ processed: number; sent: number }> {
   const admin = adminOrNull();
-  const transport = admin ? await getEmailProvider(admin) : readTransport();
+  const transport = admin ? await getEmailProvider(admin) : null;
   if (!admin) return { processed: 0, sent: 0 };
   const now = new Date().toISOString();
   const { data } = await admin

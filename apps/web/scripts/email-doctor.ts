@@ -42,13 +42,16 @@ async function main() {
 
   // 2. Transport value.
   const transport = readTransport();
+  const transportLabel = transport === null ? "auto (SMTP transactional, SES batches)" : transport;
   check(
     "Transport",
-    transport === "ses" ? "PASS" : "FAIL",
-    transport === "ses"
+    transport === null || transport === "ses" || transport === "smtp" ? "PASS" : "FAIL",
+    transport === null
       ? undefined
-      : `EMAIL_PROVIDER/EMAIL_TRANSPORT resolves to "${transport}". Set it to "ses" for real delivery.`,
-    `readTransport() => ${transport}`,
+      : transport === "console" || transport === "memory"
+        ? "Transport is dev-only. Set EMAIL_PROVIDER=smtp or ses for real delivery."
+        : undefined,
+    `readTransport() => ${transportLabel}`,
   );
 
   // 3. SES credential presence (names only; never log the values).
