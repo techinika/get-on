@@ -15,12 +15,12 @@ import {
   ArrowDown,
   EyeOff,
 } from "lucide-react";
-import { createNode, defaultSmartProps, type ContentNode } from "@get-on/blocks";
+import { cloneNode, createNode, defaultSmartProps, findNode, validateContentV5, type ContentNode } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
 import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, PATTERNS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
 import { Box } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
-import { generateEditorSections } from "./actions";
+import { deleteEditorPattern, generateEditorSections, listEditorPatterns, recordEditorPatternUse, saveEditorPattern, type SavedPattern } from "./actions";
 
 export function LeftPanel({ projectId }: { projectId: string }) {
   const tab = useEditorStore((state) => state.leftTab);
@@ -242,13 +242,89 @@ function AddTab({ projectId }: { projectId: string }) {
 
 function PatternsTab() {
   const insertNodesAt = useEditorStore((state) => state.insertNodesAt);
+  const content = useEditorStore((state) => state.content);
+  const selectedId = useEditorStore((state) => state.selectedId);
   const [category, setCategory] = React.useState("All");
+  const [saved, setSaved] = React.useState<SavedPattern[]>([]);
+  const [savedState, setSavedState] = React.useState<"loading" | "ready" | "error">("loading");
+  const [name, setName] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
   const categories = ["All", ...Array.from(new Set(PATTERNS.map((item) => item.category)))];
   const patterns = PATTERNS.filter((item) => category === "All" || item.category === category);
+  const selected = selectedId ? findNode(content.root, selectedId) : null;
+  const canSave = Boolean(selected && selected.type !== "page");
+
+  React.useEffect(() => {
+    let alive = true;
+    void listEditorPatterns().then((result) => {
+      if (!alive) return;
+      if (result.ok) {
+        setSaved(result.patterns);
+        setSavedState("ready");
+      } else {
+        setSavedState("error");
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function save() {
+    if (!selected || !canSave || busy) return;
+    setBusy(true);
+    setMessage(null);
+    const result = await saveEditorPattern({
+      name: name.trim() || nodeLabel(selected),
+      category: "My patterns",
+      tags: [],
+      node: selected,
+    });
+    setBusy(false);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setSaved((current) => [result.pattern, ...current]);
+    setName("");
+    setMessage("Saved for this team.");
+  }
+
+  async function remove(id: string) {
+    const result = await deleteEditorPattern(id);
+    if (result.ok) setSaved((current) => current.filter((item) => item.id !== id));
+    else setMessage(result.message ?? "That pattern could not be deleted.");
+  }
 
   return (
     <div className="flex-1 overflow-auto p-3">
-      <p className="text-xs text-text-muted">
+      <div className="rounded-input border border-border bg-surface-muted p-2">
+        <p className="text-xs font-semibold text-text">Save what you selected</p>
+        {canSave ? (
+          <>
+            <input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={selected ? nodeLabel(selected) : "Pattern name"}
+              className="mt-2 h-8 w-full rounded-input border border-border bg-surface px-2 text-xs text-text outline-none focus:border-primary"
+            />
+            <button
+              type="button"
+              onClick={() => void save()}
+              disabled={busy}
+              className="mt-2 h-8 w-full rounded-input border border-border bg-surface text-xs font-semibold text-text hover:bg-surface-muted disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save as pattern"}
+            </button>
+          </>
+        ) : (
+          <p className="mt-1 text-[11px] text-text-muted">Select a section or element on the page first.</p>
+        )}
+        {message ? <p className="mt-1 text-[11px] text-text-muted">{message}</p> : null}
+      </div>
+
+      <p className="mt-3 text-xs text-text-muted">
         Start with a whole page made of sections. You can change everything after adding it.
       </p>
       <div className="mt-2 flex flex-wrap gap-1">
@@ -269,6 +345,51 @@ function PatternsTab() {
         ))}
       </div>
       <div className="mt-3 space-y-3">
+        {savedState === "loading" ? (
+          <div className="rounded-card border border-border bg-surface p-3 text-xs text-text-muted">Loading saved patterns…</div>
+        ) : null}
+        {saved.map((pattern) => (
+          <div key={pattern.id} className="rounded-card border border-border bg-surface p-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <span className="block truncate text-sm font-semibold text-text">{pattern.name}</span>
+                <span className="block text-xs text-text-muted">
+                  {pattern.category}
+                  {pattern.usageCount > 0 ? ` · used ${pattern.usageCount} times` : ""}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => void remove(pattern.id)}
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-input text-text-muted hover:bg-surface-muted hover:text-text"
+                aria-label={`Delete ${pattern.name}`}
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                const copy = cloneNode(pattern.content);
+                const checked = validateContentV5({
+                  schemaVersion: 5,
+                  root: { id: "page", type: "page", props: {}, children: [copy] },
+                });
+                const node = checked.ok ? checked.content.root.children?.[0] : undefined;
+                if (!node) {
+                  setMessage("That saved pattern can no longer be added.");
+                  return;
+                }
+                insertNodesAt([node]);
+                void recordEditorPatternUse(pattern.id);
+              }}
+              className="mt-2 h-8 w-full rounded-input bg-primary text-xs font-semibold text-on-primary"
+            >
+              Add to page
+            </button>
+          </div>
+        ))}
         {patterns.map((pattern) => (
           <button
             key={pattern.id}
