@@ -5,9 +5,12 @@ import { createClient } from "@/lib/supabase/server";
 import { Card } from "@/components/ui/card";
 import { AppPage } from "@/components/app/app-page";
 import { RenderPage, SiteRoot, SiteHeader, SiteFooter } from "@get-on/renderer";
-import { migrateContent } from "@get-on/blocks";
+import { migrateContent, migrateV4ToV5 } from "@get-on/blocks";
 import { parseTheme } from "@/lib/publishing/build-input";
 import { getCurrentTeam } from "@/lib/team";
+import { editorV3Enabled } from "@/lib/editor/flags";
+import { publicMediaUrl } from "@/lib/media";
+import { EditorShell } from "./editor/editor-shell";
 import { AiSectionComposer } from "./ai-section-composer";
 import { PageTextEditor, type PageTextField } from "./page-text-editor";
 import { collectTemplateSlots, type PageRow } from "@/lib/ai/template-slots";
@@ -27,7 +30,7 @@ export default async function PageEditorPage({ params }: Params) {
         .maybeSingle(),
       supabase
         .from("pages")
-        .select("id, project_id, title, path, blocks")
+        .select("id, project_id, title, path, blocks, revision")
         .eq("id", pageId)
         .eq("project_id", projectId)
         .maybeSingle(),
@@ -39,7 +42,7 @@ export default async function PageEditorPage({ params }: Params) {
     ]);
 
   const page = pageData as
-    | { id: string; project_id: string; title: string; path: string; blocks: unknown }
+    | { id: string; project_id: string; title: string; path: string; blocks: unknown; revision?: number }
     | null;
   if (!page || !project) {
     notFound();
@@ -62,6 +65,62 @@ export default async function PageEditorPage({ params }: Params) {
   const hours = typeof projectSettings.hours === "string" ? projectSettings.hours : undefined;
   const businessType = typeof projectSettings.businessType === "string" ? projectSettings.businessType : undefined;
   const tagline = typeof projectSettings.tagline === "string" ? projectSettings.tagline : undefined;
+
+  const canEdit = Boolean(current && ["owner", "admin", "editor"].includes(current.team.role));
+  if (editorV3Enabled() && canEdit) {
+    const [{ data: pagesData }, { data: mediaData }] = await Promise.all([
+      supabase
+        .from("pages")
+        .select("id, title, path, is_homepage, is_hidden, show_in_menu")
+        .eq("project_id", projectId)
+        .order("position", { ascending: true }),
+      supabase
+        .from("media")
+        .select("id, path, width, height, alt")
+        .eq("project_id", projectId)
+        .is("deleted_at", null),
+    ]);
+    const nav = (pagesData ?? [])
+      .filter((item) => !item.is_hidden && item.show_in_menu !== false)
+      .map((item) => ({
+        pageId: String(item.id),
+        label: String(item.title),
+        href: item.is_homepage || item.path === "" ? "/" : `/${String(item.path).replace(/^\//, "")}`,
+      }));
+    const media = (mediaData ?? []).map((item) => [
+      String(item.id),
+      {
+        src: publicMediaUrl(String(item.path)),
+        width: item.width ? Number(item.width) : undefined,
+        height: item.height ? Number(item.height) : undefined,
+        alt: item.alt ? String(item.alt) : undefined,
+      },
+    ] as [string, { src: string; width?: number; height?: number; alt?: string }]);
+
+    return (
+      <EditorShell
+        projectId={projectId}
+        pageId={pageId}
+        title={page.title}
+        initialContent={migrateV4ToV5(page.blocks)}
+        revision={Number(page.revision ?? 0)}
+        theme={theme}
+        business={{
+          name: String(project.name),
+          tagline,
+          businessType,
+          phone: typeof contact?.phone === "string" ? contact.phone : undefined,
+          email: typeof contact?.email === "string" ? contact.email : undefined,
+          address: typeof contact?.address === "string" ? contact.address : undefined,
+          hours,
+          socialLinks,
+        }}
+        media={media}
+        nav={nav}
+        protect={current?.team.planId === "free"}
+      />
+    );
+  }
 
   const header = (
     <SiteHeader
