@@ -11,6 +11,9 @@ export * from './copy';
 
 export type EmailTransport = 'ses' | 'smtp' | 'console' | 'memory';
 
+let sender: EmailSender | null = null;
+let senderTransport: EmailTransport | null = null;
+
 /**
  * Reads the email transport preference from environment variables.
  * Order of precedence: EMAIL_PROVIDER, EMAIL_TRANSPORT, auto-detect.
