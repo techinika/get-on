@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/require-await */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-call */
 import { SESv2Client, SendEmailCommand } from "@aws-sdk/client-sesv2";
 import { EMAIL_STREAMS, streamForKind, type EmailStream } from "./streams";
 // nodemailer is provided at runtime; this package currently does not expose TypeScript declarations.
@@ -125,6 +129,7 @@ export class SmtpSender implements EmailSender {
 
     const fromEmail = `"${safeFromName(this.name ?? definition.fromName)}" <${safeHeader(this.from || definition.from, 254)}>`;
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const info = await this.transporter.sendMail({
       from: fromEmail,
       to: message.to,
