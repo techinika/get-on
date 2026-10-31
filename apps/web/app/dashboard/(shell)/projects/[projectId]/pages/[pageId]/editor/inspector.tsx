@@ -15,13 +15,17 @@ import {
   STYLE_GROUPS,
   THEME_TOKENS,
   findNode,
+  richTextFromPlain,
+  richTextToPlain,
   type ContentNode,
   type LinkTarget,
+  type RichNode,
 } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
 import { nodeLabel } from "@/lib/editor/registry";
 import { useEditorStore, type Device, type StateKey } from "@/lib/editor/v5-store";
 import { RichTextEditor } from "./rich-text";
+import { improveEditorText } from "./actions";
 
 type Tab = "settings" | "style" | "advanced";
 
@@ -38,7 +42,7 @@ const STATES: { id: StateKey; label: string }[] = [
   { id: "active", label: "Active" },
 ];
 
-export function Inspector() {
+export function Inspector({ projectId }: { projectId: string }) {
   const open = useEditorStore((state) => state.rightOpen);
   const toggle = useEditorStore((state) => state.toggleRight);
   const content = useEditorStore((state) => state.content);
@@ -137,7 +141,7 @@ export function Inspector() {
         {!node || node.type === "page" ? (
           <PagePanel />
         ) : tab === "settings" ? (
-          <SettingsTab node={node} />
+          <SettingsTab node={node} projectId={projectId} />
         ) : tab === "style" ? (
           <StyleTab node={node} />
         ) : (
@@ -199,7 +203,7 @@ function Tips() {
   );
 }
 
-function SettingsTab({ node }: { node: ContentNode }) {
+function SettingsTab({ node, projectId }: { node: ContentNode; projectId: string }) {
   const updateProps = useEditorStore((state) => state.updateProps);
   const duplicate = useEditorStore((state) => state.duplicate);
   const remove = useEditorStore((state) => state.remove);
@@ -228,6 +232,7 @@ function SettingsTab({ node }: { node: ContentNode }) {
           <Field label="Text">
             <RichTextEditor key={node.id} node={node} />
           </Field>
+          <AiTextActions node={node} projectId={projectId} />
           <Field label="Level">
             <select
               value={String(node.props?.level ?? "h2")}
@@ -245,9 +250,12 @@ function SettingsTab({ node }: { node: ContentNode }) {
       ) : null}
 
       {node.type === "text" ? (
-        <Field label="Text">
-          <RichTextEditor key={node.id} node={node} />
-        </Field>
+        <>
+          <Field label="Text">
+            <RichTextEditor key={node.id} node={node} />
+          </Field>
+          <AiTextActions node={node} projectId={projectId} />
+        </>
       ) : null}
 
       {node.type === "button" ? (
@@ -414,6 +422,63 @@ function SettingsTab({ node }: { node: ContentNode }) {
       {["container", "stack", "columns", "column", "grid", "accordion", "page"].includes(node.type) ? (
         <p className="text-xs text-text-muted">Use the Style tab to change the layout, spacing and look.</p>
       ) : null}
+    </div>
+  );
+}
+
+function AiTextActions({ node, projectId }: { node: ContentNode; projectId: string }) {
+  const updateProps = useEditorStore((state) => state.updateProps);
+  const [busy, setBusy] = React.useState<string | null>(null);
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [credits, setCredits] = React.useState<number | null>(null);
+  const presets = [
+    { key: "Rewrite", instruction: "Rewrite this in a natural, plain way. Keep the same meaning and length." },
+    { key: "Shorter", instruction: "Make this shorter without losing the important meaning." },
+    { key: "Longer", instruction: "Make this a little longer with useful detail. Do not invent facts." },
+    { key: "Fix", instruction: "Fix spelling and grammar. Do not change the meaning." },
+    { key: "Friendlier", instruction: "Make this friendlier and warmer. Keep it plain and short." },
+  ];
+
+  async function run(preset: (typeof presets)[number]) {
+    if (busy) return;
+    const text = richTextToPlain((node.props?.rich as RichNode | undefined) ?? String(node.props?.text ?? "")).trim();
+    if (!text) {
+      setMessage("Write something first, then ask AI to help.");
+      return;
+    }
+    setBusy(preset.key);
+    setMessage(null);
+    const result = await improveEditorText({ projectId, text, instruction: preset.instruction });
+    setBusy(null);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    updateProps(node.id, { rich: richTextFromPlain(result.text), text: result.text });
+    setCredits(result.credits);
+    setMessage("Updated. You can undo this.");
+  }
+
+  return (
+    <div className="rounded-input border border-border bg-accent-soft p-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-semibold text-accent-text">Ask AI to help with these words</span>
+        {credits != null ? <span className="text-[11px] text-accent-text">{credits} credits</span> : null}
+      </div>
+      <div className="mt-1 flex flex-wrap gap-1">
+        {presets.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            disabled={busy != null}
+            onClick={() => void run(preset)}
+            className="h-7 rounded-input border border-border bg-surface px-2 text-[11px] font-semibold text-text hover:bg-surface-muted disabled:opacity-50"
+          >
+            {busy === preset.key ? "Working…" : preset.key}
+          </button>
+        ))}
+      </div>
+      {message ? <p className="mt-1 text-[11px] text-text-muted">{message}</p> : null}
     </div>
   );
 }

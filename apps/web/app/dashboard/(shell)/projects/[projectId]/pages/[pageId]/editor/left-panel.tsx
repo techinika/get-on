@@ -9,6 +9,7 @@ import {
   Lock,
   Plus,
   Search,
+  Sparkles,
   Trash2,
   ArrowUp,
   ArrowDown,
@@ -19,8 +20,9 @@ import { cn } from "@/lib/utils";
 import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
 import { Box } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
+import { generateEditorSections } from "./actions";
 
-export function LeftPanel() {
+export function LeftPanel({ projectId }: { projectId: string }) {
   const tab = useEditorStore((state) => state.leftTab);
   const setTab = useEditorStore((state) => state.setLeftTab);
   const open = useEditorStore((state) => state.leftOpen);
@@ -88,16 +90,37 @@ export function LeftPanel() {
           <ChevronRight size={18} strokeWidth={1.75} />
         </button>
       </div>
-      {tab === "add" ? <AddTab /> : <LayersTab count={count} root={content.root} />}
+      {tab === "add" ? <AddTab projectId={projectId} /> : <LayersTab count={count} root={content.root} />}
     </aside>
   );
 }
 
-function AddTab() {
+function AddTab({ projectId }: { projectId: string }) {
   const insert = useEditorStore((state) => state.insert);
   const insertSmart = useEditorStore((state) => state.insertSmart);
+  const insertNodeAt = useEditorStore((state) => state.insertNodeAt);
   const [query, setQuery] = React.useState("");
+  const [brief, setBrief] = React.useState("");
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
+  const [credits, setCredits] = React.useState<number | null>(null);
   const needle = query.trim().toLowerCase();
+
+  async function generate() {
+    if (brief.trim().length === 0 || busy) return;
+    setBusy(true);
+    setMessage(null);
+    const result = await generateEditorSections({ projectId, brief: brief.trim() });
+    setBusy(false);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    for (const node of result.nodes) insertNodeAt(node);
+    setCredits(result.credits);
+    setBrief("");
+    setMessage("Added to your page as a draft.");
+  }
 
   const elements = ELEMENTS.filter((item) => !needle || item.label.toLowerCase().includes(needle));
   const sections = SMART_SECTIONS.filter(
@@ -115,6 +138,34 @@ function AddTab() {
           className="h-9 w-full rounded-input border border-border bg-surface pl-9 pr-3 text-sm text-text outline-none focus:border-primary"
         />
       </label>
+
+      <div className="mt-3 rounded-input border border-border bg-accent-soft p-2">
+        <div className="flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-input bg-surface text-accent-text">
+            <Sparkles size={16} strokeWidth={1.75} aria-hidden />
+          </span>
+          <span className="text-sm font-semibold text-accent-text">Describe a section</span>
+          {credits != null ? <span className="ml-auto text-[11px] text-accent-text">{credits} credits</span> : null}
+        </div>
+        <input
+          value={brief}
+          onChange={(event) => setBrief(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") void generate();
+          }}
+          placeholder="For example: three pricing cards with a highlighted middle plan"
+          className="mt-2 h-9 w-full rounded-input border border-border bg-surface px-2 text-xs text-text outline-none focus:border-primary"
+        />
+        <button
+          type="button"
+          onClick={() => void generate()}
+          disabled={busy || brief.trim().length === 0}
+          className="mt-2 h-8 w-full rounded-input bg-primary text-xs font-semibold text-on-primary disabled:opacity-50"
+        >
+          {busy ? "Writing…" : "Generate section"}
+        </button>
+        {message ? <p className="mt-1 text-[11px] text-text-muted">{message}</p> : null}
+      </div>
 
       {ELEMENT_GROUPS.map((group) => {
         const items = elements.filter((item) => item.group === group);

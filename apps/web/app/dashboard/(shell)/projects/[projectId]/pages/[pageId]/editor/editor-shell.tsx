@@ -195,7 +195,7 @@ export function EditorShell({
 
       <div className="flex min-h-0 flex-1 gap-3 overflow-hidden">
         <div className="flex min-w-0 flex-1 overflow-hidden rounded-card border border-border bg-surface">
-          <LeftPanel />
+          <LeftPanel projectId={projectId} />
           <div className="flex min-w-0 flex-1 flex-col">
             <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-border px-2">
               <div className="flex h-9 items-center rounded-input border border-border p-0.5">
@@ -276,7 +276,7 @@ export function EditorShell({
             </div>
           </div>
         </div>
-        <Inspector />
+        <Inspector projectId={projectId} />
       </div>
     </div>
   );

@@ -1,9 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { validateContentV5, type PageContentV5 } from "@get-on/blocks";
+import { blockSchema, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { generateSectionsWithAi, writeWithAi } from "@/lib/ai/actions";
 
 type SaveResult =
   | { ok: true; revision: number }
@@ -91,4 +92,50 @@ export async function savePageContent(input: {
   revalidatePath(`/dashboard/projects/${input.projectId}/pages`);
   revalidatePath(`/dashboard/projects/${input.projectId}`);
   return { ok: true, revision: Number(data) };
+}
+
+
+export type EditorAiSectionsResult =
+  | { ok: true; nodes: ContentNode[]; credits: number; requestId: string }
+  | { ok: false; code: string; message: string };
+
+export async function generateEditorSections(input: {
+  projectId: string;
+  brief: string;
+}): Promise<EditorAiSectionsResult> {
+  const result = await generateSectionsWithAi({ projectId: input.projectId, brief: input.brief });
+  if (!result.ok) return { ok: false, code: result.code, message: result.message };
+  const blocks = Array.isArray(result.data) ? result.data : [];
+  const nodes: ContentNode[] = [];
+  for (const block of blocks) {
+    const parsed = blockSchema.safeParse(block);
+    if (parsed.success) nodes.push(smartNodeFromBlock(parsed.data));
+  }
+  if (nodes.length === 0) {
+    return { ok: false, code: "AI_BAD_RESULT", message: "AI did not send a usable section. Try again." };
+  }
+  return { ok: true, nodes, credits: result.credits, requestId: result.requestId };
+}
+
+export type EditorAiTextResult =
+  | { ok: true; text: string; credits: number }
+  | { ok: false; code: string; message: string };
+
+export async function improveEditorText(input: {
+  projectId: string;
+  text: string;
+  instruction: string;
+}): Promise<EditorAiTextResult> {
+  const text = input.text.trim();
+  if (text.length === 0) {
+    return { ok: false, code: "AI_EMPTY", message: "Write something first, then ask AI to help." };
+  }
+  const result = await writeWithAi({
+    projectId: input.projectId,
+    taskId: "text.improve",
+    text: `${input.instruction.trim()}\n\n${text}`,
+    existingText: text,
+  });
+  if (!result.ok) return { ok: false, code: result.code, message: result.message };
+  return { ok: true, text: result.text.trim(), credits: result.credits };
 }
