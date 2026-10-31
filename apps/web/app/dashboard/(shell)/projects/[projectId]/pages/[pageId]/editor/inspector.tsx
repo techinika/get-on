@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { nodeLabel } from "@/lib/editor/registry";
 import { useEditorStore, type Device, type StateKey } from "@/lib/editor/v5-store";
 import { RichTextEditor } from "./rich-text";
-import { improveEditorText, listEditorMedia, type EditorMediaItem } from "./actions";
+import { improveEditorText, listEditorMedia, updatePageBasics, type EditorMediaItem } from "./actions";
 
 type Tab = "settings" | "style" | "advanced";
 
@@ -43,7 +43,7 @@ const STATES: { id: StateKey; label: string }[] = [
   { id: "active", label: "Active" },
 ];
 
-export function Inspector({ projectId }: { projectId: string }) {
+export function Inspector({ projectId, pageId, pagePath }: { projectId: string; pageId: string; pagePath: string }) {
   const open = useEditorStore((state) => state.rightOpen);
   const toggle = useEditorStore((state) => state.toggleRight);
   const content = useEditorStore((state) => state.content);
@@ -140,7 +140,7 @@ export function Inspector({ projectId }: { projectId: string }) {
 
       <div className="min-h-0 flex-1 overflow-auto p-3">
         {!node || node.type === "page" ? (
-          <PagePanel />
+          <PagePanel projectId={projectId} pageId={pageId} pagePath={pagePath} />
         ) : tab === "settings" ? (
           <SettingsTab node={node} projectId={projectId} />
         ) : tab === "style" ? (
@@ -153,13 +153,14 @@ export function Inspector({ projectId }: { projectId: string }) {
   );
 }
 
-function PagePanel() {
+function PagePanel({ projectId, pageId, pagePath }: { projectId: string; pageId: string; pagePath: string }) {
   const content = useEditorStore((state) => state.content);
   const setContent = useEditorStore((state) => state.setContent);
   const bytes = new TextEncoder().encode(content.css ?? "").length;
 
   return (
     <div className="space-y-4">
+      <PageBasicsPanel projectId={projectId} pageId={pageId} pagePath={pagePath} />
       <section>
         <h3 className="text-sm font-semibold text-text">Page</h3>
         <p className="mt-1 text-xs text-text-muted">
@@ -568,6 +569,65 @@ function ImageField({ node, projectId }: { node: ContentNode; projectId: string 
     </Field>
   );
 }
+
+function PageBasicsPanel({ projectId, pageId, pagePath }: { projectId: string; pageId: string; pagePath: string }) {
+  const content = useEditorStore((state) => state.content);
+  const [title, setTitle] = React.useState(() => String(content.meta?.title ?? "").trim());
+  const [path, setPath] = React.useState(pagePath);
+  const [busy, setBusy] = React.useState(false);
+  const [message, setMessage] = React.useState<string | null>(null);
+
+  async function save() {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    const result = await updatePageBasics({ projectId, pageId, title, path });
+    setBusy(false);
+    if (!result.ok) {
+      setMessage(result.message);
+      return;
+    }
+    setMessage("Page settings saved.");
+    setTimeout(() => setMessage(null), 2500);
+  }
+
+  return (
+    <section>
+      <h3 className="text-sm font-semibold text-text">Page settings</h3>
+      <div className="space-y-2">
+        <Field label="Page title">
+          <input
+            value={title}
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="Untitled page"
+            className="h-9 w-full rounded-input border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
+          />
+        </Field>
+        <Field label="Page address">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center text-xs text-text-muted">/{" "}</span>
+            <input
+              value={path}
+              onChange={(event) => setPath(event.target.value)}
+              placeholder="about"
+              className="flex-1 h-9 rounded-input border border-border bg-surface px-2 text-sm text-text outline-none focus:border-primary"
+            />
+          </div>
+        </Field>
+        <button
+          type="button"
+          onClick={() => void save()}
+          disabled={busy}
+          className="h-8 rounded-input border border-border bg-surface px-3 text-xs font-semibold text-text hover:bg-surface-muted disabled:opacity-50"
+        >
+          {busy ? "Saving…" : "Save page settings"}
+        </button>
+        {message ? <p className="mt-1 text-[11px] text-text-muted">{message}</p> : null}
+      </div>
+    </section>
+  );
+}
+
 
 function SmartFields({ node }: { node: ContentNode }) {
   const updateProps = useEditorStore((state) => state.updateProps);

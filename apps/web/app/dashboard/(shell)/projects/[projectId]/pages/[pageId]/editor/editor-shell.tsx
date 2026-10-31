@@ -40,10 +40,12 @@ export function EditorShell({
   media,
   nav,
   protect,
+  path,
 }: {
   projectId: string;
   pageId: string;
   title: string;
+  path: string;
   initialContent: PageContentV5;
   revision: number;
   theme: Theme;
@@ -330,7 +332,7 @@ export function EditorShell({
             </div>
           </div>
         </div>
-        <Inspector projectId={projectId} />
+        <Inspector projectId={projectId} pageId={pageId} pagePath={path} />
       </div>
 
       {conflict ? (

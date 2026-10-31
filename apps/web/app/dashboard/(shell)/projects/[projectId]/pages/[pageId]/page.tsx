@@ -118,6 +118,7 @@ export default async function PageEditorPage({ params }: Params) {
         media={media}
         nav={nav}
         protect={current?.team.planId === "free"}
+        path={String(page.path ?? "")}
       />
     );
   }

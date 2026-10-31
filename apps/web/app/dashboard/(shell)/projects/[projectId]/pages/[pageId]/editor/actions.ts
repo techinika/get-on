@@ -192,6 +192,95 @@ export async function listEditorMedia(projectId: string): Promise<EditorMediaIte
   }));
 }
 
+export type PageBasicsResult =
+  | { ok: true }
+  | { ok: false; code: string; message: string };
+
+function slugPagePath(input: string): string {
+  return (
+    "/" +
+    input
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, "-")
+      .replace(/[^a-z0-9-]/g, "")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "")
+  );
+}
+
+export async function updatePageBasics(input: {
+  projectId: string;
+  pageId: string;
+  title?: string | null;
+  path?: string | null;
+}): Promise<PageBasicsResult> {
+  const current = await getCurrentTeam();
+  if (!current) return { ok: false, code: "AUTH", message: "Please sign in again." };
+  if (!["owner", "admin", "editor"].includes(current.team.role)) {
+    return { ok: false, code: "FORBIDDEN", message: "Only editors, admins and the owner can change page settings." };
+  }
+  const title = input.title == null ? undefined : input.title.trim();
+  const path = input.path == null ? undefined : slugPagePath(input.path);
+  if (title !== undefined && title.length === 0) {
+    return { ok: false, code: "INVALID", message: "Give the page a title." };
+  }
+  if (path !== undefined && path !== "/" && !/^\/[a-z0-9-]+$/.test(path)) {
+    return { ok: false, code: "INVALID", message: "That page address is not valid." };
+  }
+  if (title === undefined && path === undefined) {
+    return { ok: true };
+  }
+
+  const supabase = await createClient();
+  const { data: page } = await supabase
+    .from("pages")
+    .select("id, path, is_homepage")
+    .eq("id", input.pageId)
+    .eq("project_id", input.projectId)
+    .maybeSingle();
+  if (!page) return { ok: false, code: "NOT_FOUND", message: "We could not find that page." };
+
+  const updates: Record<string, unknown> = {};
+  if (title !== undefined) updates.title = title;
+  if (path !== undefined) {
+    if (path !== page.path) {
+      const { data: clash } = await supabase
+        .from("pages")
+        .select("id")
+        .eq("project_id", input.projectId)
+        .eq("path", path)
+        .neq("id", input.pageId)
+        .maybeSingle();
+      if (clash) {
+        return { ok: false, code: "PAGE_PATH_TAKEN", message: "That page address is already in use." };
+      }
+    }
+    updates.path = path;
+    if (path === "/" && !page.is_homepage) {
+      updates.is_homepage = true;
+      const { data: currentHome } = await supabase
+        .from("pages")
+        .select("id")
+        .eq("project_id", input.projectId)
+        .eq("is_homepage", true)
+        .neq("id", input.pageId)
+        .maybeSingle();
+      if (currentHome) {
+        await supabase.from("pages").update({ is_homepage: false, path: "/home" }).eq("id", currentHome.id);
+      }
+    }
+  }
+  updates.updated_at = new Date().toISOString();
+  updates.updated_by = current.user.id;
+
+  const { error } = await supabase.from("pages").update(updates).eq("id", input.pageId);
+  if (error) return { ok: false, code: "UNKNOWN", message: "The page settings could not be saved." };
+  revalidatePath(`/dashboard/projects/${input.projectId}/pages`);
+  revalidatePath(`/dashboard/projects/${input.projectId}/pages/${input.pageId}`);
+  return { ok: true };
+}
+
 export type SavedPattern = {
   id: string;
   name: string;
