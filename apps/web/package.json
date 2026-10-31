@@ -15,6 +15,7 @@
     "dev:all": "node scripts/dev-all.mjs",
     "seed:site": "tsx scripts/seed-site.ts",
     "job:email": "tsx scripts/email-queue.ts",
+    "job:email:doctor": "tsx scripts/email-doctor.ts",
     "job:cleanup": "tsx scripts/cleanup-spam.ts",
     "job:backups": "tsx scripts/jobs/backups.ts",
     "job:backup-gc": "tsx scripts/jobs/backup-gc.ts",

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import {
   emailLayout,
   emailKindUsesConsent,
@@ -20,6 +20,7 @@ import {
   trackableLinks,
   trackingOrigin,
 } from "@/lib/email/tracking";
+import { recordTrace } from "@/lib/observability/trace";
 
 const MAX_ATTEMPTS = 5;
 
@@ -46,6 +47,7 @@ export type OutboxRow = {
   created_at: string;
   sent_at: string | null;
   expires_at: string | null;
+  trace_id: string | null;
 };
 
 export type OutboxResult = {
@@ -278,11 +280,31 @@ async function deliverRow(
   result: OutboxResult,
   marketing: Awaited<ReturnType<typeof marketingStatus>>,
 ): Promise<void> {
+  const trace = row.trace_id ?? randomUUID();
   result.processed += 1;
   const payload = row.payload ?? {};
   const subject = payloadText(payload, "subject", 180) || row.kind;
 
+  await recordTrace({
+    traceId: trace,
+    stage: "outbox.claimed",
+    level: "debug",
+    template: payloadText(payload, "template", 200) ?? undefined,
+    stream: row.stream,
+    outboxId: row.id,
+    meta: { kind: row.kind, scheduledFor: row.scheduled_for, attempts: row.attempts },
+  });
+
   if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
+    await recordTrace({
+      traceId: trace,
+      stage: "email.final",
+      level: "warn",
+      stream: row.stream,
+      outboxId: row.id,
+      reason: "expired",
+      meta: { kind: row.kind },
+    });
     await admin.rpc("email_mark_failed", { p_id: row.id, p_error: "EXPIRED", p_retry_at: null });
     await writeLog(admin, row, {
       status: "failed",
@@ -297,6 +319,15 @@ async function deliverRow(
 
   const isMarketingRow = row.stream === "marketing" || emailKindUsesConsent(row.kind);
   if (isMarketingRow && marketing.paused) {
+    await recordTrace({
+      traceId: trace,
+      stage: "outbox.skipped",
+      level: "warn",
+      stream: row.stream,
+      outboxId: row.id,
+      reason: "marketing_paused",
+      meta: { kind: row.kind, pauseReason: marketing.pauseReason },
+    });
     const retryAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
     await admin.rpc("email_defer", { p_id: row.id, p_retry_at: retryAt });
     result.deferred += 1;
@@ -305,6 +336,15 @@ async function deliverRow(
 
   const to = await resolveEmail(admin, row);
   if (!to) {
+    await recordTrace({
+      traceId: trace,
+      stage: "recipients.resolved",
+      level: "warn",
+      stream: row.stream,
+      outboxId: row.id,
+      reason: "no_recipients",
+      meta: { kind: row.kind },
+    });
     await admin.rpc("email_mark_failed", {
       p_id: row.id,
       p_error: "NO_RECIPIENT",
@@ -322,6 +362,15 @@ async function deliverRow(
   }
 
   if (await isSuppressed(admin, to)) {
+    await recordTrace({
+      traceId: trace,
+      stage: "outbox.skipped",
+      level: "warn",
+      stream: row.stream,
+      outboxId: row.id,
+      toMasked: to,
+      reason: "suppressed",
+    });
     await admin.rpc("email_mark_suppressed", { p_id: row.id, p_reason: "SUPPRESSED" });
     await writeLog(admin, row, {
       status: "suppressed",
@@ -335,10 +384,39 @@ async function deliverRow(
   }
 
   let built: Awaited<ReturnType<typeof buildMessage>>;
+  const renderStart = Date.now();
+  await recordTrace({
+    traceId: trace,
+    stage: "template.render.start",
+    level: "debug",
+    template: payloadText(payload, "template", 200) ?? row.kind,
+    stream: row.stream,
+    outboxId: row.id,
+  });
   try {
     built = await buildMessage(admin, row, to);
+    await recordTrace({
+      traceId: trace,
+      stage: "template.render.ok",
+      level: "debug",
+      template: payloadText(payload, "template", 200) ?? row.kind,
+      stream: row.stream,
+      outboxId: row.id,
+      durationMs: Date.now() - renderStart,
+      meta: { htmlBytes: built.message.html?.length ?? 0 },
+    });
   } catch (error) {
     const reason = String((error as { message?: string })?.message ?? error);
+    await recordTrace({
+      traceId: trace,
+      stage: "template.render.fail",
+      level: "error",
+      template: payloadText(payload, "template", 200) ?? row.kind,
+      stream: row.stream,
+      outboxId: row.id,
+      durationMs: Date.now() - renderStart,
+      reason,
+    });
     const retry = reason === "MARKETING_PAUSED";
     const retryAt = retry ? new Date(Date.now() + 30 * 60 * 1000).toISOString() : null;
     await admin.rpc(retry ? "email_defer" : "email_mark_failed", {
@@ -360,8 +438,32 @@ async function deliverRow(
     return;
   }
 
+  const sendStart = Date.now();
+  await recordTrace({
+    traceId: trace,
+    stage: "ses.send.request",
+    level: "debug",
+    template: payloadText(payload, "template", 200) ?? row.kind,
+    stream: row.stream,
+    outboxId: row.id,
+    toMasked: to,
+    toCount: 1,
+    configSet: payloadText(payload, "configSet", 60) ?? undefined,
+    fromIdentity: built.message.replyTo ?? undefined,
+  });
   try {
     const sent = await sendWithTimeout(built.message);
+    const durationMs = Date.now() - sendStart;
+    await recordTrace({
+      traceId: trace,
+      stage: "ses.send.response",
+      level: "info",
+      template: payloadText(payload, "template", 200) ?? row.kind,
+      stream: row.stream,
+      outboxId: row.id,
+      messageId: sent.id,
+      durationMs,
+    });
     await admin.rpc("email_mark_sent", { p_id: row.id, p_ses_message_id: sent.id });
     await writeLog(admin, row, {
       status: "sent",
@@ -370,9 +472,33 @@ async function deliverRow(
       attempts: row.attempts,
       messageId: sent.id,
     });
+    await recordTrace({
+      traceId: trace,
+      stage: "email.final",
+      level: "info",
+      template: payloadText(payload, "template", 200) ?? row.kind,
+      stream: row.stream,
+      outboxId: row.id,
+      messageId: sent.id,
+      durationMs: Date.now() - sendStart,
+      meta: { status: "delivered" },
+    });
     result.sent += 1;
   } catch (error) {
+    const durationMs = Date.now() - sendStart;
     const reason = String((error as { message?: string })?.message ?? error);
+    await recordTrace({
+      traceId: trace,
+      stage: "ses.send.error",
+      level: "error",
+      template: payloadText(payload, "template", 200) ?? row.kind,
+      stream: row.stream,
+      outboxId: row.id,
+      reason,
+      code: (error as { code?: string })?.code ?? undefined,
+      durationMs,
+      retryable: Boolean(isTransient(error)),
+    });
     const transient = isTransient(error) && row.attempts < MAX_ATTEMPTS;
     const retryAt = transient ? nextAttempt(row.attempts) : null;
     await admin.rpc("email_mark_failed", {
@@ -388,8 +514,31 @@ async function deliverRow(
       error: reason,
     });
     if (transient) {
+      await recordTrace({
+        traceId: trace,
+        stage: "outbox.retry_scheduled",
+        level: "warn",
+        stream: row.stream,
+        outboxId: row.id,
+        reason: "transient_send_error",
+        code: (error as { code?: string })?.code ?? undefined,
+        durationMs,
+        meta: { nextAttemptAt: retryAt },
+      });
       result.deferred += 1;
     } else {
+      await recordTrace({
+        traceId: trace,
+        stage: "email.final",
+        level: "error",
+        template: payloadText(payload, "template", 200) ?? row.kind,
+        stream: row.stream,
+        outboxId: row.id,
+        reason,
+        code: (error as { code?: string })?.code ?? undefined,
+        durationMs,
+        meta: { status: "failed" },
+      });
       result.failed += 1;
     }
   }
@@ -408,18 +557,61 @@ export async function processNotificationOutbox(limit = 50): Promise<OutboxResul
     suppressed: 0,
     deferred: 0,
   };
+  const jobRun = randomUUID();
+  const jobStart = Date.now();
+  await recordTrace({
+    traceId: jobRun,
+    stage: "job.notifications.start",
+    level: "info",
+    jobRun,
+    meta: { limit },
+  });
   const { data, error } = await admin.rpc("email_claim", { p_limit: limit });
   if (error) throw error;
   const rows = (data ?? []) as OutboxRow[];
-  if (rows.length === 0) return result;
+  if (rows.length === 0) {
+    await recordTrace({
+      traceId: jobRun,
+      stage: "job.notifications.finish",
+      level: "info",
+      jobRun,
+      durationMs: Date.now() - jobStart,
+      meta: { claimed: 0, sent: 0, failed: 0, skipped: 0, deferred: 0 },
+    });
+    return result;
+  }
   const marketing = await marketingStatus(admin);
   for (const row of rows) {
     try {
       await deliverRow(admin, row, result, marketing);
     } catch (error) {
       console.error(`[notifications] row ${row.id} failed unexpectedly`, error);
+      await recordTrace({
+        traceId: jobRun,
+        stage: "outbox.skipped",
+        level: "error",
+        jobRun,
+        outboxId: row.id,
+        reason: "unexpected_error",
+        code: (error as { code?: string })?.code ?? undefined,
+        meta: { kind: row.kind },
+      });
       result.failed += 1;
     }
   }
+  await recordTrace({
+    traceId: jobRun,
+    stage: "job.notifications.finish",
+    level: "info",
+    jobRun,
+    durationMs: Date.now() - jobStart,
+    meta: {
+      claimed: rows.length,
+      sent: result.sent,
+      failed: result.failed,
+      skipped: result.suppressed,
+      deferred: result.deferred,
+    },
+  });
   return result;
 }
