@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { compileStyles, emptyPage, findNode } from "@get-on/blocks";
+import { compileStyles, createNode, defaultSmartProps, emptyPage, findNode } from "@get-on/blocks";
 import { useEditorStore } from "../lib/editor/v5-store";
 
 function reset() {
@@ -81,6 +81,19 @@ describe("editor v5 store", () => {
     expect(children).toHaveLength(2);
     expect(children[0].id).not.toBe(children[1].id);
     expect(children[1].children?.[0].id).not.toBe(children[0].children?.[0].id);
+  });
+
+  it("inserts a whole pattern as one undo step", () => {
+    const nodes = ["hero", "features", "cta"].map((kind) => createNode("smart", defaultSmartProps(kind)));
+    useEditorStore.getState().insertNodesAt(nodes);
+    expect(useEditorStore.getState().content.root.children?.map((node) => node.props?.kind)).toEqual([
+      "hero",
+      "features",
+      "cta",
+    ]);
+    expect(useEditorStore.getState().past).toHaveLength(1);
+    useEditorStore.getState().undo();
+    expect(useEditorStore.getState().content.root.children).toHaveLength(0);
   });
 
   it("adds a smart section from the registry defaults", () => {

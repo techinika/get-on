@@ -104,6 +104,59 @@ export const SMART_SECTIONS: SmartSectionDef[] = [
   { kind: "contact-form", label: "Contact form", icon: MessageSquare, description: "Let people send a message." },
 ];
 
+export type PatternDef = {
+  id: string;
+  label: string;
+  description: string;
+  category: string;
+  kinds: string[];
+};
+
+export const PATTERNS: PatternDef[] = [
+  {
+    id: "landing",
+    label: "Simple landing page",
+    description: "A clear opening, what you offer, and one ask.",
+    category: "Pages",
+    kinds: ["hero", "features", "cta"],
+  },
+  {
+    id: "about",
+    label: "About page",
+    description: "Your story, a few numbers, and the people behind it.",
+    category: "Pages",
+    kinds: ["image-text", "stats", "team", "cta"],
+  },
+  {
+    id: "services",
+    label: "Services page",
+    description: "Services, proof from customers, and common questions.",
+    category: "Pages",
+    kinds: ["hero", "services", "testimonials", "faq", "cta"],
+  },
+  {
+    id: "contact",
+    label: "Contact page",
+    description: "A short welcome and a form people can send.",
+    category: "Pages",
+    kinds: ["hero", "contact-form"],
+  },
+  {
+    id: "pricing",
+    label: "Prices page",
+    description: "Plans side by side, with answers to worries.",
+    category: "Pages",
+    kinds: ["hero", "pricing", "faq", "cta"],
+  },
+  {
+    id: "portfolio",
+    label: "Work gallery",
+    description: "Show pictures of your work and how to reach you.",
+    category: "Sections",
+    kinds: ["hero", "gallery", "cta"],
+  },
+];
+
 export const ELEMENT_GROUPS = ["Layout", "Text", "Media", "Actions", "Advanced"] as const;
 
 export function elementIcon(type: NodeType): LucideIcon {

@@ -15,9 +15,9 @@ import {
   ArrowDown,
   EyeOff,
 } from "lucide-react";
-import type { ContentNode } from "@get-on/blocks";
+import { createNode, defaultSmartProps, type ContentNode } from "@get-on/blocks";
 import { cn } from "@/lib/utils";
-import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
+import { ELEMENTS, ELEMENT_GROUPS, NODE_ICONS, PATTERNS, SMART_SECTIONS, nodeLabel } from "@/lib/editor/registry";
 import { Box } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
 import { generateEditorSections } from "./actions";
@@ -73,6 +73,17 @@ export function LeftPanel({ projectId }: { projectId: string }) {
         <button
           type="button"
           className={cn(
+            "h-9 flex-1 rounded-input px-2 text-sm font-semibold",
+            tab === "patterns" ? "bg-surface-muted text-text" : "text-text-muted hover:bg-surface-muted",
+          )}
+          onClick={() => setTab("patterns")}
+          aria-pressed={tab === "patterns"}
+        >
+          Patterns
+        </button>
+        <button
+          type="button"
+          className={cn(
             "h-9 flex-1 rounded-input px-3 text-sm font-semibold",
             tab === "layers" ? "bg-surface-muted text-text" : "text-text-muted hover:bg-surface-muted",
           )}
@@ -90,7 +101,13 @@ export function LeftPanel({ projectId }: { projectId: string }) {
           <ChevronRight size={18} strokeWidth={1.75} />
         </button>
       </div>
-      {tab === "add" ? <AddTab projectId={projectId} /> : <LayersTab count={count} root={content.root} />}
+      {tab === "add" ? (
+        <AddTab projectId={projectId} />
+      ) : tab === "patterns" ? (
+        <PatternsTab />
+      ) : (
+        <LayersTab count={count} root={content.root} />
+      )}
     </aside>
   );
 }
@@ -98,7 +115,7 @@ export function LeftPanel({ projectId }: { projectId: string }) {
 function AddTab({ projectId }: { projectId: string }) {
   const insert = useEditorStore((state) => state.insert);
   const insertSmart = useEditorStore((state) => state.insertSmart);
-  const insertNodeAt = useEditorStore((state) => state.insertNodeAt);
+  const insertNodesAt = useEditorStore((state) => state.insertNodesAt);
   const [query, setQuery] = React.useState("");
   const [brief, setBrief] = React.useState("");
   const [busy, setBusy] = React.useState(false);
@@ -116,7 +133,7 @@ function AddTab({ projectId }: { projectId: string }) {
       setMessage(result.message);
       return;
     }
-    for (const node of result.nodes) insertNodeAt(node);
+    insertNodesAt(result.nodes);
     setCredits(result.credits);
     setBrief("");
     setMessage("Added to your page as a draft.");
@@ -219,6 +236,64 @@ function AddTab({ projectId }: { projectId: string }) {
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+function PatternsTab() {
+  const insertNodesAt = useEditorStore((state) => state.insertNodesAt);
+  const [category, setCategory] = React.useState("All");
+  const categories = ["All", ...Array.from(new Set(PATTERNS.map((item) => item.category)))];
+  const patterns = PATTERNS.filter((item) => category === "All" || item.category === category);
+
+  return (
+    <div className="flex-1 overflow-auto p-3">
+      <p className="text-xs text-text-muted">
+        Start with a whole page made of sections. You can change everything after adding it.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {categories.map((item) => (
+          <button
+            key={item}
+            type="button"
+            onClick={() => setCategory(item)}
+            className={cn(
+              "h-7 rounded-full border px-2 text-[11px] font-semibold",
+              category === item
+                ? "border-primary bg-primary-soft text-text"
+                : "border-border bg-surface text-text-muted hover:bg-surface-muted",
+            )}
+          >
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="mt-3 space-y-3">
+        {patterns.map((pattern) => (
+          <button
+            key={pattern.id}
+            type="button"
+            onClick={() =>
+              insertNodesAt(pattern.kinds.map((kind) => createNode("smart", defaultSmartProps(kind))))
+            }
+            className="block w-full rounded-card border border-border bg-surface p-2 text-left hover:border-primary hover:shadow-card"
+          >
+            <span className="flex h-24 flex-col gap-1 overflow-hidden rounded-input bg-surface-muted p-2">
+              {pattern.kinds.map((kind, index) => (
+                <span
+                  key={`${pattern.id}-${kind}-${index}`}
+                  className={cn(
+                    "block rounded-sm",
+                    kind === "hero" ? "h-8 bg-primary/30" : kind === "cta" ? "h-4 bg-accent/40" : "h-3 bg-border",
+                  )}
+                />
+              ))}
+            </span>
+            <span className="mt-2 block text-sm font-semibold text-text">{pattern.label}</span>
+            <span className="block text-xs text-text-muted">{pattern.description}</span>
+          </button>
+        ))}
+      </div>
     </div>
   );
 }

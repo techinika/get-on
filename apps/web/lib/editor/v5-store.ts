@@ -26,7 +26,7 @@ export type Device = "computer" | "tablet" | "phone";
 export type StateKey = keyof StyleSet;
 export type SaveState = "saved" | "unsaved" | "saving" | "offline" | "error";
 export type EditorMode = "edit" | "preview";
-export type LeftTab = "add" | "layers";
+export type LeftTab = "add" | "patterns" | "layers";
 export type Zoom = "fit" | number;
 
 type CommitOptions = { history?: boolean; group?: string };
@@ -57,6 +57,7 @@ type EditorState = {
   insert: (type: NodeType, props?: Record<string, unknown>) => string | null;
   insertSmart: (kind: string) => string | null;
   insertNodeAt: (node: ContentNode, parentId?: string, index?: number) => string | null;
+  insertNodesAt: (nodes: ContentNode[]) => string | null;
   remove: (id: string) => void;
   duplicate: (id: string) => void;
   move: (id: string, parentId: string, index?: number) => void;
@@ -197,6 +198,24 @@ export const useEditorStore = create<EditorState>()((set, get) => {
       commit({ ...state.content, root });
       set({ selectedId: node.id });
       return node.id;
+    },
+
+    insertNodesAt: (nodes) => {
+      if (nodes.length === 0) return null;
+      const state = get();
+      const target = targetFor(state.content.root, state.selectedId, nodes[0]!.type);
+      const parent = findNode(state.content.root, target.parentId);
+      if (!parent) return null;
+      let root = state.content.root;
+      let index = target.index;
+      for (const node of nodes) {
+        if (!acceptsChild(findNode(root, target.parentId) ?? parent, node)) return null;
+        root = insertNode(root, target.parentId, node, index);
+        if (index != null) index += 1;
+      }
+      commit({ ...state.content, root });
+      set({ selectedId: nodes[nodes.length - 1]!.id });
+      return nodes[nodes.length - 1]!.id;
     },
 
     remove: (id) => {
