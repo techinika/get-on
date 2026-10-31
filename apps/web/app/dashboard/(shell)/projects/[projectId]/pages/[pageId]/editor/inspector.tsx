@@ -4,6 +4,7 @@ import * as React from "react";
 import {
   ChevronDown,
   Copy,
+  Image as ImageIcon,
   Lock,
   Monitor,
   Smartphone,
@@ -25,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { nodeLabel } from "@/lib/editor/registry";
 import { useEditorStore, type Device, type StateKey } from "@/lib/editor/v5-store";
 import { RichTextEditor } from "./rich-text";
-import { improveEditorText } from "./actions";
+import { improveEditorText, listEditorMedia, type EditorMediaItem } from "./actions";
 
 type Tab = "settings" | "style" | "advanced";
 
@@ -303,14 +304,7 @@ function SettingsTab({ node, projectId }: { node: ContentNode; projectId: string
 
       {node.type === "image" ? (
         <>
-          <Field label="Picture">
-            <input
-              value={String(node.props?.imageId ?? "")}
-              onChange={(event) => updateProps(node.id, { imageId: event.target.value || null })}
-              placeholder="Choose a picture from Images"
-              className="h-9 w-full rounded-input border border-border bg-surface px-2 text-sm"
-            />
-          </Field>
+          <ImageField node={node} projectId={projectId} />
           <Field label="Alt text">
             <input
               value={String(node.props?.alt ?? "")}
@@ -480,6 +474,98 @@ function AiTextActions({ node, projectId }: { node: ContentNode; projectId: stri
       </div>
       {message ? <p className="mt-1 text-[11px] text-text-muted">{message}</p> : null}
     </div>
+  );
+}
+
+function ImageField({ node, projectId }: { node: ContentNode; projectId: string }) {
+  const updateProps = useEditorStore((state) => state.updateProps);
+  const [open, setOpen] = React.useState(false);
+  const [media, setMedia] = React.useState<EditorMediaItem[]>([]);
+  const [loading, setLoading] = React.useState(false);
+  const currentId = String(node.props?.imageId ?? "");
+
+  async function openPicker() {
+    setOpen(true);
+    if (media.length > 0) return;
+    setLoading(true);
+    const items = await listEditorMedia(projectId);
+    setMedia(items);
+    setLoading(false);
+  }
+
+  const current = media.find((item) => item.id === currentId);
+
+  return (
+    <Field label="Picture">
+      <button
+        type="button"
+        onClick={() => void openPicker()}
+        className="flex w-full items-center gap-2 rounded-input border border-border bg-surface p-2 text-left hover:border-primary"
+      >
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-input bg-surface-muted text-text-muted">
+          {current ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={current.src} alt="" className="h-full w-full object-cover" />
+          ) : (
+            <ImageIcon size={20} />
+          )}
+        </span>
+        <span className="min-w-0">
+          <span className="block text-sm font-semibold text-text">{current ? current.alt || "Picture selected" : "Choose a picture"}</span>
+          <span className="block text-xs text-text-muted">{currentId ? "Change picture" : "From your Images library"}</span>
+        </span>
+      </button>
+      {currentId && !current ? (
+        <p className="mt-1 text-[11px] text-text-muted">This picture is no longer in your library. Choose another one.</p>
+      ) : null}
+
+      {open ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="choose-picture-title">
+          <div className="flex max-h-[80vh] w-full max-w-3xl flex-col rounded-card border border-border bg-surface p-4 shadow-card">
+            <div className="flex items-center justify-between gap-2">
+              <h2 id="choose-picture-title" className="text-h2">Choose a picture</h2>
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                className="h-9 rounded-input border border-border px-3 text-sm font-semibold text-text hover:bg-surface-muted"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-3 min-h-0 flex-1 overflow-auto">
+              {loading ? (
+                <p className="text-sm text-text-muted">Loading your pictures…</p>
+              ) : media.length === 0 ? (
+                <p className="text-sm text-text-muted">
+                  You have not added any pictures yet. Add them in the Images area first.
+                </p>
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+                  {media.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        updateProps(node.id, { imageId: item.id, alt: String(node.props?.alt ?? "") || item.alt });
+                        setOpen(false);
+                      }}
+                      className={cn(
+                        "overflow-hidden rounded-input border bg-surface-muted text-left hover:border-primary",
+                        item.id === currentId ? "border-primary ring-2 ring-primary" : "border-border",
+                      )}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={item.src} alt={item.alt} className="aspect-[4/3] w-full object-cover" />
+                      <span className="block truncate px-2 py-1 text-xs text-text">{item.alt || "Picture"}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </Field>
   );
 }
 

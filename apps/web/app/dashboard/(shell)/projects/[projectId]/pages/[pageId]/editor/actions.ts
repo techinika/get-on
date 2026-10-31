@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { blockSchema, countNodes, customCodeLimits, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
+import { publicMediaUrl } from "@/lib/media";
 import { generatePageWithAi, generateSectionsWithAi, writeWithAi } from "@/lib/ai/actions";
 
 type SaveResult =
@@ -162,6 +163,34 @@ export async function improveEditorText(input: {
   return { ok: true, text: result.text.trim(), credits: result.credits };
 }
 
+
+export type EditorMediaItem = {
+  id: string;
+  src: string;
+  alt: string;
+  width?: number;
+  height?: number;
+};
+
+export async function listEditorMedia(projectId: string): Promise<EditorMediaItem[]> {
+  const current = await getCurrentTeam();
+  if (!current) return [];
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("media")
+    .select("id, path, width, height, alt")
+    .eq("project_id", projectId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(120);
+  return (data ?? []).map((row) => ({
+    id: String(row.id),
+    src: publicMediaUrl(String(row.path)),
+    alt: String(row.alt ?? ""),
+    width: row.width ? Number(row.width) : undefined,
+    height: row.height ? Number(row.height) : undefined,
+  }));
+}
 
 export type SavedPattern = {
   id: string;
