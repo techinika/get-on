@@ -14,6 +14,10 @@ alter table public.plans add column if not exists backup_manual_max int not null
 alter table public.plans add column if not exists backup_storage_mb int not null default 100;
 alter table public.plans add column if not exists exports_per_day int not null default 3;
 alter table public.plans add column if not exists support_priority text not null default 'standard';
+alter table public.plans add column if not exists custom_domains_per_site int not null default 0;
+alter table public.plans add column if not exists ai_monthly_credits int not null default 0;
+alter table public.plans add column if not exists ai_daily_actions int not null default 30;
+alter table public.plans add column if not exists max_deleted_pending int not null default 2;
 
 do $$ begin
   alter table public.plans add constraint plans_backup_frequency_check

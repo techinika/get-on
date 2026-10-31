@@ -9,7 +9,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   SUBDOMAIN_TAKEN: "That web address is taken. Try one of these.",
   SUBDOMAIN_RESERVED: "That web address cannot be used. Please pick another.",
   SUBDOMAIN_INVALID:
-    "Please use only letters, numbers and dashes, with at least 3 characters.",
+    "Please use only letters, numbers and dashes, with at least 5 characters.",
   NAME_REQUIRED: "Please enter your business name.",
   TEMPLATE_NOT_FOUND: "We could not find that design. Please choose another.",
   TEMPLATE_PLAN_REQUIRED: "That design is included in a bigger plan. Choose another design or see plans.",

@@ -14,6 +14,7 @@
     "test:e2e": "pnpm --filter web test:e2e",
     "screenshots": "pnpm --filter web screenshots",
     "job:email": "pnpm --filter web job:email",
+    "job:email:doctor": "pnpm --filter web job:email:doctor",
     "job:cleanup": "pnpm --filter web job:cleanup",
     "job:backups": "pnpm --filter web job:backups",
     "job:backup-gc": "pnpm --filter web job:backup-gc",

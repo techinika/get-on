@@ -130,7 +130,7 @@ export function StepBusinessName({
               />
             </div>
             <p className="mt-1.5 text-sm text-text-muted">
-              Use letters, numbers and dashes only. At least 3 characters.
+              Use letters, numbers and dashes only. At least 5 characters.
             </p>
           </div>
         ) : null}
