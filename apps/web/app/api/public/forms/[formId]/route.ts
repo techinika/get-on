@@ -8,12 +8,50 @@ import { isDuplicate, checkSubmissionRate } from "@/lib/contact/rate-limit";
 import { scoreSubmission, SPAM_THRESHOLD } from "@/lib/contact/spam";
 import { notifyNewMessage } from "@/lib/contact/notify";
 import type { PlanId } from "@/lib/plans";
+import { randomUUID } from "node:crypto";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
 const MAX_BODY = 16 * 1024;
+
+type SubmissionResult =
+  | "stored"
+  | "stored_spam"
+  | "stored_duplicate"
+  | "honeypot_dropped"
+  | "rate_limited"
+  | "invalid"
+  | "closed"
+  | "not_found"
+  | "unauthorised"
+  | "error";
+
+async function logSubmission(
+  admin: ReturnType<typeof createAdminClient>,
+  input: {
+    projectId: string;
+    formId: string;
+    result: SubmissionResult;
+    reason?: string;
+    spamScore?: number;
+    durationMs?: number;
+    hostKind?: string;
+  },
+): Promise<void> {
+  const started = input.durationMs ?? 0;
+  await admin.from("form_submission_log").insert({
+    project_id: input.projectId,
+    form_id: input.formId,
+    result: input.result,
+    reason: input.reason ?? null,
+    spam_score: input.spamScore ?? 0,
+    duration_ms: started,
+    host_kind: input.hostKind ?? null,
+    trace_id: randomUUID(),
+  });
+}
 
 function json(status: number, body: Record<string, unknown> = { ok: false }) {
   return NextResponse.json(body, {
@@ -30,11 +68,28 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ formId: string }> },
 ) {
+  const startedAt = Date.now();
   const { formId } = await context.params;
-  if (!FORM_ID_RE.test(formId)) return json(404);
+  if (!FORM_ID_RE.test(formId)) {
+    await logSubmission(createAdminClient(), {
+      projectId: "",
+      formId,
+      result: "not_found",
+      reason: "bad_form_id",
+      durationMs: Date.now() - startedAt,
+    });
+    return json(404);
+  }
 
   const contentType = request.headers.get("content-type") ?? "";
   if (!contentType.toLowerCase().startsWith("application/x-www-form-urlencoded")) {
+    await logSubmission(createAdminClient(), {
+      projectId: "",
+      formId,
+      result: "error",
+      reason: "unsupported_content_type",
+      durationMs: Date.now() - startedAt,
+    });
     return json(415);
   }
 
@@ -54,14 +109,34 @@ export async function POST(
   const signatureOk =
     Boolean(secret) &&
     (await verifyWorkerRequest(secret, { ts, host, ip, bodyHash, sig }));
-  if (!signatureOk) return json(401);
+  if (!signatureOk) {
+    await logSubmission(createAdminClient(), {
+      projectId: "",
+      formId,
+      result: "unauthorised",
+      reason: "bad_worker_signature",
+      durationMs: Date.now() - startedAt,
+      hostKind: host ? "custom" : "free",
+    });
+    return json(401);
+  }
 
   const admin = createAdminClient();
   const config = readPublishConfig();
   const parsedHost =
     parseHost(host, config.rootDomain) ??
     parseHost(host, config.localRootDomain);
-  if (!parsedHost.ok) return json(404);
+  if (!parsedHost.ok) {
+    await logSubmission(createAdminClient(), {
+      projectId: "",
+      formId,
+      result: "not_found",
+      reason: "unknown_host",
+      durationMs: Date.now() - startedAt,
+      hostKind: host ? "custom" : "free",
+    });
+    return json(404);
+  }
 
   let projectQuery = admin
     .from("projects")
@@ -96,6 +171,14 @@ export async function POST(
     project.suspended_at ||
     project.review_state === "pending"
   ) {
+    await logSubmission(createAdminClient(), {
+      projectId: "",
+      formId,
+      result: "not_found",
+      reason: "project_not_published",
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
     return json(404);
   }
 
@@ -115,13 +198,33 @@ export async function POST(
       .maybeSingle(),
   ]);
 
-  if (install?.state !== "active") return json(404);
+  if (install?.state !== "active") {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "closed",
+      reason: "contact_plugin_inactive",
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
+    return json(404);
+  }
 
   const forms = Array.isArray(live?.forms) ? live.forms : [];
   const formConfig = forms.find(
     (entry: { id?: string }) => entry && String(entry.id) === formId,
   ) as ContactFormConfig | undefined;
-  if (!formConfig) return json(404);
+  if (!formConfig) {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "closed",
+      reason: "form_not_in_live_publish",
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
+    return json(404);
+  }
 
   const configForForm: ContactFormConfig = {
     id: formId,
@@ -139,8 +242,17 @@ export async function POST(
     _b: readString(body, "_b"),
   };
 
-  // A filled honeypot gets the same answer as a real submission.
+  // A filled honeypot gets the same answer as a real submission, but is
+  // logged as an attempt and never stored as a message.
   if (readString(body, "company_website").trim()) {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "honeypot_dropped",
+      reason: "filled_honeypot",
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
     return json(200, { ok: true });
   }
 
@@ -162,7 +274,31 @@ export async function POST(
     tokenResult.payload.s !== project.id ||
     tokenResult.payload.f !== formId
   ) {
-    // A tampered or missing token is discarded without telling the sender.
+    // A tampered or missing token is stored as spam so nothing is silently
+    // dropped, but no notification is sent.
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "stored_spam",
+      reason: "token_invalid",
+      spamScore: SPAM_THRESHOLD,
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
+    await admin.from("contact_messages").insert({
+      project_id: project.id,
+      form_id: formId,
+      page_path: configForForm.pagePath,
+      name: values.name,
+      email: values.email,
+      phone: values.phone,
+      message: values.message,
+      status: "spam",
+      spam_score: SPAM_THRESHOLD,
+      spam_reasons: ["token_invalid"],
+      ip_hash: ipHash,
+      user_agent: ua || null,
+    });
     return json(200, { ok: true });
   }
 
@@ -176,7 +312,17 @@ export async function POST(
   }
 
   const normalized = normalizeSubmissionFields(values, configForForm);
-  if (!normalized.ok) return json(400);
+  if (!normalized.ok) {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "invalid",
+      reason: "invalid_fields",
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
+    return json(400);
+  }
 
   const rate = await checkSubmissionRate(admin, {
     projectId: project.id,
@@ -184,6 +330,14 @@ export async function POST(
     planId,
   });
   if (!rate.ok) {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "rate_limited",
+      reason: rate.code,
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
     if (rate.code === "closed") {
       await admin
         .from("projects")
@@ -194,13 +348,38 @@ export async function POST(
   }
 
   const submission = normalized.value;
-  if (
-    await isDuplicate(admin, {
+  const dup = await isDuplicate(admin, {
+    projectId: project.id,
+    email: submission.email,
+    message: submission.message,
+  });
+  if (dup) {
+    // A repeat submitter is stored (flagged duplicate) but no notification
+    // email is sent again.
+    await logSubmission(createAdminClient(), {
       projectId: project.id,
+      formId,
+      result: "stored_duplicate",
+      reason: "duplicate_email_message",
+      spamScore: 0,
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
+    await admin.from("contact_messages").insert({
+      project_id: project.id,
+      form_id: formId,
+      page_path: submission.pagePath || configForForm.pagePath || "/",
+      name: submission.name,
       email: submission.email,
+      phone: submission.phone,
       message: submission.message,
-    })
-  ) {
+      status: "new",
+      duplicate: true,
+      spam_score: 0,
+      spam_reasons: [],
+      ip_hash: ipHash,
+      user_agent: ua || null,
+    });
     return json(200, { ok: true });
   }
 
@@ -233,9 +412,27 @@ export async function POST(
     .maybeSingle();
 
   if (insertError || !inserted) {
+    await logSubmission(createAdminClient(), {
+      projectId: project.id,
+      formId,
+      result: "error",
+      reason: String(insertError?.message ?? "insert_failed"),
+      durationMs: Date.now() - startedAt,
+      hostKind: parsedHost.custom ? "custom" : "free",
+    });
     console.error("[contact] could not store message", insertError);
     return json(500);
   }
+
+  await logSubmission(createAdminClient(), {
+    projectId: project.id,
+    formId,
+    result: isSpam ? "stored_spam" : "stored",
+    reason: isSpam ? "spam_threshold" : undefined,
+    spamScore,
+    durationMs: Date.now() - startedAt,
+    hostKind: parsedHost.custom ? "custom" : "free",
+  });
 
   if (!isSpam) {
     const messageForNotify = {
