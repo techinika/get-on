@@ -66,6 +66,7 @@ export function EditorShell({
   const [aiBrief, setAiBrief] = React.useState("");
   const [aiBusy, setAiBusy] = React.useState(false);
   const [aiMessage, setAiMessage] = React.useState<string | null>(null);
+  const [conflict, setConflict] = React.useState(false);
 
   async function generatePage() {
     if (aiBusy || aiBrief.trim().length === 0) return;
@@ -108,6 +109,9 @@ export function EditorShell({
         const latest = useEditorStore.getState();
         if (latest.content === snapshot) latest.markSaved(snapshot, result.revision);
         else useEditorStore.setState({ revision: result.revision, saveState: "unsaved" });
+      } else if (result.code === "REVISION_CONFLICT") {
+        setConflict(true);
+        useEditorStore.getState().setSaveState("error", result.message);
       } else {
         useEditorStore.getState().setSaveState("error", result.message);
       }
@@ -130,6 +134,9 @@ export function EditorShell({
             const latest = useEditorStore.getState();
             if (latest.content === snapshot) latest.markSaved(snapshot, result.revision);
             else useEditorStore.setState({ revision: result.revision, saveState: "unsaved" });
+          } else if (result.code === "REVISION_CONFLICT") {
+            setConflict(true);
+            useEditorStore.getState().setSaveState("error", result.message);
           } else {
             useEditorStore.getState().setSaveState("error", result.message);
           }
@@ -306,6 +313,34 @@ export function EditorShell({
         </div>
         <Inspector projectId={projectId} />
       </div>
+
+      {conflict ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="alertdialog" aria-modal="true" aria-labelledby="save-conflict-title">
+          <div className="w-full max-w-md rounded-card border border-border bg-surface p-5 shadow-card">
+            <h2 id="save-conflict-title" className="text-h2">This page changed somewhere else</h2>
+            <p className="mt-2 text-sm text-text-muted">
+              Another tab or person saved this page after you opened it. Reload to get their latest version. Your
+              unsaved changes on this screen will be lost.
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConflict(false)}
+                className="h-10 rounded-input border border-border px-4 text-sm font-semibold text-text hover:bg-surface-muted"
+              >
+                Keep looking
+              </button>
+              <button
+                type="button"
+                onClick={() => window.location.reload()}
+                className="h-10 rounded-input bg-primary px-4 text-sm font-semibold text-on-primary"
+              >
+                Reload page
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {aiOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="generate-page-title">
