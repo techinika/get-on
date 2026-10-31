@@ -73,3 +73,30 @@ export function assertStyledHtml(html: string): void {
   if (!/\bdata-gs\b/.test(match[1] ?? "")) throw new Error("HTML_STYLE_UNMARKED");
   assertStyledCss(match[2] ?? "");
 }
+
+/**
+ * The v5 stylesheet: one cascade order shared by the editor canvas, the
+ * preview and the published site. Renderer styles sit in gs-base, theme tokens
+ * in gs-theme, compiled node styles in gs-nodes and custom CSS in gs-user.
+ */
+export function buildLayeredCss(options: {
+  theme: Parameters<typeof themeTokens>[0];
+  rendererCss: string;
+  fonts: { family: string; weight: number; style: string; fileName: string }[];
+  pageCss: string;
+}): string {
+  const parts = [
+    "@layer gs-protect,gs-base,gs-theme,gs-nodes,gs-user;",
+    fontFaceCss(options.fonts),
+    `@layer gs-theme{${tokenCss(options.theme)}}`,
+    `@layer gs-base{${options.rendererCss}}`,
+    options.pageCss,
+  ];
+  return minifyCss(parts.filter(Boolean).join("\n"));
+}
+
+/** Stops a Free-plan publish when the protected badge is missing. */
+export function assertProtectedBadge(html: string): void {
+  if (!/data-gs-protect="1"/.test(html)) throw new Error("PROTECTED_BADGE_MISSING");
+  if (!/Report this site/.test(html)) throw new Error("PROTECTED_REPORT_MISSING");
+}
