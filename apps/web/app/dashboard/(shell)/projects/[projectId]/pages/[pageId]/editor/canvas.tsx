@@ -12,14 +12,19 @@ import {
 } from "@get-on/renderer";
 import {
   compileStyles,
+  createNode,
+  defaultSmartProps,
   findNode,
   findParent,
+  isContainerType,
   richTextFromPlain,
+  type NodeType,
   type PageContentV5,
   type Theme,
 } from "@get-on/blocks";
-import { ArrowDown, ArrowUp, Copy, CornerLeftUp, GripVertical, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, CornerLeftUp, GripVertical, Plus, Trash2 } from "lucide-react";
 import { useEditorStore } from "@/lib/editor/v5-store";
+import { ELEMENTS, ELEMENT_GROUPS, SMART_SECTIONS } from "@/lib/editor/registry";
 
 export type CanvasBusiness = {
   name: string;
@@ -78,9 +83,106 @@ export function EditorCanvas({
   const moveSibling = useEditorStore((state) => state.moveSibling);
   const duplicate = useEditorStore((state) => state.duplicate);
   const remove = useEditorStore((state) => state.remove);
+  const insertNodeAt = useEditorStore((state) => state.insertNodeAt);
+  const editingId = useEditorStore((state) => state.editingId);
+
+  const [insertionPoint, setInsertionPoint] = React.useState<{
+    left: number;
+    top: number;
+    parentId: string;
+    index: number;
+  } | null>(null);
+  const [inserterOpen, setInserterOpen] = React.useState(false);
 
   const images = React.useMemo(() => new Map(media), [media]);
   const compiled = React.useMemo(() => compileStyles(content.root, { customCss: content.css }), [content]);
+
+  const scale = zoom === "fit" ? Math.min(1, Math.max(0.25, (areaWidth - 48) / width)) : zoom / 100;
+
+  const updateInsertionPoint = React.useCallback(
+    (event: MouseEvent) => {
+      if (!doc || mode !== "edit" || editingId) {
+        setInsertionPoint(null);
+        return;
+      }
+      const frame = iframeRef.current;
+      const area = areaRef.current;
+      if (!frame || !area) {
+        setInsertionPoint(null);
+        return;
+      }
+      const frameRect = frame.getBoundingClientRect();
+      const areaRect = area.getBoundingClientRect();
+      const pointInFrame = { x: event.clientX - frameRect.left, y: event.clientY - frameRect.top };
+      const element = doc.elementFromPoint(event.clientX, event.clientY);
+      const node = element?.closest?.("[data-gs-node]");
+      if (!node) {
+        setInsertionPoint(null);
+        return;
+      }
+      let container: Element | null = node;
+      while (container && !container.hasAttribute("data-gs-node")) container = container.parentElement;
+      const containerNode = container?.closest("[data-gs-node]");
+      if (!containerNode) {
+        setInsertionPoint(null);
+        return;
+      }
+      const containerId = containerNode.getAttribute("data-gs-node")!;
+      const found = findNode(content.root, containerId);
+      if (!found || !isContainerType(found.type)) {
+        setInsertionPoint(null);
+        return;
+      }
+      const children = Array.from(containerNode.children).filter((el) => el.hasAttribute("data-gs-node"));
+      if (children.length === 0) {
+        setInsertionPoint(null);
+        return;
+      }
+      const rects = children.map((el) => el.getBoundingClientRect());
+      let targetIndex = -1;
+      let targetRect: DOMRect | null = null;
+      for (let i = 0; i <= rects.length; i++) {
+        const top = i === 0 ? 0 : rects[i - 1].bottom;
+        const bottom = i === rects.length ? Infinity : rects[i].top;
+        if (pointInFrame.y >= top - 8 && pointInFrame.y <= bottom + 8) {
+          targetIndex = i;
+          targetRect = i === 0 ? rects[0] : i === rects.length ? rects[rects.length - 1] : rects[i - 1];
+          break;
+        }
+      }
+      if (targetIndex === -1 || !targetRect) {
+        setInsertionPoint(null);
+        return;
+      }
+      setInsertionPoint({
+        left: Math.max(8, frameRect.left - areaRect.left + targetRect.left * scale),
+        top: Math.max(8, frameRect.top - areaRect.top + (targetIndex === 0 ? targetRect.top : targetRect.bottom) * scale),
+        parentId: containerId,
+        index: targetIndex,
+      });
+    },
+    [doc, mode, editingId, scale, content, iframeRef, areaRef],
+  );
+
+  const insertAtPoint = React.useCallback(
+    (kind: string) => {
+      if (!insertionPoint) return;
+      const node = createNode("smart", defaultSmartProps(kind));
+      insertNodeAt(node, insertionPoint.parentId, insertionPoint.index);
+      setInserterOpen(false);
+    },
+    [insertionPoint, insertNodeAt],
+  );
+
+  const insertElementAtPoint = React.useCallback(
+    (type: NodeType, props?: Record<string, unknown>) => {
+      if (!insertionPoint) return;
+      const node = createNode(type, props);
+      insertNodeAt(node, insertionPoint.parentId, insertionPoint.index);
+      setInserterOpen(false);
+    },
+    [insertionPoint, insertNodeAt],
+  );
 
   React.useEffect(() => {
     const element = areaRef.current;
@@ -140,8 +242,12 @@ export function EditorCanvas({
       const target = event.target as Element | null;
       const node = target?.closest?.("[data-gs-node]");
       hover(node?.getAttribute("data-gs-node") ?? null);
+      updateInsertionPoint(event);
     };
-    const onLeave = () => hover(null);
+    const onLeave = () => {
+      hover(null);
+      setInsertionPoint(null);
+    };
     const onDoubleClick = (event: MouseEvent) => {
       if (mode === "preview") return;
       const target = event.target as Element | null;
@@ -187,7 +293,7 @@ export function EditorCanvas({
       doc.removeEventListener("dblclick", onDoubleClick, true);
       doc.removeEventListener("blur", onBlur, true);
     };
-  }, [doc, content, mode, select, hover, setEditing, updateProps]);
+  }, [doc, content, mode, select, hover, setEditing, updateProps, updateInsertionPoint]);
 
   React.useEffect(() => {
     if (!doc) return;
@@ -209,7 +315,6 @@ export function EditorCanvas({
     return () => observer.disconnect();
   }, [doc, content, width]);
 
-  const scale = zoom === "fit" ? Math.min(1, Math.max(0.25, (areaWidth - 48) / width)) : zoom / 100;
   const [toolbar, setToolbar] = React.useState<{ left: number; top: number; width: number } | null>(null);
 
   React.useEffect(() => {
@@ -384,6 +489,28 @@ export function EditorCanvas({
           </ToolbarButton>
         </div>
       ) : null}
+      {insertionPoint && mode === "edit" ? (
+        <div
+          className="absolute z-20 flex h-9 w-9 items-center justify-center rounded-full border-2 border-primary bg-primary text-on-primary shadow-card cursor-pointer"
+          style={{ left: insertionPoint.left, top: insertionPoint.top - 8 }}
+          onClick={(event) => {
+            event.stopPropagation();
+            setInserterOpen(true);
+          }}
+          aria-label="Insert element here"
+          title="Insert element"
+        >
+          <Plus size={16} strokeWidth={2} />
+        </div>
+      ) : null}
+      {inserterOpen && insertionPoint ? (
+        <InserterPopover
+          open={inserterOpen}
+          onClose={() => setInserterOpen(false)}
+          onInsertElement={insertElementAtPoint}
+          onInsertSection={insertAtPoint}
+        />
+      ) : null}
     </div>
   );
 }
@@ -407,5 +534,102 @@ function ToolbarButton({
     >
       {children}
     </button>
+  );
+}
+
+function InserterPopover({
+  open,
+  onClose,
+  onInsertElement,
+  onInsertSection,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onInsertElement: (type: NodeType, props?: Record<string, unknown>) => void;
+  onInsertSection: (kind: string) => void;
+}) {
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="inserter-title"
+      onClick={onClose}
+    >
+      <div
+        className="flex max-h-[80vh] w-full max-w-lg flex-col rounded-card border border-border bg-surface p-4 shadow-card"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex items-center justify-between gap-2 shrink-0 mb-3">
+          <h2 id="inserter-title" className="text-h2">Insert element</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="h-9 rounded-input border border-border px-3 text-sm font-semibold text-text hover:bg-surface-muted"
+          >
+            Close
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {ELEMENT_GROUPS.map((group) => {
+              const items = ELEMENTS.filter((item) => item.group === group);
+              if (items.length === 0) return null;
+              return (
+                <section key={group} className="flex flex-col gap-2">
+                  <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-text-muted">
+                    {group}
+                  </h3>
+                  <div className="grid grid-cols-2 gap-2">
+                    {items.map((item) => (
+                      <button
+                        key={`${item.type}-${item.label}`}
+                        type="button"
+                        onClick={() => {
+                          onInsertElement(item.type, item.props);
+                          onClose();
+                        }}
+                        className="flex min-h-[76px] flex-col items-center justify-center gap-1 rounded-input border border-border bg-surface px-2 py-2 text-center text-[13px] font-semibold text-text hover:border-primary hover:shadow-card"
+                      >
+                        <item.icon size={22} strokeWidth={1.6} aria-hidden />
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
+            <section className="flex flex-col gap-2">
+              <h3 className="mb-2 text-[11px] font-bold uppercase tracking-wide text-text-muted">
+                Sections
+              </h3>
+              <div className="space-y-2">
+                {SMART_SECTIONS.map((item) => (
+                  <button
+                    key={item.kind}
+                    type="button"
+                    onClick={() => {
+                      onInsertSection(item.kind);
+                      onClose();
+                    }}
+                    className="flex w-full items-center gap-3 rounded-input border border-border bg-surface p-2 text-left hover:border-primary hover:shadow-card"
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-input bg-surface-muted text-primary">
+                      <item.icon size={20} strokeWidth={1.6} aria-hidden />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-semibold text-text">{item.label}</span>
+                      <span className="block truncate text-xs text-text-muted">{item.description}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
