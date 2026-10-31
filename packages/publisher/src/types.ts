@@ -1,4 +1,4 @@
-import type { Theme } from "@get-on/blocks";
+import type { PageContentV5, Theme } from "@get-on/blocks";
 
 export type PublishPage = {
   id: string;
@@ -12,6 +12,8 @@ export type PublishPage = {
   hidden?: boolean;
   showInMenu?: boolean;
   blocks: unknown[];
+  /** The v5 editor tree. When present, it is rendered instead of blocks. */
+  content?: PageContentV5;
 };
 
 export type PublishImage = {

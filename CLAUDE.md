@@ -66,8 +66,20 @@ The site design system is prepared for a future "dark-mode" plugin:
 - Domains are Basic and above. Limits come from `plans.custom_domains_per_site`; Free is 0.
 - See `docs/domains.md`, `docs/domains-spike.md` and `docs/ui-spec-domains.md`.
 
+## Editor v3 core rules (tested; see docs/ui-spec-editor-v3.md and docs/editor-engine.md)
+1. One renderer and one CSS compiler feed the editor canvas, preview, published site, ZIP export, templates and thumbnails. If two of them disagree, that is a bug.
+2. Styles are structured data compiled to CSS. Raw CSS exists only as sandboxed custom CSS; no editor action writes an inline `style` attribute.
+3. Everything from the browser is untrusted: validate the tree, styles, rich text, CSS and HTML on the server before saving or publishing.
+4. Published pages never contain scripts. There is no script node, no `on*` attribute and no JavaScript in custom HTML.
+5. The Free-plan badge and the "Report this site" link cannot be hidden or restyled by customers or plugins. They are protected direct children of the site root with inline `!important`; custom CSS forbids `!important`.
+6. Plugin requirements live in the content model and are enforced on save, render and publish. A missing plugin never breaks the page.
+7. Every change is undoable in one editor history: text, style, structure, custom CSS, AI patches and template apply. Autosave never loses an unsaved change.
+8. Responsive styles are desktop-first overrides emitted with `@container site`, not viewport media queries.
+9. AI never invents business facts, never publishes, and never sees more than the current page context. Credits are shown before an action runs.
+10. Editor screens say when a change takes effect ("Saved as draft" vs "Live after you publish") and mark unpublished changes.
+
 ## Known gaps
-- The page editor shows a live preview of blocks; continue using Pages and Templates to update content and design.
+- The v3 editor is behind `EDITOR_V3`; the old text-slot editor stays until the v4 pages are converted.
 - Signed-in screenshots and the dashboard need a database with every migration applied and email confirmation switched off (or confirmed accounts).
 
 ## Templates (added)
@@ -128,6 +140,15 @@ The site design system is prepared for a future "dark-mode" plugin:
 - docs/ses-setup.md
 - docs/security.md
 - docs/ui-spec-security.md
+- docs/ui-spec-editor-v3.md
+- docs/editor-engine.md
+- docs/editor-audit.md
+- docs/editor-prototypes.md
+- docs/style-system.md
+- docs/custom-code.md
+- docs/editor-migration.md
+- docs/patterns.md
+- docs/editor-registry.md
 
 
 ## Website settings core rules

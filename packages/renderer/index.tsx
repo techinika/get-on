@@ -3,6 +3,8 @@ import type { Theme } from "@get-on/blocks";
 import { themeTokens } from "@get-on/blocks";
 
 export { RenderPage } from "./src/render-page";
+export { RenderPageV5, RenderNodeV5, ProtectedBadge } from "./src/render-v5";
+export type { RenderV5Context } from "./src/render-v5";
 export { RenderBlock } from "./src/render-block";
 export type { RenderContext, RenderImage } from "./src/render-block";
 export { SiteHeader, SiteFooter } from "./src/site-chrome";

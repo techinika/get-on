@@ -6,7 +6,9 @@ import {
   SiteHeader,
   SiteFooter,
   RenderPage,
+  RenderPageV5,
 } from "@get-on/renderer";
+import type { CompiledStyles } from "@get-on/blocks";
 import { localBusinessJsonLd, pageSeo, webPageJsonLd } from "./seo";
 import type { PublishPage, SiteSettings } from "./types";
 
@@ -38,6 +40,10 @@ export type HtmlOptions = {
   contactEnabled?: boolean;
   /** The exact path this page is served at, for the form back link. */
   pagePath?: string;
+  /** The compiled v5 styles, so the canvas and the published page share them. */
+  compiled?: CompiledStyles;
+  /** Where the protected "Report this site" link goes. */
+  reportHref?: string;
 };
 
 /** The HTML document with one inline style tag and the JSON-LD data. */
@@ -57,11 +63,14 @@ export function renderHtml(options: HtmlOptions): string {
   const plan = (settings.plan ?? "free").toLowerCase();
   const watermark = settings.showWatermark !== false && plan === "free";
 
+  const isV5 = page.content?.schemaVersion === 5;
+  const showBadge = watermark;
+
   const header = React.createElement(SiteHeader, {
     businessName: settings.businessName,
     logoUrl: options.logoUrl ?? null,
     nav: options.nav.map(({ label, href }) => ({ label, href })),
-    watermark,
+    watermark: isV5 ? false : watermark,
     theme: settings.theme,
     tagline: settings.tagline,
     businessType: settings.businessType,
@@ -76,34 +85,61 @@ export function renderHtml(options: HtmlOptions): string {
     address: settings.address ?? undefined,
     hours: settings.hours,
     nav: options.nav.map(({ label, href }) => ({ label, href })),
-    showWatermark: watermark,
+    showWatermark: isV5 ? false : watermark,
     theme: settings.theme,
     tagline: settings.tagline,
     socialLinks: settings.socialLinks,
   });
 
+  const ctx = {
+    getPageHref: (pageId: string) =>
+      options.nav.find((item) => item.pageId === pageId)?.href ?? "/",
+    getImage: (imageId: string) => options.images.get(imageId) ?? null,
+    getField: (key: string) => {
+      const values: Record<string, string | null | undefined> = {
+        "business.name": settings.businessName,
+        "business.tagline": settings.tagline,
+        "business.description": settings.seo?.description,
+        "business.type": settings.businessType,
+        "contact.phone": settings.phone,
+        "contact.email": settings.email,
+        "contact.address": settings.address,
+        "contact.hours": settings.hours,
+        "page.title": page.title,
+      };
+      return values[key] ?? null;
+    },
+    mode: "live" as const,
+    contactEnabled: options.contactEnabled !== false,
+    pagePath: options.pagePath,
+    theme: settings.theme,
+    hours: settings.hours,
+    address: settings.address,
+    phone: settings.phone,
+    email: settings.email,
+    socialLinks: settings.socialLinks,
+  };
+
   const content = React.createElement(
     SiteRoot,
     { theme: settings.theme },
-    React.createElement(RenderPage, {
-      content: { schemaVersion: 3, blocks: page.blocks },
-      header,
-      footer,
-      ctx: {
-        getPageHref: (pageId: string) =>
-          options.nav.find((item) => item.pageId === pageId)?.href ?? "/",
-        getImage: (imageId: string) => options.images.get(imageId) ?? null,
-        mode: "live",
-        contactEnabled: options.contactEnabled !== false,
-        pagePath: options.pagePath,
-        theme: settings.theme,
-        hours: settings.hours,
-        address: settings.address,
-        phone: settings.phone,
-        email: settings.email,
-        socialLinks: settings.socialLinks,
-      },
-    }) as React.ReactNode,
+    isV5
+      ? (React.createElement(RenderPageV5, {
+          content: page.content!,
+          header,
+          footer,
+          ctx,
+          compiled: options.compiled,
+          protect: showBadge,
+          reportHref: options.reportHref,
+          overlay: false,
+        }) as React.ReactNode)
+      : (React.createElement(RenderPage, {
+          content: { schemaVersion: 3, blocks: page.blocks },
+          header,
+          footer,
+          ctx,
+        }) as React.ReactNode),
   );
 
   const body = neutralizeStrayPlaceholders(renderToStaticMarkup(content));

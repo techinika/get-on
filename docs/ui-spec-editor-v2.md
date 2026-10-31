@@ -1,3 +1,5 @@
+> The editor is replaced by `docs/ui-spec-editor-v3.md`. Where they conflict, v3 wins.
+
 # Visual editor v2
 
 See `docs/ui-spec-ai.md` for all AI controls; it wins where it conflicts.

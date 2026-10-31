@@ -13,3 +13,4 @@ export * from './fonts';
 export * from './legacy';
 export * from './design-catalogue';
 export * from './layout-lint';
+export * from './v5';
