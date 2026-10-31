@@ -10,6 +10,7 @@ import {
   Redo2,
   Save,
   Smartphone,
+  Sparkles,
   Tablet,
   Undo2,
 } from "lucide-react";
@@ -17,7 +18,7 @@ import type { PageContentV5, Theme } from "@get-on/blocks";
 import type { RenderImage } from "@get-on/renderer";
 import { cn } from "@/lib/utils";
 import { useEditorStore, type Device, type Zoom } from "@/lib/editor/v5-store";
-import { savePageContent } from "./actions";
+import { generateEditorPage, savePageContent } from "./actions";
 import { EditorCanvas, type CanvasBusiness } from "./canvas";
 import { LeftPanel } from "./left-panel";
 import { Inspector } from "./inspector";
@@ -61,6 +62,26 @@ export function EditorShell({
   const past = useEditorStore((state) => state.past);
   const future = useEditorStore((state) => state.future);
   const booted = React.useRef(false);
+  const [aiOpen, setAiOpen] = React.useState(false);
+  const [aiBrief, setAiBrief] = React.useState("");
+  const [aiBusy, setAiBusy] = React.useState(false);
+  const [aiMessage, setAiMessage] = React.useState<string | null>(null);
+
+  async function generatePage() {
+    if (aiBusy || aiBrief.trim().length === 0) return;
+    setAiBusy(true);
+    setAiMessage(null);
+    const result = await generateEditorPage({ projectId, brief: aiBrief.trim() });
+    setAiBusy(false);
+    if (!result.ok) {
+      setAiMessage(result.message);
+      return;
+    }
+    useEditorStore.getState().insertNodesAt(result.nodes);
+    setAiOpen(false);
+    setAiBrief("");
+    setAiMessage(null);
+  }
 
   React.useEffect(() => {
     const store = useEditorStore.getState();
@@ -179,6 +200,13 @@ export function EditorShell({
           </IconButton>
           <button
             type="button"
+            onClick={() => setAiOpen(true)}
+            className="flex h-9 items-center gap-1 rounded-input border border-border px-3 text-sm font-semibold hover:bg-surface-muted"
+          >
+            <Sparkles size={15} /> Generate
+          </button>
+          <button
+            type="button"
             onClick={() => useEditorStore.getState().setMode(mode === "edit" ? "preview" : "edit")}
             className="flex h-9 items-center gap-1 rounded-input border border-border px-3 text-sm font-semibold hover:bg-surface-muted"
           >
@@ -278,6 +306,43 @@ export function EditorShell({
         </div>
         <Inspector projectId={projectId} />
       </div>
+
+      {aiOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-scrim p-4" role="dialog" aria-modal="true" aria-labelledby="generate-page-title">
+          <div className="w-full max-w-lg rounded-card border border-border bg-surface p-5 shadow-card">
+            <h2 id="generate-page-title" className="text-h2">Generate a page with AI</h2>
+            <p className="mt-1 text-sm text-text-muted">
+              Describe the page in your own words. AI adds a draft you can change. Nothing goes live until you publish.
+            </p>
+            <textarea
+              value={aiBrief}
+              onChange={(event) => setAiBrief(event.target.value)}
+              rows={4}
+              autoFocus
+              placeholder="For example: a page for a family plumbing business in Nairobi, with services, reviews and a contact form"
+              className="mt-3 w-full rounded-input border border-border bg-surface p-3 text-sm text-text outline-none focus:border-primary"
+            />
+            {aiMessage ? <p className="mt-2 text-sm text-danger-text">{aiMessage}</p> : null}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setAiOpen(false)}
+                className="h-10 rounded-input border border-border px-4 text-sm font-semibold text-text hover:bg-surface-muted"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void generatePage()}
+                disabled={aiBusy || aiBrief.trim().length === 0}
+                className="h-10 rounded-input bg-primary px-4 text-sm font-semibold text-on-primary disabled:opacity-50"
+              >
+                {aiBusy ? "Writing…" : "Generate page"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

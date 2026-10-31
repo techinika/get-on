@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { blockSchema, countNodes, customCodeLimits, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
-import { generateSectionsWithAi, writeWithAi } from "@/lib/ai/actions";
+import { generatePageWithAi, generateSectionsWithAi, writeWithAi } from "@/lib/ai/actions";
 
 type SaveResult =
   | { ok: true; revision: number }
@@ -113,6 +113,24 @@ export async function generateEditorSections(input: {
   }
   if (nodes.length === 0) {
     return { ok: false, code: "AI_BAD_RESULT", message: "AI did not send a usable section. Try again." };
+  }
+  return { ok: true, nodes, credits: result.credits, requestId: result.requestId };
+}
+
+export async function generateEditorPage(input: {
+  projectId: string;
+  brief: string;
+}): Promise<EditorAiSectionsResult> {
+  const result = await generatePageWithAi({ projectId: input.projectId, brief: input.brief });
+  if (!result.ok) return { ok: false, code: result.code, message: result.message };
+  const blocks = Array.isArray(result.data) ? result.data : [];
+  const nodes: ContentNode[] = [];
+  for (const block of blocks) {
+    const parsed = blockSchema.safeParse(block);
+    if (parsed.success) nodes.push(smartNodeFromBlock(parsed.data));
+  }
+  if (nodes.length === 0) {
+    return { ok: false, code: "AI_BAD_RESULT", message: "AI did not send a usable page. Try again." };
   }
   return { ok: true, nodes, credits: result.credits, requestId: result.requestId };
 }
