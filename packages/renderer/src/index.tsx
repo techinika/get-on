@@ -3,6 +3,8 @@ import type { Theme } from "@get-on/blocks";
 import { themeTokens } from "@get-on/blocks";
 
 export { RenderPage } from "./render-page";
+export { RenderPageV5, RenderNodeV5, ProtectedBadge } from "./render-v5";
+export type { RenderV5Context } from "./render-v5";
 export { themeTokens } from "@get-on/blocks";
 
 export function SiteRoot({

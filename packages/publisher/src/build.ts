@@ -1,7 +1,8 @@
 import { gzipSync } from "node:zlib";
 import sharp from "sharp";
 import { RENDERER_CSS, RENDERER_CSS_VERSION } from "@get-on/renderer";
-import { assertStyledCss, assertStyledHtml, buildCss } from "./css";
+import { compileStyles, type CompiledStyles } from "@get-on/blocks";
+import { assertProtectedBadge, assertStyledCss, assertStyledHtml, buildCss, buildLayeredCss } from "./css";
 import { prepareFonts } from "./fonts";
 import { renderHtml, renderNotFoundHtml, renderFormStatusHtml, type NavItem } from "./html";
 import { prepareImages, type PreparedImage } from "./images";
@@ -84,12 +85,26 @@ export async function buildSite(
   const images = await prepareImages(input.images ?? []);
   warnings.push(...images.warnings);
 
+  const visiblePages = input.pages.filter((page) => !page.hidden);
   const rendererCss = input.css ?? readRendererCss();
-  const css = buildCss({
-    theme: input.settings.theme,
-    rendererCss,
-    fonts: fonts.fonts,
-  });
+  const compiledByPage = new Map<string, CompiledStyles>();
+  for (const page of visiblePages) {
+    if (page.content?.schemaVersion === 5) {
+      compiledByPage.set(page.id, compileStyles(page.content.root, { customCss: page.content.css }));
+    }
+  }
+  const css = compiledByPage.size > 0
+    ? buildLayeredCss({
+        theme: input.settings.theme,
+        rendererCss,
+        fonts: fonts.fonts,
+        pageCss: [...compiledByPage.values()].map((entry) => entry.css).join(""),
+      })
+    : buildCss({
+        theme: input.settings.theme,
+        rendererCss,
+        fonts: fonts.fonts,
+      });
   assertStyledCss(css);
 
   const cssGzip = gzipSize(new TextEncoder().encode(css));
@@ -103,7 +118,6 @@ export async function buildSite(
   Object.assign(files, images.files);
 
   const formsEnabled = input.forms?.enabled === true;
-  const visiblePages = input.pages.filter((page) => !page.hidden);
   if (
     !formsEnabled &&
     visiblePages.some((page) =>
@@ -164,8 +178,13 @@ export async function buildSite(
       ogImageUrl: ogImage.url,
       contactEnabled: formsEnabled,
       pagePath: page.slug === "" ? "/" : `/${slugify(page.slug)}`,
+      compiled: compiledByPage.get(page.id),
+      reportHref: `/report-site?host=${encodeURIComponent(input.primaryHost || `${input.subdomain}.${rootDomain}`)}`,
     });
     assertStyledHtml(html);
+    if (page.content?.schemaVersion === 5 && input.settings.showWatermark !== false && (input.settings.plan ?? "free").toLowerCase() === "free") {
+      assertProtectedBadge(html);
+    }
     const file = textFile(html);
     files[pagePath(page.slug)] = file;
 
@@ -282,6 +301,27 @@ function collectForms(input: BuildSiteInput): BuildSiteResult["forms"] {
   for (const page of input.pages) {
     if (page.hidden) continue;
     const pagePath = page.slug === "" ? "/" : `/${slugify(page.slug)}`;
+    if (page.content?.schemaVersion === 5) {
+      const visit = (node: any) => {
+        if (!node || typeof node !== "object") return;
+        if (node.type === "smart" && node.props?.kind === "contact-form") {
+          const id = node.id;
+          if (id && FORM_ID_RE.test(id)) {
+            const props = (node.props ?? {}) as Record<string, unknown>;
+            found.push({
+              id,
+              pagePath,
+              showName: props.variation === 'mini' ? props.showName === true : props.showName !== false,
+              showPhone: Boolean(props.showPhone),
+              phoneRequired: Boolean(props.phoneRequired) && Boolean(props.showPhone),
+            });
+          }
+        }
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(page.content.root);
+      continue;
+    }
     for (const block of page.blocks) {
       if (!block || typeof block !== "object") continue;
       if ((block as { type?: string }).type !== "contact-form") continue;
