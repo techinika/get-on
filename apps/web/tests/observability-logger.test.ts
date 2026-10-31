@@ -71,7 +71,7 @@ describe("email observability logger", () => {
 
   it("emits production JSON with standard fields", () => {
     const orig = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    (process.env as { NODE_ENV?: string }).NODE_ENV = "production";
     const { writes, restore } = captureWrite();
     emailLogger.info({
       stage: "ses.send.response",
@@ -80,7 +80,7 @@ describe("email observability logger", () => {
       durationMs: 412,
     });
     restore();
-    process.env.NODE_ENV = orig;
+    (process.env as { NODE_ENV?: string }).NODE_ENV = orig;
     const joined = writes.join("");
     const parsed = JSON.parse(joined.trim().split("\n").pop() ?? "{}");
     expect(parsed.level).toBe("info");
