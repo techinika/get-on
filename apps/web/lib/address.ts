@@ -5,6 +5,9 @@
 
 const ADDRESS_RE = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/;
 
+export const SUBDOMAIN_MIN_LENGTH = 5;
+export const SUBDOMAIN_MAX_LENGTH = 40;
+
 export const FREE_SUFFIX = ".get-on.tech";
 
 export type AddressCheck =
@@ -25,11 +28,11 @@ export function normalizeAddress(raw: string): string {
 
 export function validateAddress(raw: string): { ok: boolean; reason?: string } {
   const value = normalizeAddress(raw);
-  if (value.length < 3) {
-    return { ok: false, reason: "Please use at least 3 characters." };
+  if (value.length < SUBDOMAIN_MIN_LENGTH) {
+    return { ok: false, reason: `Use at least ${SUBDOMAIN_MIN_LENGTH} characters.` };
   }
-  if (value.length > 63) {
-    return { ok: false, reason: "Please use 63 characters or fewer." };
+  if (value.length > SUBDOMAIN_MAX_LENGTH) {
+    return { ok: false, reason: `Use ${SUBDOMAIN_MAX_LENGTH} characters or fewer.` };
   }
   if (!ADDRESS_RE.test(value)) {
     return {
