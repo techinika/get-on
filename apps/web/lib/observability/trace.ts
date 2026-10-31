@@ -1,5 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
-import { emailLogger, type LogEntry } from "@/lib/observability/logger";
+import {
+  consoleEmailLogger,
+  emailLogger,
+  type LogEntry,
+} from "@/lib/observability/logger";
 
 /* Persistent trace store. Every logged stage is written to email_trace_events
  * so a single trace id follows an email from trigger through SES send to the
@@ -65,6 +69,22 @@ async function flush(admin: ReturnType<typeof createAdminClient>): Promise<void>
 export async function recordTrace(event: TraceEvent): Promise<void> {
   // Always emit to the structured logger first (this is the authoritative log).
   emailLogger.debug({
+    trace: event.traceId,
+    stage: event.stage,
+    template: event.template,
+    stream: event.stream,
+    outboxId: event.outboxId,
+    emailLogId: event.emailLogId,
+    reason: event.reason,
+    code: event.code,
+    durationMs: event.durationMs,
+    meta: event.meta,
+  });
+
+  // Always write every email stage to stdout so it appears in hosting logs
+  // (e.g. Vercel) regardless of EMAIL_LOG_LEVEL. This is the observable trail
+  // for diagnosing why emails are not sent.
+  consoleEmailLogger({
     trace: event.traceId,
     stage: event.stage,
     template: event.template,

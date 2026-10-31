@@ -265,6 +265,25 @@ const DEFAULT_ENV = isDev() ? "development" : "production";
 export const platformLogger = new Logger("get-on", DEFAULT_ENV);
 export const emailLogger = platformLogger.child({ service: "email" });
 
+/**
+ * Console email logger that always writes email pipeline events to stdout,
+ * regardless of EMAIL_LOG_LEVEL. This is the observable trail an operator
+ * sees in Vercel / hosting logs when emails are not arriving. Every field is
+ * redacted (no codes, tokens, links or full addresses) so it is safe to ship
+ * to production log aggregation.
+ */
+export function consoleEmailLogger(fields: Partial<LogEntry> & { msg?: string }): void {
+  const entry: LogEntry = {
+    ts: new Date().toISOString(),
+    level: "info",
+    service: "email",
+    env: isDev() ? "development" : "production",
+    ...fields,
+  };
+  const line = isDev() ? renderDev(entry) : renderProd(entry);
+  process.stdout.write(line + "\n");
+}
+
 export function traceId(): string {
   return `${Date.now().toString(36)}-${createHmac("sha256", Buffer.from(String(Math.random()), "utf8")).digest("hex").slice(0, 12)}`;
 }
