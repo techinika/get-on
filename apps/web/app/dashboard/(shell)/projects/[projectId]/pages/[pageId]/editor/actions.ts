@@ -35,6 +35,10 @@ export async function savePageContent(input: {
   if (bytes > 1024 * 1024) {
     return { ok: false, code: "TOO_LARGE", message: "This page is too big. Remove something and try again." };
   }
+  const cssBytes = new TextEncoder().encode(content.css ?? "").length;
+  if (cssBytes > 20 * 1024) {
+    return { ok: false, code: "TOO_LARGE", message: "Page CSS must be 20 KB or less. Remove some rules and try again." };
+  }
 
   const supabase = await createClient();
   const { data: page } = await supabase
