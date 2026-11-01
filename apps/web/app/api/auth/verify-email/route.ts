@@ -97,8 +97,13 @@ export async function POST(request: Request) {
   }
   const deviceHash = hashDeviceId(deviceId);
 
-  await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
-  await markSessionVerified({ sessionId, userId, method: "signup_otp", challengeId: null });
+  try {
+    await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
+    await markSessionVerified({ sessionId, userId, method: "signup_otp", challengeId: null });
+  } catch (error) {
+    console.error("Could not finish signup verification", error);
+    return rejected("SOMETHING_WRONG", 500);
+  }
   await touchDevice({ userId, deviceIdHash: deviceHash, label: ua });
 
   const welcome = welcomeEmail(null);

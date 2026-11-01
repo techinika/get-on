@@ -60,19 +60,18 @@ export async function POST(request: Request) {
   const cookieStore = await cookies();
 
   const deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
-  let deviceHash: string | null = null;
-  if (deviceId) {
-    deviceHash = hashDeviceId(deviceId);
-    const existing = await getSessionRow(sessionId);
-    if (!existing) {
-      await createPendingSession({
-        sessionId,
-        userId: user.id,
-        ipHash,
-        uaFamily: ua,
-        deviceIdHash: deviceHash,
-      });
-    }
+  const deviceHash = deviceId ? hashDeviceId(deviceId) : null;
+  const existing = await getSessionRow(sessionId);
+  if (!existing) {
+    await createPendingSession({
+      sessionId,
+      userId: user.id,
+      ipHash,
+      uaFamily: ua,
+      deviceIdHash: deviceHash,
+    });
+  }
+  if (deviceHash) {
     const { isNew } = await touchDevice({ userId: user.id, deviceIdHash: deviceHash, label: ua });
     if (isNew && user.email) {
       let secureUrl: string | null = null;
@@ -106,12 +105,17 @@ export async function POST(request: Request) {
     }
   }
 
-  await markSessionVerified({
-    sessionId,
-    userId: user.id,
-    method: "totp",
-    challengeId: null,
-  });
+  try {
+    await markSessionVerified({
+      sessionId,
+      userId: user.id,
+      method: "totp",
+      challengeId: null,
+    });
+  } catch (error) {
+    console.error("Could not finish MFA sign-in", error);
+    return NextResponse.json({ ok: false, code: "SESSION_NOT_VERIFIED" }, { status: 500 });
+  }
 
   await recordSecurityEvent({
     userId: user.id,

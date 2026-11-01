@@ -29,7 +29,7 @@ export async function createPendingSession(input: {
   const admin = createAdminClient();
   const settings = await getSecuritySettings();
   const now = Date.now();
-  await admin.from("session_security").upsert(
+  const { error } = await admin.from("session_security").upsert(
     {
       session_id: input.sessionId,
       user_id: input.userId,
@@ -49,6 +49,9 @@ export async function createPendingSession(input: {
     },
     { onConflict: "session_id" },
   );
+  if (error) {
+    throw new Error(`Could not save the sign-in session: ${error.message}`);
+  }
 }
 
 export async function markSessionVerified(input: {
@@ -60,7 +63,7 @@ export async function markSessionVerified(input: {
   const admin = createAdminClient();
   const settings = await getSecuritySettings();
   const now = Date.now();
-  await admin
+  const { data, error } = await admin
     .from("session_security")
     .update({
       verified_at: new Date(now).toISOString(),
@@ -71,7 +74,14 @@ export async function markSessionVerified(input: {
       last_seen_at: new Date(now).toISOString(),
     })
     .eq("session_id", input.sessionId)
-    .eq("user_id", input.userId);
+    .eq("user_id", input.userId)
+    .select("session_id");
+  if (error) {
+    throw new Error(`Could not mark the sign-in session as verified: ${error.message}`);
+  }
+  if (!data || data.length === 0) {
+    throw new Error("Could not find the sign-in session to verify.");
+  }
 }
 
 export async function getSessionRow(sessionId: string): Promise<SessionRow | null> {

@@ -133,7 +133,12 @@ export async function POST(request: Request) {
   }
   const deviceHash = hashDeviceId(deviceId);
 
-  await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
+  try {
+    await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
+  } catch (error) {
+    console.error("Could not start the sign-in session", error);
+    return loginFailed(request, "SOMETHING_WRONG", next);
+  }
 
   const { data: factors } = await supabase.auth.mfa.listFactors();
   const hasTotp = (factors?.totp ?? []).some((factor) => factor.status === "verified");
