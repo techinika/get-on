@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export type EmailTransport = "ses" | "smtp" | "console" | "memory";
+export type EmailTransport = "auto" | "resend" | "ses" | "smtp" | "console" | "memory";
 
 export type EmailSettings = {
   email_provider: EmailTransport;
@@ -27,7 +27,7 @@ export async function getEmailSettings(): Promise<EmailSettings> {
   }
 
   return {
-    email_provider: (data?.email_provider ?? "console") as EmailTransport,
+    email_provider: (data?.email_provider ?? "auto") as EmailTransport,
     smtp_host: data?.smtp_host ?? null,
     smtp_port: data?.smtp_port ?? 587,
     smtp_secure: data?.smtp_secure ?? false,

@@ -1,4 +1,11 @@
-import { describeEmailKind, getSender, readTransport, safeHeader, type EmailStream, type EmailTransport } from "@get-on/email";
+import {
+  describeEmailKind,
+  getSender,
+  readTransport,
+  safeHeader,
+  type EmailStream,
+  type EmailTransport,
+} from "@get-on/email";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 export type EmailKind =
@@ -99,15 +106,24 @@ function normaliseEmail(value: string): string {
 }
 
 export function isTransient(error: unknown): boolean {
-  const value = error as { name?: string; code?: string; $metadata?: { httpStatusCode?: number } };
-  const status = value?.$metadata?.httpStatusCode ?? 0;
-  if (status >= 500) return true;
-  if (value?.name === "ThrottlingException" || value?.name === "TooManyRequestsException") {
+  const value = error as {
+    name?: string;
+    code?: string;
+    statusCode?: number;
+    $metadata?: { httpStatusCode?: number };
+  };
+  const status = value?.$metadata?.httpStatusCode ?? value?.statusCode ?? 0;
+  if (status >= 500 || status === 429) return true;
+  if (
+    value?.name === "ThrottlingException" ||
+    value?.name === "TooManyRequestsException" ||
+    value?.name === "ResendServerError"
+  ) {
     return true;
   }
   if (value?.name === "TimeoutError" || value?.name === "AbortError") return true;
   const message = String((error as { message?: string })?.message ?? "");
-  return /timeout|throttl|temporar|network|ECONN|ETIMEDOUT/i.test(message);
+  return /timeout|throttl|temporar|network|ECONN|ETIMEDOUT|rate.?limit/i.test(message);
 }
 
 export async function isSuppressed(admin: AdminClient, email: string): Promise<boolean> {
@@ -133,13 +149,15 @@ async function sentTodayCount(admin: AdminClient): Promise<number> {
 async function overDailyGuard(admin: AdminClient, kind: string): Promise<boolean> {
   const limit = Number(process.env.SES_DAILY_LIMIT ?? "");
   if (!Number.isFinite(limit) || limit <= 0) return false;
+  const transport = readTransport() ?? (describeEmailKind(kind).stream === "marketing" ? "ses" : "resend");
+  if (transport !== "ses") return false;
   if (CRITICAL_KINDS.has(kind)) return false;
   return (await sentTodayCount(admin)) >= Math.floor(limit * 0.9);
 }
 
-export async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0], transport?: EmailTransport) {
+export async function sendWithTimeout(message: Parameters<ReturnType<typeof getSender>["send"]>[0], overrideTransport?: EmailTransport | null) {
   return Promise.race([
-    getSender(transport).send(message),
+    getSender(message, overrideTransport).send(message),
     new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error("Email timeout")), TIMEOUT_MS),
     ),
@@ -151,16 +169,18 @@ export function nextAttempt(attempts: number): string {
   return new Date(Date.now() + minutes * 60 * 1000).toISOString();
 }
 
-async function getEmailProvider(admin: ReturnType<typeof createAdminClient>): Promise<EmailTransport> {
+async function getEmailProvider(admin: ReturnType<typeof createAdminClient>): Promise<EmailTransport | null> {
   const { data, error } = await admin
     .from('email_settings')
     .select('email_provider')
     .eq('id', true)
     .maybeSingle();
-  if (!error && data?.email_provider && ['ses', 'smtp', 'console', 'memory'].includes(data.email_provider)) {
+  if (error || !data?.email_provider) return null;
+  if (data.email_provider === 'auto') return null;
+  if (['resend', 'ses', 'smtp', 'console', 'memory'].includes(data.email_provider)) {
     return data.email_provider as EmailTransport;
   }
-  return 'console';
+  return null;
 }
 
 /**
@@ -173,7 +193,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   const subject = safeHeader(input.subject, 180);
   const stream = input.stream ?? describeEmailKind(input.kind).stream;
   const admin = adminOrNull();
-  const transport = admin ? await getEmailProvider(admin) : readTransport();
+  const transport = admin ? await getEmailProvider(admin) : null;
   const message = { ...input, to, subject, stream };
   if (!admin) {
     try {
@@ -261,7 +281,7 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
 /** Sends emails that were queued, with backoff and a hard attempt limit. */
 export async function processEmailQueue(limit = 50): Promise<{ processed: number; sent: number }> {
   const admin = adminOrNull();
-  const transport = admin ? await getEmailProvider(admin) : readTransport();
+  const transport = admin ? await getEmailProvider(admin) : null;
   if (!admin) return { processed: 0, sent: 0 };
   const now = new Date().toISOString();
   const { data } = await admin

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { registerAccount } from "@/lib/auth/register";
-import { BINDING_COOKIE, PENDING_COOKIE, bindingCookieOptions, pendingCookieOptions } from "@/lib/auth/cookies";
+import { BINDING_COOKIE, PENDING_COOKIE, pendingCookieOptions } from "@/lib/auth/cookies";
 import { getIpHash, isSameOrigin, uaFamily } from "@/lib/security/request";
 import { securityMessage } from "@/lib/security/messages";
 import { signToken } from "@/lib/security/tokens";
@@ -62,16 +62,19 @@ export async function POST(request: Request) {
   await sleep();
 
   if (result.ok) {
-    const pending = signToken({ challengeId: result.challengeId, purpose: "signup_verify", next: "/dashboard/new" }, 30 * 60);
+    const pending = signToken(
+      { email: result.email, purpose: "signup_verify", next: "/dashboard/new" },
+      30 * 60,
+    );
     const response = NextResponse.json({ ok: true, next: "/verify-email", maskedEmail: result.maskedEmail });
-    response.cookies.set(BINDING_COOKIE, result.bindingValue, bindingCookieOptions());
+    response.cookies.delete(BINDING_COOKIE);
     response.cookies.set(PENDING_COOKIE, pending.value, pendingCookieOptions());
     return response;
   }
 
   if (result.pending) {
     const pending = signToken(
-      { challengeId: result.pending.challengeId, purpose: "signup_verify", next: "/dashboard/new" },
+      { email: result.pending.email, purpose: "signup_verify", next: "/dashboard/new" },
       30 * 60,
     );
     const response = NextResponse.json({
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
       field: "email",
       next: "/verify-email",
     });
-    response.cookies.set(BINDING_COOKIE, result.pending.bindingValue, bindingCookieOptions());
+    response.cookies.delete(BINDING_COOKIE);
     response.cookies.set(PENDING_COOKIE, pending.value, pendingCookieOptions());
     return response;
   }

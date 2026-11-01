@@ -441,7 +441,7 @@ async function deliverRow(
   const sendStart = Date.now();
   await recordTrace({
     traceId: trace,
-    stage: "ses.send.request",
+    stage: "email.send.request",
     level: "debug",
     template: payloadText(payload, "template", 200) ?? row.kind,
     stream: row.stream,
@@ -456,7 +456,7 @@ async function deliverRow(
     const durationMs = Date.now() - sendStart;
     await recordTrace({
       traceId: trace,
-      stage: "ses.send.response",
+      stage: "email.send.response",
       level: "info",
       template: payloadText(payload, "template", 200) ?? row.kind,
       stream: row.stream,
@@ -489,7 +489,7 @@ async function deliverRow(
     const reason = String((error as { message?: string })?.message ?? error);
     await recordTrace({
       traceId: trace,
-      stage: "ses.send.error",
+      stage: "email.send.error",
       level: "error",
       template: payloadText(payload, "template", 200) ?? row.kind,
       stream: row.stream,

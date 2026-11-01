@@ -54,7 +54,8 @@ export async function createPendingSession(input: {
 export async function markSessionVerified(input: {
   sessionId: string;
   userId: string;
-  challengeId: string;
+  challengeId?: string | null;
+  method?: "email_otp" | "signup_otp" | "totp";
 }): Promise<void> {
   const admin = createAdminClient();
   const settings = await getSecuritySettings();
@@ -63,8 +64,8 @@ export async function markSessionVerified(input: {
     .from("session_security")
     .update({
       verified_at: new Date(now).toISOString(),
-      verified_method: "email_otp",
-      verified_challenge_id: input.challengeId,
+      verified_method: input.method ?? "email_otp",
+      verified_challenge_id: input.challengeId ?? null,
       expires_at: new Date(now + settings.sessionDays * 86_400_000).toISOString(),
       idle_expires_at: new Date(now + settings.sessionIdleDays * 86_400_000).toISOString(),
       last_seen_at: new Date(now).toISOString(),

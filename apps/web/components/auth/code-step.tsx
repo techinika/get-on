@@ -10,6 +10,7 @@ export type CodeStepProps = {
   description: string;
   maskedEmail: string;
   verifyUrl: string;
+  resendUrl?: string;
   next: string;
   helpText?: React.ReactNode;
   footer?: React.ReactNode;
@@ -25,7 +26,7 @@ type VerifyResponse = {
 
 const COOLDOWN = 60;
 
-export function CodeStep({ title, description, maskedEmail, verifyUrl, next, helpText, footer }: CodeStepProps) {
+export function CodeStep({ title, description, maskedEmail, verifyUrl, resendUrl = "/api/auth/otp/resend", next, helpText, footer }: CodeStepProps) {
   const router = useRouter();
   const [code, setCode] = React.useState("");
   const [status, setStatus] = React.useState<string | null>(null);
@@ -79,7 +80,7 @@ export function CodeStep({ title, description, maskedEmail, verifyUrl, next, hel
     if (cooldown > 0) return;
     setStatus(null);
     try {
-      const response = await fetch("/api/auth/otp/resend", { method: "POST" });
+      const response = await fetch(resendUrl, { method: "POST" });
       const data = (await response.json()) as { ok?: boolean; message?: string };
       if (response.ok && data.ok) {
         setResent(true);

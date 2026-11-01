@@ -6,15 +6,21 @@ export type TurnstileResult = { ok: true } | { ok: false; reason: "missing" | "f
 
 /**
  * Server-side Turnstile check. Tokens are single use and are bound to the
- * action and hostname we expect. When no secret is configured (development)
- * the check is skipped, which is documented in docs/security.md.
+ * action and hostname we expect.
+ *
+ * Verification only runs when BOTH sides of the integration are configured:
+ * `TURNSTILE_SECRET_KEY` (server) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (client).
+ * If only one is set the widget either cannot render (no site key) or cannot
+ * be verified (no secret), so requiring a token would either break registration
+ * or accept an unverified token. In either case the check is skipped.
  */
 export async function verifyTurnstile(
   token: string | null | undefined,
   options: { ip?: string | null; action?: string; hostname?: string | null } = {},
 ): Promise<TurnstileResult> {
   const secret = process.env.TURNSTILE_SECRET_KEY;
-  if (!secret) return { ok: true };
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+  if (!secret || !siteKey) return { ok: true };
   if (!token) return { ok: false, reason: "missing" };
   // Cloudflare's documented test secrets always pass.
   if (TEST_SECRETS.has(secret)) return { ok: true };

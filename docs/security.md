@@ -9,21 +9,24 @@ screens; `docs/security-audit.md` records the route, RLS and secret inventory.
 
 1. **No access without a verified email and a completed second step.** A
    session counts only when `profiles.email_verified_at` is set **and** the
-   session has an `email_otp` verification in `session_security`. This is
-   enforced in `proxy.ts`, in server helpers and, once the restrictive policies
-   are applied, in the database through `session_verified()`.
+   session has a `totp` verification in `session_security` after Supabase MFA.
+   The signup email code only proves the address; it does not replace the
+   authenticator. This is enforced in `proxy.ts`, in server helpers and, once
+   the restrictive policies are applied, in the database through
+   `session_verified()`.
 2. **One person, one account per email.** The canonical key
    (`public.canonical_email` / `canonical_email` in `apps/web/lib/security/canonical-email.ts`)
    is unique among non-duplicate profiles. Every signup path refuses a key that
    already exists.
-3. **Codes are secret, short lived, single use and bound.** Only an HMAC of the
-   code is stored (`auth_challenges.code_hash`). A code is bound to its purpose,
-   subject, challenge id, browser binding cookie and, for sign-in, the auth
-   session id.
+3. **One-time secrets are single use.** Supabase Auth owns the signup email
+   code (short lived, single use, hashed by Supabase). Our own reset and
+   not-me links are random tokens stored only as SHA-256 hashes in
+   `auth_tokens`, with a single-use conditional update.
 4. **No one-time action is consumed by a page view.** Verification and reset
    links only render a page; the state change is always a `POST`.
-5. **Sensitive actions need a fresh code** (step-up). `session_step_up_ok()` in
-   the database and `requireStepUp()` in server code.
+5. **Sensitive actions still need a fresh check.** Staff actions require
+   Supabase AAL2. Customer step-up can build on the same authenticator flow;
+   there is no emailed login code.
 6. **Sessions are visible and revocable.** `session_security` is the list;
    revoking sets `revoked_at` and the database function stops accepting the
    session immediately, before the JWT expires.
@@ -47,8 +50,9 @@ hook), because the public anon key would otherwise bypass these rules.
 Order of checks: origin, body, registration switch, email syntax, disposable and
 blocked domains, terms, password policy, Have I Been Pwned, per-IP rate limits,
 Turnstile, canonical uniqueness, then `auth.admin.createUser({ email_confirm: false })`.
-The auth service does **not** send an email; we create a `signup_verify`
-challenge and send the code through our outbox.
+The auth service sends the signup code through its SMTP settings, which point
+at Resend on `mail.get-on.tech`. We store only the address in a signed pending
+cookie; there is no local challenge row.
 
 An existing **unverified** account with the same canonical email is never
 duplicated: a new code is sent and the existing account is kept (its password is
@@ -60,49 +64,45 @@ does not reveal which branch ran.
 
 ## 3. Verification
 
-`/verify-email` shows six boxes. `POST /api/auth/verify-email` verifies the
-code, sets `email_confirmed_at` through the admin API and
-`profiles.email_verified_at`, then starts the session server-side with a
-`magiclink` token that is used once, immediately, and never emailed. The signup
-code counts as the first sign-in code for that browser.
+`/verify-email` shows six boxes. `POST /api/auth/verify-email` calls Supabase
+`verifyOtp({ type: "signup" })`, which confirms the address and returns the
+session. We then set `profiles.email_verified_at`, create the
+`session_security` row, and send the person to `/mfa/setup`.
 
-There are **no verification links**. Supabase's own auth emails must be disabled
-(Section 9). Expired and wrong codes verify nothing and always return a clear
-message; a new code invalidates the old one.
+There are **no verification links**. Supabase's signup template must show
+`{{ .Token }}`. Expired and wrong codes verify nothing; a new code invalidates
+the old one. `POST /api/auth/signup/resend` sends another code.
 
 ## 4. Sign-in
 
 1. `POST /api/auth/login` checks origin, rate limits and account lockout, then
    verifies the password on the server (cookies set there).
 2. A `session_security` row is created with `verified_at` null.
-3. A `login` challenge is created, bound to `__Host-gs_chal` and the session id.
-4. The code email goes out. `/login/verify` has six boxes.
-5. `POST /api/auth/otp/verify` verifies the code, marks the session verified,
-   records the device and, for a genuinely new device, emails the owner.
+3. If the account has a verified Supabase TOTP factor, redirect to `/mfa`;
+   otherwise redirect to `/mfa/setup`. `/mfa/setup` enrols the authenticator.
+4. The browser calls Supabase `mfa.challenge` and `mfa.verify`, giving an AAL2
+   session.
+5. `POST /api/auth/mfa/complete` checks AAL2, marks `session_security` verified
+   with method `totp`, records the device and, for a genuinely new device,
+   emails the owner with a not-me link.
 
-A session that has a password step but no code can only reach `/login/verify`,
-resend, logout and static assets. `proxy.ts` redirects everything under
-`/dashboard` and `/onboarding` to the code page.
+A session that has a password step but no authenticator code can only reach
+`/mfa`, setup, logout and static assets. `proxy.ts` redirects everything under
+`/dashboard` and `/onboarding` to the authenticator page.
 
 Sessions created before this release have no `session_security` row and are
-therefore unverified: the next page load asks for a code.
+therefore unverified: the next page load asks for the authenticator code.
 
-## 5. Codes
+## 5. One-time secrets
 
-| Purpose | Lifetime | Bound to |
-| --- | --- | --- |
-| `signup_verify` | 30 minutes | email hash, browser |
-| `login` | 10 minutes | user, session, browser |
-| `step_up` | 10 minutes | user, session, browser |
-| `email_change_old` / `_new` | 15 minutes | user, browser |
-| `recovery` | 30 minutes | user, browser |
+- **Signup code:** sent by Supabase Auth; six digits, short lived, hashed and
+  rate limited by Supabase. We add per-email and per-network sends.
+- **Reset and not-me links:** 43-character random tokens in `auth_tokens`,
+  stored as SHA-256 hashes, single use, `POST`-only for the state change.
+  Lifetimes: reset 30 minutes, not-me 24 hours, email-change undo 72 hours.
 
-Six digits from `crypto.randomInt`, leading zeros kept. Stored as
-`HMAC-SHA256(OTP_PEPPER, purpose | subject | challengeId | code)` with the
-pepper version, compared in constant time. Five attempts per code, then it is
-invalidated. Resend cooldown 60 seconds; five codes per hour per subject and
-per email hash, ten per hour per network. Parallel verification is safe because
-consumption is a conditional update (`consumed_at is null`).
+Supabase Auth does not offer an email MFA factor. Customer sign-in uses TOTP;
+the signup code is the only Supabase-sent code.
 
 ## 6. Passwords
 

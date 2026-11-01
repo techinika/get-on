@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { createHash } from "node:crypto";
 import { createRouteClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { emailOtpProvider } from "@/lib/auth/second-factor";
-import { BINDING_COOKIE, PENDING_COOKIE, DEVICE_COOKIE, deviceCookieOptions } from "@/lib/auth/cookies";
+import { readPendingSignup } from "@/lib/auth/pending";
+import { BINDING_COOKIE, DEVICE_COOKIE, PENDING_COOKIE, deviceCookieOptions } from "@/lib/auth/cookies";
 import {
   createPendingSession,
   hashDeviceId,
@@ -12,115 +13,83 @@ import {
   touchDevice,
 } from "@/lib/auth/session-security";
 import { getIpHash, uaFamily } from "@/lib/security/request";
-import { verifyToken } from "@/lib/security/tokens";
 import { securityMessage } from "@/lib/security/messages";
 import { recordSecurityEvent } from "@/lib/security/events";
+import { rateLimit } from "@/lib/security/rate-limit";
+import { POLICIES } from "@/lib/security/policies";
 import { enqueueEmail } from "@/lib/email/enqueue";
 import { welcomeEmail } from "@/lib/email/account-emails";
-import { newBindingValue, hashBrowserBinding } from "@/lib/security/otp";
-import { tokenSecret } from "@/lib/security/tokens";
+import { newBindingValue } from "@/lib/security/otp";
 import { grantFreeEntitlements } from "@/lib/provisioning";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
-  const cookieStore = await cookies();
-  const pending = verifyToken(cookieStore.get(PENDING_COOKIE)?.value);
-  const binding = cookieStore.get(BINDING_COOKIE)?.value ?? "";
+function rejected(code: string, status = 400) {
+  return NextResponse.json(
+    { ok: false, code, message: securityMessage(code) },
+    { status },
+  );
+}
 
-  if (!pending || pending.purpose !== "signup_verify" || typeof pending.challengeId !== "string") {
-    return NextResponse.json(
-      { ok: false, code: "SESSION_EXPIRED", message: securityMessage("SESSION_EXPIRED") },
-      { status: 400 },
-    );
-  }
+export async function POST(request: Request) {
+  const pending = await readPendingSignup();
+  if (!pending) return rejected("SESSION_EXPIRED");
 
   let code = "";
   try {
     const body = (await request.json()) as { code?: unknown };
-    code = String(body.code ?? "");
+    code = String(body.code ?? "").replace(/\D/g, "");
   } catch {
-    return NextResponse.json({ ok: false, code: "OTP_INVALID", message: securityMessage("OTP_INVALID") }, { status: 400 });
+    return rejected("OTP_INVALID");
+  }
+  if (code.length !== 6) return rejected("OTP_INVALID");
+
+  const ipHash = getIpHash(request.headers);
+  const ua = uaFamily(request.headers.get("user-agent"));
+  const emailHash = createHash("sha256").update(pending.email).digest("hex");
+
+  const limited = await rateLimit(`signup:verify:${emailHash}`, POLICIES.codeVerifyPerUser);
+  if (!limited.ok) {
+    return NextResponse.json(
+      { ok: false, code: "OTP_LOCKED", message: securityMessage("OTP_LOCKED"), retryAfter: limited.retryAfter },
+      { status: 429, headers: { "Retry-After": String(limited.retryAfter) } },
+    );
   }
 
-  const ua = uaFamily(request.headers.get("user-agent"));
-  const ipHash = getIpHash(request.headers);
-  const result = await emailOtpProvider.verify(String(pending.challengeId), code, {
-    browserBindingHash: binding ? hashBrowserBinding(binding, tokenSecret()) : null,
-    ipHash,
-    uaFamily: ua,
+  const response = NextResponse.json({ ok: true, next: "/mfa/setup" });
+  const supabase = await createRouteClient(response);
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: pending.email,
+    token: code,
+    type: "signup",
   });
 
-  if (!result.ok) {
-    if (result.code === "OTP_EXPIRED") {
-      await recordSecurityEvent({
-        userId: null,
-        category: "second_factor",
-        event: "otp_expired",
-        severity: "notice",
-        summary: "A verification code expired",
-        ipHash,
-        uaFamily: ua,
-        visibleToUser: true,
-      });
-    }
-    return NextResponse.json(
-      {
-        ok: false,
-        code: result.code,
-        message: securityMessage(result.code),
-        remaining: result.remaining ?? null,
-      },
-      { status: 400 },
-    );
+  if (error || !data.user || !data.session) {
+    const expired = /expired/i.test(error?.message ?? "");
+    await recordSecurityEvent({
+      category: "account",
+      event: expired ? "signup_code_expired" : "signup_code_failed",
+      severity: "notice",
+      summary: expired ? "A signup code expired" : "A wrong signup code was entered",
+      ipHash,
+      uaFamily: ua,
+      visibleToUser: true,
+    });
+    return rejected(expired ? "OTP_EXPIRED" : "OTP_INVALID");
   }
 
-  if (!result.userId) {
-    return NextResponse.json({ ok: false, code: "TOKEN_INVALID", message: securityMessage("TOKEN_INVALID") }, { status: 400 });
-  }
+  const userId = data.user.id;
+  const sessionId = sessionIdFromAccessToken(data.session.access_token);
+  if (!sessionId) return rejected("SOMETHING_WRONG", 500);
 
   const admin = createAdminClient();
-  const confirmed = await admin.auth.admin.updateUserById(result.userId, { email_confirm: true });
-  if (confirmed.error) {
-    console.error("[security] could not confirm email:", confirmed.error.message);
-    return NextResponse.json(
-      { ok: false, code: "SOMETHING_WRONG", message: securityMessage("SOMETHING_WRONG") },
-      { status: 500 },
-    );
-  }
-
   const verifiedAt = new Date().toISOString();
   await admin
     .from("profiles")
     .update({ email_verified_at: verifiedAt, last_sign_in_at: verifiedAt })
-    .eq("id", result.userId);
+    .eq("id", userId);
 
-  // Start the session server-side. The email code we just accepted counts as
-  // the first sign-in code for this device.
-  const response = NextResponse.json({ ok: true, next: "/dashboard/new" });
-  const supabase = await createRouteClient(response);
-  const link = await admin.auth.admin.generateLink({ type: "magiclink", email: result.email });
-  const hashedToken = link.data?.properties?.hashed_token;
-  if (link.error || !hashedToken) {
-    console.error("[security] could not start session:", link.error?.message);
-    return NextResponse.json(
-      { ok: false, code: "SOMETHING_WRONG", message: securityMessage("SOMETHING_WRONG") },
-      { status: 500 },
-    );
-  }
-
-  const { data: sessionData, error: sessionError } = await supabase.auth.verifyOtp({
-    type: "magiclink",
-    token_hash: hashedToken,
-  });
-  if (sessionError || !sessionData.session) {
-    return NextResponse.json(
-      { ok: false, code: "SESSION_EXPIRED", message: securityMessage("SESSION_EXPIRED") },
-      { status: 400 },
-    );
-  }
-
-  const sessionId = sessionIdFromAccessToken(sessionData.session.access_token);
+  const cookieStore = await cookies();
   let deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
   if (!deviceId) {
     deviceId = newBindingValue();
@@ -128,29 +97,26 @@ export async function POST(request: Request) {
   }
   const deviceHash = hashDeviceId(deviceId);
 
-  if (sessionId) {
-    await createPendingSession({ sessionId, userId: result.userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
-    await markSessionVerified({ sessionId, userId: result.userId, challengeId: String(pending.challengeId) });
-  }
-  await touchDevice({ userId: result.userId, deviceIdHash: deviceHash, label: ua });
+  await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
+  await markSessionVerified({ sessionId, userId, method: "signup_otp", challengeId: null });
+  await touchDevice({ userId, deviceIdHash: deviceHash, label: ua });
 
   const welcome = welcomeEmail(null);
   await enqueueEmail({
     kind: "welcome",
     stream: "transactional",
-    userId: result.userId,
-    toEmail: result.email,
+    userId,
+    toEmail: pending.email,
     relatedType: "account",
-    relatedId: result.userId,
-    dedupeKey: `welcome:${result.userId}`,
+    relatedId: userId,
+    dedupeKey: `welcome:${userId}`,
     payload: { subject: welcome.subject, text: welcome.text, html: welcome.html },
   });
 
-  // Grant free plan entitlements (25 AI credits, plan defaults, etc.) synchronously
-  await grantFreeEntitlements(result.userId);
+  await grantFreeEntitlements(userId);
 
   await recordSecurityEvent({
-    userId: result.userId,
+    userId,
     category: "auth",
     event: "email_verified",
     severity: "info",
@@ -160,7 +126,14 @@ export async function POST(request: Request) {
     visibleToUser: true,
   });
 
-  response.cookies.delete(BINDING_COOKIE);
-  response.cookies.delete(PENDING_COOKIE);
-  return response;
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const hasTotp = (factors?.totp ?? []).some((factor) => factor.status === "verified");
+  const target = new URL(hasTotp ? "/mfa" : "/mfa/setup", request.url);
+  if (pending.next !== "/dashboard") target.searchParams.set("next", pending.next);
+
+  const finalResponse = NextResponse.json({ ok: true, next: `${target.pathname}${target.search}` });
+  for (const cookie of response.cookies.getAll()) finalResponse.cookies.set(cookie);
+  finalResponse.cookies.delete(BINDING_COOKIE);
+  finalResponse.cookies.delete(PENDING_COOKIE);
+  return finalResponse;
 }

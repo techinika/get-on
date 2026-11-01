@@ -1,7 +1,10 @@
 export type EmailStream = "transactional" | "billing" | "marketing";
 
 export interface EmailStreamDefinition {
+  /** SES sender identity. */
   from: string;
+  /** Resend sender identity. Falls back to `from` when absent. */
+  resendFrom?: string;
   fromName: string;
   replyTo: string;
   configurationSet: string;
@@ -15,6 +18,7 @@ export interface EmailStreamDefinition {
 export const EMAIL_STREAMS: Record<EmailStream, EmailStreamDefinition> = {
   transactional: {
     from: "no-reply@contact.get-on.tech",
+    resendFrom: "no-reply@mail.get-on.tech",
     fromName: "Get-On",
     replyTo: "team@get-on.tech",
     configurationSet: "gs-transactional",
@@ -22,6 +26,7 @@ export const EMAIL_STREAMS: Record<EmailStream, EmailStreamDefinition> = {
   },
   billing: {
     from: "billing@contact.get-on.tech",
+    resendFrom: "billing@mail.get-on.tech",
     fromName: "Get-On Billing",
     replyTo: "billing@contact.get-on.tech",
     configurationSet: "gs-billing",
@@ -29,6 +34,7 @@ export const EMAIL_STREAMS: Record<EmailStream, EmailStreamDefinition> = {
   },
   marketing: {
     from: "no-reply@contact.get-on.tech",
+    resendFrom: "no-reply@mail.get-on.tech",
     fromName: "Get-On",
     replyTo: "team@get-on.tech",
     configurationSet: "gs-marketing",

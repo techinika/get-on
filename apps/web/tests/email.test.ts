@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   EMAIL_CATALOGUE,
+  ResendSender,
   button,
   EMAIL_STREAMS,
   describeEmailKind,
@@ -9,8 +10,23 @@ import {
   gradeLevel,
   lintEmailCopy,
   marketingCampaignEmail,
+  resetTransportCache,
   streamForKind,
+  transportForMessage,
+  type EmailMessage,
+  type EmailStream,
 } from "@get-on/email";
+
+function messageFor(stream: EmailStream): EmailMessage {
+  return {
+    to: "person@example.com",
+    subject: "Hello",
+    text: "Hello",
+    html: "<p>Hello</p>",
+    kind: stream === "marketing" ? "marketing_campaign" : stream === "billing" ? "billing_receipt" : "team_invite",
+    stream,
+  };
+}
 
 describe("email catalogue", () => {
   it("sends billing mail from the billing identity", () => {
@@ -55,6 +71,79 @@ describe("email catalogue", () => {
       expect(value.kind, key).toBe(key);
       expect(["transactional", "billing", "marketing"]).toContain(value.stream);
     }
+  });
+});
+
+describe("email transport routing", () => {
+  beforeEach(() => {
+    delete process.env.EMAIL_PROVIDER;
+    delete process.env.EMAIL_TRANSPORT;
+    resetTransportCache();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete process.env.RESEND_API_KEY;
+    resetTransportCache();
+  });
+
+  it("sends one-person mail through Resend and campaigns through SES", () => {
+    expect(transportForMessage(messageFor("transactional"))).toBe("resend");
+    expect(transportForMessage(messageFor("billing"))).toBe("resend");
+    expect(transportForMessage(messageFor("marketing"))).toBe("ses");
+  });
+
+  it("honours an explicit provider override", () => {
+    process.env.EMAIL_PROVIDER = "ses";
+    resetTransportCache();
+    expect(transportForMessage(messageFor("transactional"))).toBe("ses");
+  });
+
+  it("uses the mail.get-on.tech domain for Resend senders", () => {
+    expect(EMAIL_STREAMS.transactional.resendFrom).toBe("no-reply@mail.get-on.tech");
+    expect(EMAIL_STREAMS.billing.resendFrom).toBe("billing@mail.get-on.tech");
+  });
+
+  it("posts the right payload to the Resend API", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    const fetchMock = vi.fn(async () =>
+      new Response(JSON.stringify({ id: "re_123" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await new ResendSender({ baseUrl: "https://api.resend.test" }).send(
+      messageFor("transactional"),
+    );
+
+    expect(result.id).toBe("re_123");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe("https://api.resend.test/emails");
+    expect(init.headers).toMatchObject({ Authorization: "Bearer re_test" });
+    const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+    expect(body.from).toContain("no-reply@mail.get-on.tech");
+    expect(body.reply_to).toBe("team@get-on.tech");
+    expect(body.tags).toEqual([
+      { name: "kind", value: "team_invite" },
+      { name: "stream", value: "transactional" },
+    ]);
+  });
+
+  it("marks Resend rate limits as retryable", async () => {
+    process.env.RESEND_API_KEY = "re_test";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(JSON.stringify({ message: "Too many requests" }), { status: 429 }),
+      ),
+    );
+
+    await expect(
+      new ResendSender({ baseUrl: "https://api.resend.test" }).send(messageFor("transactional")),
+    ).rejects.toMatchObject({ name: "TooManyRequestsException", statusCode: 429 });
   });
 });
 

@@ -21,6 +21,8 @@ export default function robots(): MetadataRoute.Robots {
         "/forgot-password",
         "/verify-email",
         "/login/verify",
+        "/mfa",
+        "/mfa/setup",
         "/onboarding/",
         "/confirm-recipient",
         "/templates/[slug]/preview/",
