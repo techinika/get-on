@@ -18,6 +18,28 @@ export function hashDeviceId(deviceId: string): string {
   return createHmac("sha256", tokenSecret()).update(`device:${deviceId}`).digest("hex");
 }
 
+/**
+ * The database treats a session as usable only when the profile is marked as
+ * email-verified. Accounts confirmed outside this app (or before the column
+ * existed) can be missing that flag, which makes every RLS read return empty
+ * even though the auth session is valid. Sync it from Supabase on sign-in.
+ */
+export async function syncProfileConfirmation(input: {
+  userId: string;
+  emailConfirmedAt?: string | null;
+}): Promise<void> {
+  if (!input.emailConfirmedAt) return;
+  const admin = createAdminClient();
+  const now = new Date().toISOString();
+  const { error } = await admin
+    .from("profiles")
+    .update({ email_verified_at: input.emailConfirmedAt, last_sign_in_at: now })
+    .eq("id", input.userId);
+  if (error) {
+    throw new Error(`Could not sync the profile email confirmation: ${error.message}`);
+  }
+}
+
 export async function createPendingSession(input: {
   sessionId: string;
   userId: string;

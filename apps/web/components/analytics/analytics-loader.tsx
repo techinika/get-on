@@ -1,19 +1,21 @@
 "use client";
 
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { isAnalyticsRoute } from "@/lib/analytics/routes";
 import { readConsent, subscribeConsent } from "@/lib/analytics/consent";
+
+const MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
+
+type Gtag = (...args: unknown[]) => void;
 
 /**
  * AnalyticsLoader - loads Google Analytics only on allowed routes after consent.
  *
  * Behaviour:
- * - Only renders on allowed routes (isAnalyticsRoute check)
- * - On mount, reads consent state from __Host-gs_consent cookie / localStorage
- * - If no consent: defines dataLayer and gtag with all signals denied,
- *   loads Google script only after visitor accepts
- * - On accept: updates gtag consent, sends page view with sanitized location
- * - On decline: sets analytics_storage=denied, clears _ga/_ga_* cookies
+ * - Only runs on allowed routes (isAnalyticsRoute check)
+ * - Defines window.gtag/dataLayer before the Google script loads
+ * - Loads the Google script only once the visitor accepts analytics
+ * - Sends one sanitized page view after consent
  * - Never sends private data (emails, tokens, personal identifiers) to Google
  */
 export function AnalyticsLoader() {
@@ -22,75 +24,77 @@ export function AnalyticsLoader() {
     readConsent,
     () => null
   );
+  const prepared = useRef(false);
+  const sentPageView = useRef(false);
 
-  // No prior decision: define dataLayer and gtag with all denied, then load
-  // the Google script (it makes no requests until consent is granted).
   useEffect(() => {
-    if (consent !== null) return;
+    if (!MEASUREMENT_ID || !isAnalyticsRoute(window.location.pathname)) return;
+    if (prepared.current) return;
 
-    window.dataLayer = window.dataLayer || [];
-    function gtag(...args: unknown[]) {
+    const gtag: Gtag = (...args) => {
       window.dataLayer.push(args);
-    }
-    gtag("js", new Date());
-    gtag("consent", "default", {
+    };
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = window.gtag ?? gtag;
+    window.gtag("js", new Date());
+    window.gtag("consent", "default", {
       ad_storage: "denied",
       ad_user_data: "denied",
       ad_personalization: "denied",
       analytics_storage: "denied",
       wait_for_update: 500,
     });
+    prepared.current = true;
+  }, []);
 
-    // Load Google Tag script (only on allowed routes)
-    const script = document.createElement("script");
-    script.async = true;
-    script.src = `https://www.googletagmanager.com/gtag/js?id=${process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID}`;
-    script.crossOrigin = "anonymous";
-    script.onerror = () => {
-      // Console warning in development
-      if (process.env.NODE_ENV === "development") {
-        console.warn("Failed to load Google Analytics script");
-      }
-    };
-    document.head.appendChild(script);
-  }, [consent]);
-
-  // After consent is given, send a page view if on an allowed route
   useEffect(() => {
+    if (!MEASUREMENT_ID || !isAnalyticsRoute(window.location.pathname)) return;
     if (consent !== "accepted") return;
 
-    // Only send on allowed routes
-    if (!isAnalyticsRoute(window.location.pathname)) return;
+    loadAnalyticsScript(MEASUREMENT_ID);
 
-    // Sanitize page location
+    window.gtag?.("consent", "update", { analytics_storage: "granted" });
+
+    if (sentPageView.current) return;
+    sentPageView.current = true;
+
     const sanitized = sanitizePageLocation(window.location.href);
-
-    // Send page view
-    if (window.gtag) {
-      window.gtag("config", process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID, {
-        send_page_view: false,
-        allow_google_signals: false,
-        allow_ad_personalization_signals: false,
-        cookie_flags: "SameSite=Lax;Secure",
-        cookie_expires: 34128000,
-        page_location: sanitized.page_location,
-        page_referrer: sanitized.page_referrer,
-      });
-    }
+    window.gtag?.("config", MEASUREMENT_ID, {
+      send_page_view: false,
+      allow_google_signals: false,
+      allow_ad_personalization_signals: false,
+      cookie_flags: "SameSite=Lax;Secure",
+      cookie_expires: 34128000,
+      page_location: sanitized.page_location,
+      page_referrer: sanitized.page_referrer,
+    });
+    window.gtag?.("event", "page_view", {
+      page_location: sanitized.page_location,
+      page_referrer: sanitized.page_referrer,
+      page_title: document.title,
+    });
   }, [consent]);
 
-  // Apply the consent update to gtag
-  useEffect(() => {
-    if (consent !== "accepted") return;
+  return null;
+}
 
-    if (window.gtag) {
-      window.gtag("consent", "update", {
-        analytics_storage: "granted",
-      });
+function loadAnalyticsScript(measurementId: string) {
+  const existing = document.querySelector<HTMLScriptElement>(
+    `script[data-get-on-ga="${measurementId}"]`,
+  );
+  if (existing) return;
+
+  const script = document.createElement("script");
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(measurementId)}`;
+  script.crossOrigin = "anonymous";
+  script.dataset.getOnGa = measurementId;
+  script.onerror = () => {
+    if (process.env.NODE_ENV === "development") {
+      console.warn("Failed to load Google Analytics script");
     }
-  }, [consent]);
-
-  return null; // UI is rendered by the parent page that includes GaConsentBanner
+  };
+  document.head.appendChild(script);
 }
 
 /**

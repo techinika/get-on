@@ -93,7 +93,15 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     };
   });
 
-  if (teams.length === 0) return null;
+  if (teams.length === 0) {
+    console.warn("[dashboard] signed-in user has no active team", {
+      userId: user.id,
+      memberships: rows.length,
+      teams: teamRows?.length ?? 0,
+      profileFound: Boolean(profile),
+    });
+    return null;
+  }
 
   const cookieStore = await cookies();
   const wantedTeam = cookieStore.get(TEAM_COOKIE)?.value;

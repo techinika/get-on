@@ -42,7 +42,10 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
   if (!item) notFound();
 
   const pkg = requireSystemTemplate(slug);
-  const preview = materializeTemplate(pkg, { profile: pkg.sampleProfile });
+  const preview = materializeTemplate(pkg, {
+    profile: pkg.sampleProfile,
+    allowSampleContent: true,
+  });
   const requestedPath = typeof pageParam === "string" ? pageParam : "/";
   const page = preview.pages.find((candidate) => candidate.path === requestedPath) ?? preview.pages[0]!;
 

@@ -35,6 +35,11 @@ export type MaterializeOptions = {
   /** Plan page limit. The home page is always kept. */
   maxPages?: number | null;
   compositionId?: string;
+  /**
+   * Allows the sample profile to appear in the result. Only template previews
+   * should use this: a real website must replace every sample business fact.
+   */
+  allowSampleContent?: boolean;
 };
 
 function clone<T>(value: T): T {
@@ -155,7 +160,7 @@ export function materializeTemplate(
       .map((block: Block) =>
         markSampleOnly(fixPageLinks(freshBlock(block), homeId) as Block),
       );
-    const leaks = scanSampleLeaks(blocks, pkg.sampleProfile);
+    const leaks = options.allowSampleContent ? [] : scanSampleLeaks(blocks, pkg.sampleProfile);
     if (leaks.length > 0) {
       throw new Error(
         `TEMPLATE_SAMPLE_LEAK:${pkg.meta.slug}:${page.key}:${leaks.map((leak) => leak.value).join(",")}`,

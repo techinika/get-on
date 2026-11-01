@@ -5,7 +5,6 @@ import { PLAN_COPY } from "@/lib/plan-copy";
 import { cn } from "@/lib/utils";
 import { buttonVariants } from "@/components/ui/button";
 import { getViewer } from "@/lib/viewer";
-import { AnalyticsLoader, GaConsentBanner } from "@/components/analytics";
 
 export async function LandingPricing() {
   const viewer = await getViewer();
@@ -90,8 +89,6 @@ export async function LandingPricing() {
           </p>
         </div>
       </section>
-      <AnalyticsLoader />
-      <GaConsentBanner />
     </>
   );
 }

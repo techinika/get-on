@@ -14,6 +14,7 @@ import {
   hashDeviceId,
   markSessionVerified,
   sessionIdFromAccessToken,
+  syncProfileConfirmation,
   touchDevice,
 } from "@/lib/auth/session-security";
 import { getIpHash, isSameOrigin, safeNextPath, uaFamily } from "@/lib/security/request";
@@ -106,6 +107,10 @@ export async function POST(request: Request) {
   }
 
   try {
+    await syncProfileConfirmation({
+      userId: user.id,
+      emailConfirmedAt: user.email_confirmed_at,
+    });
     await markSessionVerified({
       sessionId,
       userId: user.id,
