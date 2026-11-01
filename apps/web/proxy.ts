@@ -23,8 +23,14 @@ export async function proxy(request: NextRequest) {
   const needsSession = PROTECTED.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
   if (!needsSession) return response;
 
+  function redirectWithRefreshedCookies(url: URL) {
+    const redirect = NextResponse.redirect(url);
+    for (const cookie of response.cookies.getAll()) redirect.cookies.set(cookie);
+    return redirect;
+  }
+
   if (!user) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return redirectWithRefreshedCookies(new URL("/login", request.url));
   }
 
   // The email must be confirmed and the authenticator code accepted for this session.
@@ -36,7 +42,7 @@ export async function proxy(request: NextRequest) {
     const target = emailConfirmed ? "/mfa" : "/verify-email";
     const url = new URL(target, request.url);
     url.searchParams.set("next", path);
-    return NextResponse.redirect(url);
+    return redirectWithRefreshedCookies(url);
   }
 
   return response;

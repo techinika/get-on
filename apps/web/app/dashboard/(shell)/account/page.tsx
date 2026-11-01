@@ -3,6 +3,7 @@ import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { AppCard } from "@/components/app/card";
 import { SettingsSection } from "@/components/app/settings-section";
+import { Badge } from "@/components/ui/badge";
 import { MarketingPreference, PasswordForm, ProfileForm } from "@/components/app/account-forms";
 import { AppearanceSetting } from "@/components/app/appearance-setting";
 import { DeleteAccount } from "@/components/app/delete-account";
@@ -16,11 +17,20 @@ export default async function AccountPage() {
   }
 
   const supabase = await createClient();
-  const { data: preferences } = await supabase
-    .from("email_preferences")
-    .select("marketing_opt_in")
-    .eq("user_id", data.user.id)
-    .maybeSingle();
+  const [{ data: preferences }, { data: factors }] = await Promise.all([
+    supabase
+      .from("email_preferences")
+      .select("marketing_opt_in")
+      .eq("user_id", data.user.id)
+      .maybeSingle(),
+    supabase.auth.mfa.listFactors(),
+  ]);
+  const authenticator = factors?.totp.find((factor) => factor.status === "verified") ?? null;
+  const authenticatorSince = authenticator?.created_at
+    ? new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(
+        new Date(authenticator.created_at),
+      )
+    : null;
 
   return (
     <AppPage width="narrow">
@@ -47,6 +57,25 @@ export default async function AccountPage() {
 
         <SettingsSection title="Password" description="Choose a password you have not used before.">
           <PasswordForm />
+        </SettingsSection>
+
+        <SettingsSection
+          title="Two-step sign-in"
+          description="The authenticator app we ask for when you sign in."
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-text">Authenticator app</p>
+              <p className="mt-1 text-sm text-text-muted">
+                {authenticatorSince
+                  ? `On since ${authenticatorSince}.`
+                  : "Not set up. You will be asked to set it up when you sign in."}
+              </p>
+            </div>
+            <Badge variant={authenticator ? "live" : "neutral"} dot={Boolean(authenticator)}>
+              {authenticator ? "On" : "Off"}
+            </Badge>
+          </div>
         </SettingsSection>
 
         <SettingsSection title="Appearance" description="Choose how Get-On looks for you.">
