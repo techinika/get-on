@@ -36,11 +36,11 @@ export function welcomeEmail(name?: string | null) {
   const greeting = name ? `Hello ${name},` : "Hello,";
   return simpleEmail({
     title: "Your Get-On account is ready",
-    preheader: "Two-step sign-in is on. You will get a code each time you sign in.",
+    preheader: "Two-step sign-in is on. You will use your authenticator app each time you sign in.",
     paragraphs: [
       greeting,
       "Your email is confirmed and your account is ready.",
-      "Each time you sign in we email you a 6-digit code. Keep that code to yourself. Get-On will never ask for it by email, phone or chat.",
+      "Each time you sign in we ask for the six-digit code in your authenticator app. Keep that code to yourself. Get-On will never ask for it by email, phone or chat.",
     ],
     reason: "You receive this email because you created a Get-On account.",
   });
@@ -89,7 +89,12 @@ export function accountSecuredEmail(input: { when: string; resetSent: boolean })
   });
 }
 
-export function newDeviceEmail(input: { device: string; when: string; country?: string | null }) {
+export function newDeviceEmail(input: {
+  device: string;
+  when: string;
+  country?: string | null;
+  secureUrl?: string | null;
+}) {
   return simpleEmail({
     title: "New sign-in to your Get-On account",
     preheader: "A new device signed in to your account.",
@@ -98,8 +103,9 @@ export function newDeviceEmail(input: { device: string; when: string; country?: 
       `Device: ${input.device}`,
       `Time: ${input.when}`,
       ...(input.country ? [`Country: ${input.country}`] : []),
-      "If this was you, you can ignore this email. If it was not you, change your password now.",
+      "If this was you, you can ignore this email. If it was not you, secure your account now.",
     ],
+    action: input.secureUrl ? { label: "Secure my account", url: input.secureUrl } : undefined,
     reason: "You receive this email because a new device signed in to your Get-On account.",
   });
 }

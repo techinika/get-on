@@ -12,7 +12,7 @@ describe("security: email verification (Problem A)", () => {
   it("(4/5) the verify-email page exists and requires a typed code", () => {
     const src = read("app/verify-email/page.tsx");
     expect(src).toMatch(/CodeStep/);
-    expect(src).toMatch(/signup_verify/);
+    expect(src).toMatch(/readPendingSignup/);
   });
 
   it("(1/4) no verification links exist: the endpoint only accepts POST codes", () => {
@@ -42,12 +42,14 @@ describe("security: email verification (Problem A)", () => {
     expect(route).toMatch(/redirect/);
   });
 
-  it("(2) codes are bound, single use and hashed", () => {
-    const src = read("lib/auth/second-factor.ts");
-    expect(src).toMatch(/code_hash/);
-    expect(src).toMatch(/consumed_at/);
-    expect(src).toMatch(/browser_binding_hash/);
-    expect(src).not.toMatch(/insert\(\{[^}]*\bcode:/);
+  it("(2) sign-in uses Supabase MFA, not local email codes", () => {
+    expect(existsSync(resolve(WEB, "app/api/auth/otp/verify/route.ts"))).toBe(false);
+    expect(existsSync(resolve(WEB, "lib/auth/second-factor.ts"))).toBe(false);
+    const login = read("app/api/auth/login/route.ts");
+    expect(login).toMatch(/mfa\.listFactors/);
+    expect(login).toMatch(/\/mfa/);
+    const form = read("components/auth/mfa-challenge-form.tsx");
+    expect(form).toMatch(/auth\.mfa\.verify/);
   });
 });
 

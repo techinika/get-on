@@ -2,28 +2,17 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createRouteClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { emailOtpProvider } from "@/lib/auth/second-factor";
-import {
-  BINDING_COOKIE,
-  DEVICE_COOKIE,
-  PENDING_COOKIE,
-  bindingCookieOptions,
-  deviceCookieOptions,
-  pendingCookieOptions,
-} from "@/lib/auth/cookies";
+import { DEVICE_COOKIE, deviceCookieOptions } from "@/lib/auth/cookies";
 import {
   createPendingSession,
   hashDeviceId,
   sessionIdFromAccessToken,
-  touchDevice,
 } from "@/lib/auth/session-security";
 import { getIpHash, isSameOrigin, safeNextPath, uaFamily } from "@/lib/security/request";
 import { verifyTurnstile } from "@/lib/security/turnstile";
 import { peekRateLimit, rateLimit } from "@/lib/security/rate-limit";
 import { POLICIES } from "@/lib/security/policies";
-import { hashBrowserBinding, newBindingValue } from "@/lib/security/otp";
-import { TOKEN_TTL, appOrigin, issueAuthToken } from "@/lib/auth/recovery";
-import { signToken, tokenSecret } from "@/lib/security/tokens";
+import { newBindingValue } from "@/lib/security/otp";
 import { recordSecurityEvent } from "@/lib/security/events";
 import { getSecuritySettings } from "@/lib/security/settings";
 import { createHash } from "node:crypto";
@@ -89,9 +78,7 @@ export async function POST(request: Request) {
     return loginFailed(request, "AUTH_LOCKED", next);
   }
 
-  const redirectTo = new URL("/login/verify", request.url);
-  if (next !== "/dashboard") redirectTo.searchParams.set("next", next);
-  const response = NextResponse.redirect(redirectTo, 303);
+  const response = NextResponse.redirect(new URL("/mfa", request.url), 303);
   const supabase = await createRouteClient(response);
 
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
@@ -138,8 +125,6 @@ export async function POST(request: Request) {
   }
 
   const cookieStore = await cookies();
-  const bindingValue = newBindingValue();
-  const bindingHash = hashBrowserBinding(bindingValue, tokenSecret());
 
   let deviceId = cookieStore.get(DEVICE_COOKIE)?.value;
   if (!deviceId) {
@@ -149,48 +134,19 @@ export async function POST(request: Request) {
   const deviceHash = hashDeviceId(deviceId);
 
   await createPendingSession({ sessionId, userId, ipHash, uaFamily: ua, deviceIdHash: deviceHash });
-  await touchDevice({ userId, deviceIdHash: deviceHash, label: ua });
 
-  // The code email carries a "secure my account" link, so a sign-in the owner
-  // did not make can be stopped from the email itself.
-  let notMeUrl: string | null = null;
-  try {
-    const notMe = await issueAuthToken({
-      userId,
-      purpose: "not_me",
-      ttlSeconds: TOKEN_TTL.notMe,
-      meta: { sessionId },
-    });
-    notMeUrl = `${appOrigin(request)}/security/not-me?t=${encodeURIComponent(notMe.token)}`;
-  } catch {
-    notMeUrl = null;
-  }
-
-  let challenge;
-  try {
-    challenge = await emailOtpProvider.challenge("login", {
-      userId,
-      email: data.user.email ?? email,
-      sessionId,
-      browserBindingHash: bindingHash,
-      ipHash,
-      uaFamily: ua,
-      notMeBaseUrl: notMeUrl,
-    });
-  } catch {
-    return loginFailed(request, "SOMETHING_WRONG", next);
-  }
-
-  const pending = signToken({ challengeId: challenge.challengeId, purpose: "login", next }, 30 * 60);
-  response.cookies.set(BINDING_COOKIE, bindingValue, bindingCookieOptions());
-  response.cookies.set(PENDING_COOKIE, pending.value, pendingCookieOptions());
+  const { data: factors } = await supabase.auth.mfa.listFactors();
+  const hasTotp = (factors?.totp ?? []).some((factor) => factor.status === "verified");
+  const target = new URL(hasTotp ? "/mfa" : "/mfa/setup", request.url);
+  if (next !== "/dashboard") target.searchParams.set("next", next);
+  response.headers.set("location", target.toString());
 
   await recordSecurityEvent({
     userId,
     category: "auth",
     event: "password_accepted",
     severity: "info",
-    summary: "Password accepted, waiting for the email code",
+    summary: "Password accepted, waiting for the authenticator code",
     ipHash,
     uaFamily: ua,
     meta: { session: sessionId },

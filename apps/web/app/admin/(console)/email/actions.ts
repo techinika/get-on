@@ -24,7 +24,7 @@ export async function saveEmailProvider(input: {
   };
 }): Promise<EmailSettingsActionResult> {
   const provider = input.provider.trim();
-  const allowed = ["ses", "smtp", "console", "memory"];
+  const allowed = ["auto", "resend", "ses", "smtp", "console", "memory"];
   if (!allowed.includes(provider)) {
     return { ok: false, error: "Choose a valid email provider." };
   }

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { CodeStep } from "@/components/auth/code-step";
-import { readPendingChallenge } from "@/lib/auth/pending";
+import { readPendingSignup } from "@/lib/auth/pending";
 
 export const dynamic = "force-dynamic";
 
@@ -13,16 +13,17 @@ export const metadata: Metadata = {
 };
 
 export default async function VerifyEmailPage() {
-  const pending = await readPendingChallenge("signup_verify");
+  const pending = await readPendingSignup();
   if (!pending) redirect("/signup");
 
   return (
     <AuthShell>
       <CodeStep
         title="Check your email"
-        description="We sent a 6-digit code to {email}. It expires in 30 minutes."
+        description="We sent a 6-digit code to {email}. It expires after a short time."
         maskedEmail={pending.maskedEmail}
         verifyUrl="/api/auth/verify-email"
+        resendUrl="/api/auth/signup/resend"
         next={pending.next}
         helpText={
           <details className="rounded-xl border border-border bg-surface-muted p-4">

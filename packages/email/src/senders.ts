@@ -88,6 +88,90 @@ export class SesSender implements EmailSender {
   }
 }
 
+export class ResendSender implements EmailSender {
+  private baseUrl: string;
+
+  constructor(opts: { baseUrl?: string } = {}) {
+    this.baseUrl = (opts.baseUrl || runtimeEnv?.RESEND_API_BASE || "https://api.resend.com").replace(/\/+$/, "");
+  }
+
+  async send(message: EmailMessage): Promise<EmailSendResult> {
+    const apiKey = runtimeEnv?.RESEND_API_KEY;
+    if (!apiKey) throw new Error("RESEND_API_KEY_MISSING");
+
+    const stream = streamForMessage(message);
+    const definition = EMAIL_STREAMS[stream];
+    const from = definition.resendFrom ?? definition.from;
+
+    if (message.from && message.from !== from && message.from !== definition.from) {
+      throw new Error("EMAIL_SENDER_NOT_ALLOWED");
+    }
+
+    const payload: Record<string, unknown> = {
+      from: `"${safeFromName(definition.fromName)}" <${safeHeader(from, 254)}>`,
+      to: [safeHeader(message.to, 254)],
+      subject: safeHeader(message.subject, 180),
+      text: message.text,
+      html: message.html,
+      reply_to: safeHeader(message.replyTo || definition.replyTo, 254),
+      tags: [
+        { name: "kind", value: resendTag(message.kind) },
+        { name: "stream", value: stream },
+      ],
+    };
+    if (message.headers) {
+      payload.headers = Object.fromEntries(
+        Object.entries(message.headers)
+          .slice(0, 20)
+          .map(([name, value]) => [safeHeader(name, 80), safeHeader(value, 998)]),
+      );
+    }
+
+    const response = await fetch(`${this.baseUrl}/emails`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const bodyText = await response.text();
+    let body: { id?: string; name?: string; message?: string } = {};
+    try {
+      body = bodyText ? (JSON.parse(bodyText) as typeof body) : {};
+    } catch {
+      body = {};
+    }
+
+    if (!response.ok) {
+      const error = new Error(
+        body.message || `Resend request failed with status ${response.status}`,
+      ) as Error & {
+        code?: string;
+        statusCode?: number;
+        $metadata?: { httpStatusCode?: number };
+      };
+      error.name =
+        response.status === 429
+          ? "TooManyRequestsException"
+          : response.status >= 500
+            ? "ResendServerError"
+            : body.name || "ResendRequestError";
+      error.code = body.name;
+      error.statusCode = response.status;
+      error.$metadata = { httpStatusCode: response.status };
+      throw error;
+    }
+
+    return { id: body.id ? String(body.id) : "" };
+  }
+}
+
+function resendTag(value: string): string {
+  return (safeHeader(value, 256) || "platform").replace(/[^A-Za-z0-9_-]/g, "_");
+}
+
 export class SmtpSender implements EmailSender {
   private transporter: nodemailer.Transporter;
   private from: string;

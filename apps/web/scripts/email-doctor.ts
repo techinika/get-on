@@ -16,12 +16,10 @@ async function main() {
 
   // 1. Configuration validation (variable names only, never values).
   const required = [
-    "EMAIL_PROVIDER / EMAIL_TRANSPORT",
+    "RESEND_API_KEY",
     "AWS_REGION",
     "AWS_ACCESS_KEY_ID",
     "AWS_SECRET_ACCESS_KEY",
-    "SES_CONFIGURATION_SET_TRANSACTIONAL",
-    "SES_CONFIGURATION_SET_BILLING",
     "SES_CONFIGURATION_SET_MARKETING",
     "SES_SNS_TOPIC_ARN",
     "APP_ORIGIN",
@@ -42,16 +40,26 @@ async function main() {
 
   // 2. Transport value.
   const transport = readTransport();
-  const transportLabel = transport === null ? "auto (SMTP transactional, SES batches)" : transport;
+  const transportLabel = transport === null ? "auto (Resend one-person, SES campaigns)" : transport;
   check(
     "Transport",
-    transport === null || transport === "ses" || transport === "smtp" ? "PASS" : "FAIL",
+    transport === null || transport === "resend" || transport === "ses" || transport === "smtp"
+      ? "PASS"
+      : "FAIL",
     transport === null
       ? undefined
       : transport === "console" || transport === "memory"
-        ? "Transport is dev-only. Set EMAIL_PROVIDER=smtp or ses for real delivery."
+        ? "Transport is dev-only. Set EMAIL_PROVIDER=resend, ses or auto for real delivery."
         : undefined,
     `readTransport() => ${transportLabel}`,
+  );
+
+  check(
+    "Resend credentials",
+    process.env.RESEND_API_KEY ? "PASS" : "FAIL",
+    process.env.RESEND_API_KEY
+      ? undefined
+      : "RESEND_API_KEY is not set. One-person email falls back to console without it.",
   );
 
   // 3. SES credential presence (names only; never log the values).
@@ -133,7 +141,7 @@ async function main() {
     check(
       "Test email",
       "INFO",
-      `Would send a traced test email to ${sendTo}. Real SES delivery requires EMAIL_PROVIDER=ses and valid credentials; run against a live environment to verify end to end.`,
+      `Would send a traced test email to ${sendTo}. One-person mail uses Resend (RESEND_API_KEY); campaigns use SES. Run against a live environment to verify end to end.`,
     );
   }
 

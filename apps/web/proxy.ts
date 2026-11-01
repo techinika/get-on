@@ -27,13 +27,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // The email must be confirmed and the emailed code accepted for this session.
+  // The email must be confirmed and the authenticator code accepted for this session.
   const emailConfirmed = Boolean((user as { email_confirmed_at?: string | null } | null)?.email_confirmed_at);
   const sessionId = sessionIdFromAccessToken(session?.access_token);
   const verified = emailConfirmed && sessionId ? await isSessionUsable(sessionId, user.id) : false;
 
   if (!verified) {
-    const target = emailConfirmed ? "/login/verify" : "/verify-email";
+    const target = emailConfirmed ? "/mfa" : "/verify-email";
     const url = new URL(target, request.url);
     url.searchParams.set("next", path);
     return NextResponse.redirect(url);
@@ -43,5 +43,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/", "/signup", "/login", "/dashboard/:path*", "/onboarding/:path*"],
+  matcher: ["/", "/signup", "/login", "/mfa/:path*", "/dashboard/:path*", "/onboarding/:path*"],
 };

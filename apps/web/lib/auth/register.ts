@@ -3,13 +3,11 @@ import { attributeReferral } from "@/lib/referrals";
 import { canonicalEmail } from "@/lib/security/canonical-email";
 import { validateEmailAddress, isDisposableDomain, isBlockedDomain } from "@/lib/security/email-address";
 import { checkPasswordPolicy, isPasswordBreached } from "@/lib/security/passwords";
-import { hashEmail } from "@/lib/security/otp";
+import { hashEmail, maskEmail } from "@/lib/security/otp";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getSecuritySettings } from "@/lib/security/settings";
 import { verifyTurnstile } from "@/lib/security/turnstile";
-import { hashBrowserBinding, newBindingValue } from "@/lib/security/otp";
-import { tokenSecret } from "@/lib/security/tokens";
-import { emailOtpProvider } from "@/lib/auth/second-factor";
+import { sendSignupCode } from "@/lib/auth/email-otp";
 import { recordSecurityEvent } from "@/lib/security/events";
 
 export type RegisterInput = {
@@ -42,11 +40,8 @@ export type RegisterErrorCode =
 export type RegisterResult =
   | {
       ok: true;
-      challengeId: string;
       email: string;
       maskedEmail: string;
-      bindingValue: string;
-      bindingHash: string;
     }
   | {
       ok: false;
@@ -56,11 +51,8 @@ export type RegisterResult =
       retryAfter?: number;
       /** Set when an unverified account already exists and a new code was sent. */
       pending?: {
-        challengeId: string;
         email: string;
         maskedEmail: string;
-        bindingValue: string;
-        bindingHash: string;
       };
     };
 
@@ -135,9 +127,6 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
   const turnstile = await verifyTurnstile(input.turnstileToken, { action: "signup" });
   if (!turnstile.ok) return fail("TURNSTILE_FAILED", "form");
 
-  const bindingValue = newBindingValue();
-  const bindingHash = hashBrowserBinding(bindingValue, tokenSecret());
-
   const existing = await findProfileByCanonical(canonical);
   if (existing) {
     const { data } = await admin.auth.admin.getUserById(String(existing.id));
@@ -148,33 +137,17 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
     }
 
     // Unverified account: send a fresh code, never create a second row.
-    try {
-      const challenge = await emailOtpProvider.challenge("signup_verify", {
-        userId: String(existing.id),
-        email,
-        browserBindingHash: bindingHash,
-        ipHash: input.ipHash,
-        uaFamily: input.uaFamily,
-      });
-      await admin
-        .from("profiles")
-        .update({ terms_accepted_at: new Date().toISOString(), timezone: input.timezone ?? "UTC" })
-        .eq("id", String(existing.id));
-      return {
-        ok: false,
-        code: "AUTH_EMAIL_EXISTS_UNVERIFIED",
-        field: "email",
-        pending: {
-          challengeId: challenge.challengeId,
-          email,
-          maskedEmail: challenge.maskedEmail,
-          bindingValue,
-          bindingHash,
-        },
-      };
-    } catch {
-      return fail("SOMETHING_WRONG", "form");
-    }
+    if (!(await sendSignupCode(email))) return fail("SOMETHING_WRONG", "form");
+    await admin
+      .from("profiles")
+      .update({ terms_accepted_at: new Date().toISOString(), timezone: input.timezone ?? "UTC" })
+      .eq("id", String(existing.id));
+    return {
+      ok: false,
+      code: "AUTH_EMAIL_EXISTS_UNVERIFIED",
+      field: "email",
+      pending: { email, maskedEmail: maskEmail(email) },
+    };
   }
 
   const { data: created, error } = await admin.auth.admin.createUser({
@@ -247,25 +220,7 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
     meta: {},
   });
 
-  let challenge;
-  try {
-    challenge = await emailOtpProvider.challenge("signup_verify", {
-      userId,
-      email,
-      browserBindingHash: bindingHash,
-      ipHash: input.ipHash,
-      uaFamily: input.uaFamily,
-    });
-  } catch {
-    return fail("SOMETHING_WRONG", "form");
-  }
+  if (!(await sendSignupCode(email))) return fail("SOMETHING_WRONG", "form");
 
-  return {
-    ok: true,
-    challengeId: challenge.challengeId,
-    email,
-    maskedEmail: challenge.maskedEmail,
-    bindingValue,
-    bindingHash,
-  };
+  return { ok: true, email, maskedEmail: maskEmail(email) };
 }

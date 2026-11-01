@@ -48,10 +48,10 @@ describe("security: account recovery", () => {
     expect(existsSync(resolve(WEB, "app/auth/reset-password/route.ts"))).toBe(false);
   });
 
-  it("(6) the sign-in code email carries a working not-me link", () => {
-    const login = read("app/api/auth/login/route.ts");
-    expect(login).toMatch(/purpose: "not_me"/);
-    expect(login).toMatch(/notMeBaseUrl/);
+  it("(6) the new-device email carries a working not-me link", () => {
+    const complete = read("app/api/auth/mfa/complete/route.ts");
+    expect(complete).toMatch(/purpose: "not_me"/);
+    expect(complete).toMatch(/secureUrl/);
     const page = read("app/security/not-me/page.tsx");
     expect(page).toMatch(/findAuthToken\(params\.t, "not_me"\)/);
   });

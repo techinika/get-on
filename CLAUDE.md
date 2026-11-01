@@ -119,9 +119,9 @@ The site design system is prepared for a future "dark-mode" plugin:
 - See `docs/pesapal-spike.md`, `docs/entitlements.md`, `docs/ui-spec-billing.md`, `docs/credits.md` and `docs/legal.md`.
 
 ## Security core rules (tested; see docs/security.md)
-1. No access without a verified email **and** an accepted emailed code for that session (`session_security.verified_at`). Enforced in `proxy.ts`, server helpers and the database.
+1. No access without a verified email **and** a completed Supabase TOTP check for that session (`session_security.verified_at`, method `totp`). Customers enrol an authenticator at `/mfa/setup`; staff must reach AAL2. The signup email code only proves the address. Enforced in `proxy.ts`, server helpers and the database.
 2. One person, one account per canonical email. `POST /api/auth/register` is the only signup path; the auth service's public signup and its own emails must stay off.
-3. Authentication codes are hashed (HMAC with `OTP_PEPPER`), single use, bound to purpose, subject, browser and session. Never log or store a plain code.
+3. Supabase Auth owns the signup email code (short lived, single use, hashed by Supabase). Our reset and not-me links are random tokens stored only as SHA-256 hashes in `auth_tokens`, single use, and never logged.
 4. A page view never consumes anything: verification links do not exist here, and reset/confirm actions are `POST` only.
 5. Signup, login, verify and resend responses are identical for existing and unknown accounts except the signup duplicate message.
 6. Everything security-relevant goes through `recordSecurityEvent()`.

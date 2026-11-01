@@ -9,6 +9,10 @@ events and the jobs that keep them moving. Read it with
 - Every platform email belongs to exactly one stream: **transactional**,
   **billing** or **marketing**. The stream decides the From address, display
   name, Reply-To and SES configuration set. A caller cannot choose a sender.
+- One-person email (everything sent to a single recipient) goes through
+  **Resend**. Batch marketing campaigns keep going through **Amazon SES**.
+  `email_settings.email_provider = 'auto'` is the default; `resend`, `ses`,
+  `smtp`, `console` and `memory` force one provider for every message.
 - Service email is always sent. Marketing email is sent only when the person
   opted in, has not unsubscribed and is not suppressed.
 - Business changes and their email are meant to be committed together through
@@ -23,11 +27,16 @@ events and the jobs that keep them moving. Read it with
 
 The source of truth is `packages/email/src/streams.ts`.
 
-| Stream | From | Display name | Reply-To | Configuration set |
-|---|---|---|---|---|
-| `transactional` | `no-reply@contact.get-on.tech` | Get-On | `team@get-on.tech` | `gs-transactional` |
-| `billing` | `billing@contact.get-on.tech` | Get-On Billing | `billing@contact.get-on.tech` | `gs-billing` |
-| `marketing` | `no-reply@contact.get-on.tech` | Get-On | `team@get-on.tech` | `gs-marketing` |
+| Stream | Resend From | SES From | Display name | Reply-To | SES configuration set |
+|---|---|---|---|---|---|
+| `transactional` | `no-reply@mail.get-on.tech` | `no-reply@contact.get-on.tech` | Get-On | `team@get-on.tech` | `gs-transactional` |
+| `billing` | `billing@mail.get-on.tech` | `billing@contact.get-on.tech` | Get-On Billing | `billing@contact.get-on.tech` | `gs-billing` |
+| `marketing` | `no-reply@mail.get-on.tech` | `no-reply@contact.get-on.tech` | Get-On | `team@get-on.tech` | `gs-marketing` |
+
+Resend sends one-person mail from `mail.get-on.tech`. SES sends campaigns from
+`contact.get-on.tech`; the SES configuration set is created by SES only. Both
+domains must be verified with their provider before production. Reply-To stays
+on the human mailboxes under `get-on.tech` or `contact.get-on.tech`.
 
 `streamForKind()` is the fallback for unknown kinds: `billing_`, `invoice_`,
 `payment_`, `refund_` and `coupon_` go to billing; `marketing_`, `campaign_`
@@ -37,10 +46,10 @@ Each configuration set can be overridden with
 `SES_CONFIGURATION_SET_TRANSACTIONAL`, `SES_CONFIGURATION_SET_BILLING` and
 `SES_CONFIGURATION_SET_MARKETING`. The fixed names are the defaults.
 
-The SES sender rejects a caller-supplied `from` that does not match the stream
-(`EMAIL_SENDER_NOT_ALLOWED`). `safeHeader()` strips CR/LF and control characters
-before anything becomes a header. Subjects are capped at 180 characters and
-recipients at 254.
+Both the Resend and SES senders reject a caller-supplied `from` that does not
+match the stream (`EMAIL_SENDER_NOT_ALLOWED`). `safeHeader()` strips CR/LF and
+control characters before anything becomes a header. Subjects are capped at 180
+characters and recipients at 254.
 
 ## 3. Catalogue and content
 
@@ -150,9 +159,12 @@ through a staff screen.
 
 `apps/web/lib/email/send.ts` is the older single-call path. It still writes
 `email_log`, checks suppression, applies an 8 second timeout, queues transient
-failures in `email_log` and processes them with `processEmailQueue()`. It also
-enforces `SES_DAILY_LIMIT`: at 90% of the limit, only critical kinds are sent
-immediately.
+failures in `email_log` and processes them with `processEmailQueue()`. Sends go
+through Resend unless the message is marketing or a provider is forced.
+
+`SES_DAILY_LIMIT` applies to SES sends only: at 90% of the limit, only critical
+kinds are sent immediately. Resend traffic is not counted against it. Resend
+HTTP 429 and 5xx responses are treated as transient and retried with backoff.
 
 Critical kinds include auth, invites, billing receipts and payment failures.
 The direct path is kept only for code that has not moved to the outbox yet;
@@ -182,14 +194,16 @@ all business call sites now enqueue through `email_enqueue` and are sent by
 
 | Variable | Purpose |
 |---|---|
-| `EMAIL_TRANSPORT` | `ses`, `console` or `memory`. Missing credentials fall back to console. |
+| `EMAIL_PROVIDER` / `EMAIL_TRANSPORT` | Optional override: `auto`, `resend`, `ses`, `smtp`, `console` or `memory`. Unset means auto: Resend for one-person email, SES for campaigns. |
+| `RESEND_API_KEY` | Resend API key. Server only. Without it, one-person email falls back to console. |
+| `RESEND_API_BASE` | Optional Resend API base. Defaults to `https://api.resend.com`. |
 | `AWS_REGION` | SES region. |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | SES API credentials. Server only. |
 | `SES_CONFIGURATION_SET_TRANSACTIONAL` | Override the transactional set name. |
 | `SES_CONFIGURATION_SET_BILLING` | Override the billing set name. |
 | `SES_CONFIGURATION_SET_MARKETING` | Override the marketing set name. |
 | `SES_SNS_TOPIC_ARN` | Reject SNS messages from another topic. |
-| `SES_DAILY_LIMIT` | Daily send guard for the direct path. |
+| `SES_DAILY_LIMIT` | Daily SES send guard for the direct path. |
 | `EMAIL_LOGO_URL` / `EMAIL_LOGO_2X_URL` | Public PNG logo URLs used in templates. |
 | `APP_ORIGIN` | Base for links, unsubscribe and webhooks. |
 | `EMAIL_TRACKING_BASE` | Base for tracked links when tracking is enabled. |
@@ -198,7 +212,9 @@ all business call sites now enqueue through `email_enqueue` and are sent by
 ## 10. Tests and local checks
 
 - `apps/web/tests/email.test.ts` covers sender selection, header safety, copy
-  rules, consent gating and the marketing block renderer.
+  rules, consent gating and the marketing block renderer. It also checks that
+  one-person mail routes to Resend, campaigns route to SES, and the Resend
+  sender builds the right API request.
 - `pnpm --filter web test` runs the unit suite. `EMAIL_TRANSPORT=memory` keeps
   messages in `memorySender.messages`; development can inspect them through
   `/api/dev/outbox`.

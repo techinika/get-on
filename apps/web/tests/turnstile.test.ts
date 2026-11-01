@@ -18,7 +18,11 @@ function env(secret: string | null | undefined, siteKey: string | null | undefin
 }
 
 function mockFetch(response: Response) {
-  const fetch = vi.fn(async () => response);
+  const fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    void input;
+    void init;
+    return response;
+  });
   vi.stubGlobal("fetch", fetch as typeof globalThis.fetch);
   return fetch;
 }
@@ -65,9 +69,9 @@ describe("verifyTurnstile", () => {
     const result = await verifyTurnstile("a-valid-token");
     expect(result).toEqual({ ok: true });
     expect(fetch).toHaveBeenCalledTimes(1);
-    const [, init] = fetch.mock.calls[0]!;
-    expect((init?.body as URLSearchParams).get("secret")).toBe("secret-key");
-    expect((init?.body as URLSearchParams).get("response")).toBe("a-valid-token");
+    const body = fetch.mock.calls[0]![1]?.body as URLSearchParams | undefined;
+    expect(body?.get("secret")).toBe("secret-key");
+    expect(body?.get("response")).toBe("a-valid-token");
   });
 
   it("returns failed when Cloudflare rejects the token", async () => {

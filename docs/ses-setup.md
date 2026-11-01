@@ -1,7 +1,10 @@
 # Amazon SES setup for Get-On
 
-All platform email goes through Amazon SES. The app is the only sender; Supabase
-Auth uses SES SMTP only for sign-in and account emails.
+Amazon SES is used for batch marketing campaigns. One-person email (auth
+codes, invites, account notices, contact mail and billing) goes through Resend,
+so `RESEND_API_KEY` and the Resend domain verification are also required in
+production. The app is the only sender; Supabase Auth uses SES SMTP only for
+sign-in and account emails.
 
 Read this with `docs/email-system.md` and `docs/marketing-email.md`. The stream
 and sender rules are in `packages/email/src/streams.ts`; do not add a new From
@@ -139,8 +142,9 @@ Check that:
 
 | Variable | Purpose |
 |---|---|
-| `EMAIL_PROVIDER` | Preferred transport switch: `ses`, `log`/`console`, `memory`/`fake`. |
+| `EMAIL_PROVIDER` | Optional override: `auto` (Resend one-person, SES campaigns), `resend`, `ses`, `log`/`console`, `memory`/`fake`. |
 | `EMAIL_TRANSPORT` | Older name still read by `readTransport()`; use `EMAIL_PROVIDER` for new setups. |
+| `RESEND_API_KEY` | Resend API key for one-person email. Server only. |
 | `AWS_REGION` | SES region, for example `eu-west-1`. |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | SES API credentials. Server only. |
 | `SES_CONFIGURATION_SET_TRANSACTIONAL` | Transactional configuration set. |
@@ -161,7 +165,8 @@ legal pages. It is not the From address.
 - All three configuration sets exist and publish to the SNS topic.
 - `contact.get-on.tech` DKIM, SPF and DMARC pass.
 - `SES_SNS_TOPIC_ARN` matches the live topic.
-- `EMAIL_PROVIDER=ses` in production.
+- `EMAIL_PROVIDER=auto` (or unset) in production, with `RESEND_API_KEY` set.
+- `contact.get-on.tech` is verified in Resend for one-person email.
 - `marketing_settings.physical_address` and `unsubscribe_base` are set before
   the first campaign.
 - The public unsubscribe page is deployed before any marketing send.

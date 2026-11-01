@@ -74,7 +74,7 @@ describe("email observability logger", () => {
     (process.env as { NODE_ENV?: string }).NODE_ENV = "production";
     const { writes, restore } = captureWrite();
     emailLogger.info({
-      stage: "ses.send.response",
+      stage: "email.send.response",
       msg: "sent",
       messageId: "msg-1",
       durationMs: 412,
@@ -84,7 +84,7 @@ describe("email observability logger", () => {
     const joined = writes.join("");
     const parsed = JSON.parse(joined.trim().split("\n").pop() ?? "{}");
     expect(parsed.level).toBe("info");
-    expect(parsed.stage).toBe("ses.send.response");
+    expect(parsed.stage).toBe("email.send.response");
     expect(parsed.message_id).toBe("msg-1");
     expect(parsed.duration_ms).toBe(412);
     // no raw full email in JSON

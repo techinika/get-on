@@ -1,4 +1,12 @@
-import { ConsoleSender, MemorySender, SesSender, SmtpSender, memorySender } from './senders';
+import {
+  ConsoleSender,
+  MemorySender,
+  ResendSender,
+  SesSender,
+  SmtpSender,
+  memorySender,
+} from './senders';
+import { EMAIL_STREAMS, streamForKind, type EmailStream } from './streams';
 import type { EmailMessage, EmailSender } from './types';
 
 export { memorySender };
@@ -10,7 +18,7 @@ export * from './streams';
 export * from './catalogue';
 export * from './copy';
 
-export type EmailTransport = 'ses' | 'smtp' | 'console' | 'memory';
+export type EmailTransport = 'resend' | 'ses' | 'smtp' | 'console' | 'memory';
 
 let cachedTransport: EmailTransport | null = null;
 let cachedLastChecked: number = 0;
@@ -20,14 +28,15 @@ const senders = new Map<EmailTransport, EmailSender>();
 /**
  * Reads the explicit email transport preference from environment variables.
  * Returns null when no override is set, meaning the transport should be chosen
- * per message (SMTP for one-person email, SES for batches).
+ * per message (Resend for one-person email, SES for batches).
  */
 export function readTransport(): EmailTransport | null {
   const now = Date.now();
   if (cachedTransport !== null && now - cachedLastChecked < 30_000) return cachedTransport;
 
   const envValue = (process.env.EMAIL_PROVIDER ?? process.env.EMAIL_TRANSPORT ?? '').toLowerCase();
-  if (envValue === 'ses') cachedTransport = 'ses';
+  if (envValue === 'resend') cachedTransport = 'resend';
+  else if (envValue === 'ses') cachedTransport = 'ses';
   else if (envValue === 'smtp') cachedTransport = 'smtp';
   else if (envValue === 'log' || envValue === 'console') cachedTransport = 'console';
   else if (envValue === 'memory' || envValue === 'fake') cachedTransport = 'memory';
@@ -38,21 +47,36 @@ export function readTransport(): EmailTransport | null {
   return cachedTransport;
 }
 
+/** Clears the cached env override. Used by tests after changing the env. */
+export function resetTransportCache(): void {
+  cachedTransport = null;
+  cachedLastChecked = 0;
+}
+
+function streamForMessage(message: EmailMessage): EmailStream {
+  if (message.stream && message.stream in EMAIL_STREAMS) return message.stream;
+  return streamForKind(message.kind);
+}
+
 /**
  * Choose the transport for a single message.
  *
- * Batches (marketing campaigns) go through SES; everything else (one-person
- * transactional and billing email) goes through SMTP by default. An explicit
- * EMAIL_PROVIDER/EMAIL_TRANSPORT override wins for every message.
+ * Batches (marketing campaigns) go through SES; every single-recipient message
+ * (auth, account, team, contact, billing and other transactional mail) goes
+ * through Resend. An explicit EMAIL_PROVIDER/EMAIL_TRANSPORT override wins for
+ * every message.
  */
 export function transportForMessage(message: EmailMessage): EmailTransport {
   const forced = readTransport();
   if (forced !== null) return forced;
-  if (message.stream === 'marketing') return 'ses';
-  return 'smtp';
+  if (streamForMessage(message) === 'marketing') return 'ses';
+  return 'resend';
 }
 
 function createSender(transport: EmailTransport): EmailSender {
+  if (transport === 'resend') {
+    return process.env.RESEND_API_KEY ? new ResendSender() : new ConsoleSender();
+  }
   if (transport === 'ses') return new SesSender();
   if (transport === 'smtp') {
     const smtpHost = process.env.SMTP_HOST;
@@ -83,7 +107,7 @@ export function getSenderForTransport(transport: EmailTransport): EmailSender {
 
 /**
  * Get the sender for a message. When no override transport is given, the
- * transport is chosen per message: SMTP for one-person email, SES for
+ * transport is chosen per message: Resend for one-person email, SES for
  * marketing batches.
  */
 export function getSender(message?: EmailMessage, overrideTransport?: EmailTransport | null): EmailSender {

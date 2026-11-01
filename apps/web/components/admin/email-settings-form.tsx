@@ -3,7 +3,16 @@
 import { useState } from "react";
 import { saveEmailProvider } from "@/app/admin/(console)/email/actions";
 
-const PROVIDERS = ["ses", "smtp", "console", "memory"] as const;
+const PROVIDERS = ["auto", "resend", "ses", "smtp", "console", "memory"] as const;
+
+const PROVIDER_LABELS: Record<(typeof PROVIDERS)[number], string> = {
+  auto: "Auto (Resend for one-person, SES for campaigns)",
+  resend: "Resend (one-person email)",
+  ses: "Amazon SES (campaigns)",
+  smtp: "SMTP",
+  console: "Console (development)",
+  memory: "Memory (tests)",
+};
 
 export type EmailSettingsFormProps = {
   initialProvider?: string;
@@ -18,10 +27,10 @@ export type EmailSettingsFormProps = {
 };
 
 export function EmailSettingsForm({
-  initialProvider = "console",
+  initialProvider = "auto",
   initialSmtp,
 }: EmailSettingsFormProps) {
-  const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider || "console");
+  const [selectedProvider, setSelectedProvider] = useState<string>(initialProvider || "auto");
   const [smtpHost, setSmtpHost] = useState(initialSmtp?.host ?? "");
   const [smtpPort, setSmtpPort] = useState<number>(initialSmtp?.port ?? 587);
   const [smtpSecure, setSmtpSecure] = useState<string>(initialSmtp?.secure ? "true" : "false");
@@ -67,7 +76,7 @@ export function EmailSettingsForm({
   const resetForm = () => {
     setSaved(false);
     setError(null);
-    setSelectedProvider("console");
+    setSelectedProvider("auto");
     setSmtpHost("");
     setSmtpPort(587);
     setSmtpSecure("false");
@@ -87,10 +96,14 @@ export function EmailSettingsForm({
         >
           {PROVIDERS.map((provider) => (
             <option key={provider} value={provider}>
-              {provider[0].toUpperCase() + provider.slice(1)}
+              {PROVIDER_LABELS[provider]}
             </option>
           ))}
         </select>
+        <p className="mt-1 text-sm text-text-muted">
+          Auto sends one-person email through Resend and marketing campaigns through Amazon SES.
+          Resend needs <code>RESEND_API_KEY</code> on the server.
+        </p>
       </div>
 
       {selectedProvider === "smtp" && (
