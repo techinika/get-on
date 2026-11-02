@@ -1,64 +1,53 @@
 "use admin";
 
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureFreeGrant, loadAiSettings } from "@/lib/ai/settings";
+import { recordSecurityEvent } from "@/lib/security/events";
 
 /**
  * Grant free plan entitlements to a newly verified account.
- * Idempotent: guarded by free_ai_grant_at unique constraint.
- * Called from the email verification handler in the same transaction.
- *
- * What it does:
- * - Grants 25 one-time AI credits into the user's balance
- * - Sets profiles.free_ai_grant_at (prevents double grant)
- * - Initialises usage counters and quotas
- * - Records the grant event
+ * Idempotent: guarded by profiles.free_ai_grant_at.
+ * Called after the email verification handler has created the session.
  */
 export async function grantFreeEntitlements(userId: string): Promise<void> {
   const admin = createAdminClient();
+  const settings = await loadAiSettings(admin);
 
-  // Check if already granted (guard: unique per user)
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("free_ai_grant_at")
-    .eq("id", userId)
+  const { data: team, error: teamError } = await admin
+    .from("teams")
+    .select("id")
+    .eq("owner_id", userId)
+    .eq("is_personal", true)
     .maybeSingle();
 
-  if (profile?.free_ai_grant_at) {
-    // Already granted; nothing to do (idempotent)
+  if (teamError || !team) {
+    console.error("[provisioning] personal team not found", teamError ?? userId);
     return;
   }
 
-  // 1. Grant 25 free AI credits by updating the ai_settings table
-  // The ai_settings table has a free_grant_credits column defaulting to 25
-  await admin.rpc("grant_credits", {
-    p_user_id: userId,
-    p_amount: 25,
-    p_kind: "free_grant",
-    p_reason: "free-account-signup",
-  });
+  let granted = false;
+  try {
+    granted = await ensureFreeGrant(
+      admin,
+      String(team.id),
+      userId,
+      settings.freeGrantCredits,
+    );
+  } catch (error) {
+    console.error("[provisioning] free AI grant failed", error);
+    return;
+  }
 
-  // 2. Set the free AI grant timestamp (unique guard per account)
-  await admin
-    .from("profiles")
-    .update({ free_ai_grant_at: new Date().toISOString() })
-    .eq("id", userId);
+  if (!granted) return;
 
-  // 3. Initialize usage counters and quotas (idempotent defaults)
-  // Read the Free plan limits and set them on the profile/projections
-  await admin.rpc("initialize_free_quotas", {
-    p_user_id: userId,
-  });
-
-  // 4. Record the grant event for audit/logging
-  await admin.rpc("record_security_event", {
-    p_user: userId,
-    p_category: "account",
-    p_event: "free_grant_granted",
-    p_severity: "info",
-    p_summary: "25 free AI credits granted at account creation",
-    p_ip_hash: "",
-    p_ua_family: "",
-    p_visible_to_user: true,
-    p_meta: JSON.stringify({ credits: 25 }),
+  await recordSecurityEvent({
+    userId,
+    teamId: String(team.id),
+    category: "account",
+    event: "free_grant_granted",
+    severity: "info",
+    summary: `${settings.freeGrantCredits} free AI credits granted at account creation`,
+    visibleToUser: true,
+    meta: { credits: settings.freeGrantCredits },
   });
 }

@@ -9,6 +9,7 @@ import { PasswordInput } from "@/components/auth/password-input";
 import { Turnstile } from "@/components/turnstile";
 import { Button } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
+import { PASSWORD_ERROR_MESSAGES } from "@/lib/security/messages";
 
 type RegisterResponse = {
   ok?: boolean;
@@ -19,15 +20,7 @@ type RegisterResponse = {
   next?: string;
 };
 
-const PASSWORD_HINTS: Record<string, string> = {
-  TOO_SHORT: "Use at least 10 characters.",
-  TOO_LONG: "Use 128 characters or fewer.",
-  COMMON: "That password is too common. Choose something unique.",
-  CONTAINS_PERSONAL: "Do not use your name or email address in the password.",
-  REPEATED: "Avoid repeating the same character many times.",
-  SEQUENTIAL: "Avoid sequences like 1234 or abcd.",
-  BREACHED: "That password appeared in a data breach. Please choose another.",
-};
+
 
 const EXISTING_CODES = new Set(["AUTH_EMAIL_EXISTS", "AUTH_EMAIL_EXISTS_GOOGLE", "AUTH_EMAIL_EXISTS_UNVERIFIED"]);
 
@@ -185,12 +178,15 @@ export function SignupForm({
             minLength={10}
             maxLength={128}
             required
-            helper="At least 10 characters"
+            helper="At least 10 characters, with uppercase, lowercase, a number and a symbol"
           />
           {passwordErrors.length > 0 ? (
             <ul role="alert" className="space-y-1 text-sm text-danger-text">
               {passwordErrors.map((code) => (
-                <li key={code}>{PASSWORD_HINTS[code] ?? "Please choose a stronger password."}</li>
+                <li key={code}>
+                  {PASSWORD_ERROR_MESSAGES[code as keyof typeof PASSWORD_ERROR_MESSAGES] ??
+                    "Please choose a stronger password."}
+                </li>
               ))}
             </ul>
           ) : null}

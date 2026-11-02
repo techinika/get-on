@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
+  grantTeamAiCredits as grantTeamAiCreditsRpc,
   requireStaffAction,
   saveAiSettings as saveAiSettingsRpc,
   toggleAiModel as toggleAiModelRpc,
@@ -80,4 +81,74 @@ export async function toggleAiModel(form: FormData) {
 
   revalidatePath("/admin/ai");
   redirect("/admin/ai?saved=model");
+}
+
+export type GrantAiCreditsResult =
+  | { ok: true; message: string }
+  | { ok: false; error: string };
+
+function creditError(error: unknown): string {
+  const text = error instanceof Error ? error.message : "";
+  if (text.includes("CREDIT_AMOUNT")) {
+    return "Add between 1 and 1,000,000 credits.";
+  }
+  if (text.includes("REASON_REQUIRED")) {
+    return "Add a reason between 3 and 500 characters.";
+  }
+  if (text.includes("EXPIRY_INVALID")) {
+    return "The expiry must be in the future.";
+  }
+  if (text.includes("TEAM_NOT_FOUND")) {
+    return "That team could not be found.";
+  }
+  if (text.includes("STAFF_NOT_ALLOWED")) {
+    return "You do not have permission to add credits.";
+  }
+  return "We could not add those credits.";
+}
+
+export async function grantAiCredits(
+  form: FormData,
+): Promise<GrantAiCreditsResult> {
+  await requireStaffAction("ai.credits.direct");
+
+  const teamId = String(form.get("team_id") ?? "").trim();
+  const credits = Number(form.get("credits"));
+  const reason = String(form.get("reason") ?? "").trim();
+  const rawExpires = String(form.get("expires_at") ?? "").trim();
+
+  if (!teamId) return { ok: false, error: "Choose a team." };
+  if (!Number.isSafeInteger(credits) || credits <= 0 || credits > 1_000_000) {
+    return { ok: false, error: "Add between 1 and 1,000,000 credits." };
+  }
+  if (reason.length < 3 || reason.length > 500) {
+    return { ok: false, error: "Add a reason between 3 and 500 characters." };
+  }
+
+  let expiresAt: string | null = null;
+  if (rawExpires) {
+    const parsed = new Date(rawExpires);
+    if (!Number.isFinite(parsed.getTime()) || parsed.getTime() <= Date.now()) {
+      return { ok: false, error: "The expiry must be in the future." };
+    }
+    expiresAt = parsed.toISOString();
+  }
+
+  try {
+    const result = await grantTeamAiCreditsRpc({
+      teamId,
+      credits,
+      reason,
+      expiresAt,
+    });
+    revalidatePath("/admin/ai");
+    revalidatePath("/admin/teams");
+    revalidatePath("/dashboard/ai");
+    return {
+      ok: true,
+      message: `${credits.toLocaleString("en-GB")} credits added. New balance: ${Number(result.balance).toLocaleString("en-GB")}.`,
+    };
+  } catch (error) {
+    return { ok: false, error: creditError(error) };
+  }
 }

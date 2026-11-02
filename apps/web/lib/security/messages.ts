@@ -1,3 +1,19 @@
+import type { PasswordErrorCode } from "@/lib/security/passwords";
+
+export const PASSWORD_ERROR_MESSAGES: Record<PasswordErrorCode, string> = {
+  TOO_SHORT: "Use at least 10 characters.",
+  TOO_LONG: "Use 128 characters or fewer.",
+  NEEDS_LOWER: "Add at least one lowercase letter.",
+  NEEDS_UPPER: "Add at least one uppercase letter.",
+  NEEDS_NUMBER: "Add at least one number.",
+  NEEDS_SYMBOL: "Add at least one symbol, such as ! or ?.",
+  COMMON: "That password is too common. Choose something unique.",
+  CONTAINS_PERSONAL: "Do not use your name or email address in the password.",
+  REPEATED: "Avoid repeating the same character many times.",
+  SEQUENTIAL: "Avoid sequences like 1234 or abcd.",
+  BREACHED: "That password appeared in a data breach. Please choose another.",
+};
+
 export const SECURITY_MESSAGES = {
   AUTH_INVALID_CREDENTIALS: "Email or password is incorrect.",
   AUTH_LOCKED: "Too many tries. Please wait a few minutes and try again.",
@@ -6,7 +22,8 @@ export const SECURITY_MESSAGES = {
   AUTH_EMAIL_EXISTS_GOOGLE: "This email is already used with Google sign-in. Continue with Google.",
   AUTH_EMAIL_DISPOSABLE: "Please use a permanent email address.",
   AUTH_EMAIL_INVALID: "That email address does not look right.",
-  AUTH_PASSWORD_WEAK: "Please choose a stronger password.",
+  AUTH_PASSWORD_WEAK:
+    "Please choose a stronger password. Use at least 10 characters with uppercase, lowercase, a number and a symbol.",
   AUTH_PASSWORD_TOO_SHORT: "Use a longer password. It needs at least 10 characters.",
   AUTH_PASSWORD_PERSONAL: "Please do not use your name or email address in your password.",
   AUTH_PASSWORD_MISMATCH: "Those two passwords do not match.",
@@ -31,4 +48,10 @@ export type SecurityMessageCode = keyof typeof SECURITY_MESSAGES;
 export function securityMessage(code: string, values: { n?: number | string; email?: string } = {}): string {
   const base = (SECURITY_MESSAGES as Record<string, string>)[code] ?? SECURITY_MESSAGES.SOMETHING_WRONG;
   return base.replace("{n}", String(values.n ?? "")).replace("{email}", String(values.email ?? ""));
+}
+
+export function passwordErrorMessages(errors: readonly string[]): string[] {
+  return errors.map(
+    (code) => PASSWORD_ERROR_MESSAGES[code as PasswordErrorCode] ?? "Please choose a stronger password.",
+  );
 }

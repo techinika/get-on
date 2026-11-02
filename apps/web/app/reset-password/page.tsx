@@ -54,7 +54,7 @@ function Card({
 export default async function ResetPasswordPage({
   searchParams,
 }: {
-  searchParams: Promise<{ t?: string; done?: string; error?: string }>;
+  searchParams: Promise<{ t?: string; done?: string; error?: string; rules?: string }>;
 }) {
   const params = await searchParams;
 
@@ -85,12 +85,15 @@ export default async function ResetPasswordPage({
     <AuthShell>
       <AuthHeader
         title="Choose a new password"
-        subtitle="Use at least 10 characters. A few words that only you would put together works well."
+        subtitle="Use at least 10 characters with uppercase, lowercase, a number and a symbol."
       />
       <Suspense fallback={null}>
         <AuthMessage />
       </Suspense>
-      <ResetPasswordForm token={String(params.t)} />
+      <ResetPasswordForm
+        token={String(params.t)}
+        passwordErrors={params.rules ? params.rules.split(",").filter(Boolean) : []}
+      />
     </AuthShell>
   );
 }

@@ -457,6 +457,20 @@ export async function saveAiSettings(input: {
   });
 }
 
+export async function grantTeamAiCredits(input: {
+  teamId: string;
+  credits: number;
+  reason: string;
+  expiresAt: string | null;
+}): Promise<{ ok: boolean; bucket_id: string; balance: number }> {
+  return rpc("admin_ai_grant_credits", {
+    p_team: input.teamId,
+    p_credits: input.credits,
+    p_reason: input.reason,
+    p_expires: input.expiresAt,
+  });
+}
+
 export async function toggleAiModel(id: string, enabled: boolean): Promise<void> {
   await rpc("admin_ai_toggle_model", { p_model: id, p_enabled: enabled });
 }

@@ -311,15 +311,15 @@ export async function ensureFreeGrant(
   teamId: string,
   userId: string,
   amount: number,
-): Promise<void> {
-  if (amount <= 0) return;
+): Promise<boolean> {
+  if (amount <= 0) return false;
 
   const { data: profile } = await admin
     .from("profiles")
     .select("free_ai_grant_at")
     .eq("id", userId)
     .maybeSingle();
-  if (profile?.free_ai_grant_at) return;
+  if (profile?.free_ai_grant_at) return false;
 
   const { data: claimed, error: claimError } = await admin
     .from("profiles")
@@ -328,7 +328,7 @@ export async function ensureFreeGrant(
     .is("free_ai_grant_at", null)
     .select("id")
     .maybeSingle();
-  if (claimError || !claimed) return;
+  if (claimError || !claimed) return false;
 
   const { error } = await admin.rpc("grant_credits", {
     p_team: teamId,
@@ -345,4 +345,5 @@ export async function ensureFreeGrant(
       .eq("id", userId);
     throw error;
   }
+  return true;
 }
