@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { builtinImageMap, requireSystemTemplate, materializeTemplate } from "@get-on/templates";
+import { TEMPLATE_CATALOG } from "@get-on/templates/catalog";
 import { templateBySlug } from "@/lib/templates/catalog";
 import { RenderPage, SiteFooter, SiteHeader, SiteRoot } from "@get-on/renderer";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,9 +15,7 @@ type Params = {
 };
 
 export function generateStaticParams() {
-  return ["starter", "software-company", "law-firm", "restaurant", "developer-portfolio"].map(
-    (slug) => ({ slug }),
-  );
+  return TEMPLATE_CATALOG.map((item) => ({ slug: item.slug }));
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
