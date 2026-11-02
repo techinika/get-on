@@ -109,8 +109,23 @@ describe("site input", () => {
     expect(decodeDataUrl("not a data url")).toBeNull();
   });
 
-  it("finds images used by blocks", () => {
+  it("finds every kind of image used by blocks", () => {
     expect([...usedImageIds([page])]).toEqual(["33333333-3333-4333-8333-333333333333"]);
+    expect([
+      ...usedImageIds([
+        {
+          ...page,
+          blocks: [
+            { id: "team", type: "team", props: { items: [{ photoId: "team-photo" }] } },
+            {
+              id: "pair",
+              type: "before-after",
+              props: { items: [{ beforeId: "before", afterId: "after" }] },
+            },
+          ],
+        },
+      ]),
+    ]).toEqual(["team-photo", "before", "after"]);
   });
 
   it("maps database rows to the builder input", () => {

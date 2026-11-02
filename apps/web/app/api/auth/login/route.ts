@@ -7,6 +7,7 @@ import {
   createPendingSession,
   hashDeviceId,
   sessionIdFromAccessToken,
+  syncProfileConfirmation,
 } from "@/lib/auth/session-security";
 import { getIpHash, isSameOrigin, safeNextPath, uaFamily } from "@/lib/security/request";
 import { verifyTurnstile } from "@/lib/security/turnstile";
@@ -121,6 +122,16 @@ export async function POST(request: Request) {
   const userId = data.user.id;
   const sessionId = sessionIdFromAccessToken(data.session.access_token);
   if (!sessionId) {
+    return loginFailed(request, "SOMETHING_WRONG", next);
+  }
+
+  try {
+    await syncProfileConfirmation({
+      userId,
+      emailConfirmedAt: data.user.email_confirmed_at,
+    });
+  } catch (error) {
+    console.error("Could not sync the profile email confirmation", error);
     return loginFailed(request, "SOMETHING_WRONG", next);
   }
 

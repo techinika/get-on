@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { requireSystemTemplate, materializeTemplate } from "@get-on/templates";
+import { builtinImageMap, requireSystemTemplate, materializeTemplate } from "@get-on/templates";
+import { TEMPLATE_CATALOG } from "@get-on/templates/catalog";
 import { templateBySlug } from "@/lib/templates/catalog";
 import { RenderPage, SiteFooter, SiteHeader, SiteRoot } from "@get-on/renderer";
 import { buttonVariants } from "@/components/ui/button";
@@ -14,9 +15,7 @@ type Params = {
 };
 
 export function generateStaticParams() {
-  return ["starter", "software-company", "law-firm", "restaurant", "developer-portfolio"].map(
-    (slug) => ({ slug }),
-  );
+  return TEMPLATE_CATALOG.map((item) => ({ slug: item.slug }));
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
@@ -42,7 +41,12 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
   if (!item) notFound();
 
   const pkg = requireSystemTemplate(slug);
-  const preview = materializeTemplate(pkg, { profile: pkg.sampleProfile });
+  const preview = materializeTemplate(pkg, {
+    profile: pkg.sampleProfile,
+    allowSampleContent: true,
+    imageSeed: slug,
+  });
+  const images = builtinImageMap();
   const requestedPath = typeof pageParam === "string" ? pageParam : "/";
   const page = preview.pages.find((candidate) => candidate.path === requestedPath) ?? preview.pages[0]!;
 
@@ -137,6 +141,7 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
               phone: contact.phone,
               email: contact.email,
               socialLinks: contact.social,
+              getImage: (imageId) => images.get(imageId) ?? null,
               getPageHref: (pageId) => {
                 const linked = preview.pages.find((candidate) => candidate.id === pageId);
                 return linked

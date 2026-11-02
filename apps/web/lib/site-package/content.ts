@@ -24,6 +24,7 @@ import {
   type SourceProject,
   type SourceSettings,
 } from "@/lib/publishing/build-input";
+import { builtinTemplateImages } from "@/lib/publishing/builtin-images";
 import { buildSite } from "@get-on/publisher";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
@@ -407,8 +408,15 @@ export async function buildWebsiteZip(
   planId: string,
 ): Promise<WebsiteZipResult> {
   const wanted = usedImageIds(source.pages);
-  const media = source.media.filter((item) => wanted.has(item.id));
-  const imageBytes = await readMediaBytes(supabase, media);
+  const builtin = await builtinTemplateImages(source.pages);
+  const media = [
+    ...source.media.filter((item) => wanted.has(item.id)),
+    ...builtin.media,
+  ];
+  const imageBytes = new Map([
+    ...(await readMediaBytes(supabase, media)),
+    ...builtin.bytes,
+  ]);
   const config = readPublishConfig();
   const input = buildSiteInput({
     project: source.project as SourceProject,

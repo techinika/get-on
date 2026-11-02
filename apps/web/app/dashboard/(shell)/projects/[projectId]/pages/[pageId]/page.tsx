@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { AppPage } from "@/components/app/app-page";
 import { RenderPage, SiteRoot, SiteHeader, SiteFooter } from "@get-on/renderer";
 import { migrateContent, migrateV4ToV5 } from "@get-on/blocks";
+import { builtinImageMap } from "@get-on/templates";
 import { parseTheme } from "@/lib/publishing/build-input";
 import { getCurrentTeam } from "@/lib/team";
 import { editorV3Enabled } from "@/lib/editor/flags";
@@ -87,7 +88,9 @@ export default async function PageEditorPage({ params }: Params) {
         label: String(item.title),
         href: item.is_homepage || item.path === "" ? "/" : `/${String(item.path).replace(/^\//, "")}`,
       }));
-    const media = (mediaData ?? []).map((item) => [
+    const media: Array<[string, { src: string; width?: number; height?: number; alt?: string }]> = (
+      mediaData ?? []
+    ).map((item) => [
       String(item.id),
       {
         src: publicMediaUrl(String(item.path)),
@@ -95,7 +98,8 @@ export default async function PageEditorPage({ params }: Params) {
         height: item.height ? Number(item.height) : undefined,
         alt: item.alt ? String(item.alt) : undefined,
       },
-    ] as [string, { src: string; width?: number; height?: number; alt?: string }]);
+    ]);
+    for (const [id, image] of builtinImageMap()) media.push([id, image]);
 
     return (
       <EditorShell
@@ -196,6 +200,7 @@ export default async function PageEditorPage({ params }: Params) {
                     phone: typeof contact?.phone === "string" ? contact.phone : undefined,
                     email: typeof contact?.email === "string" ? contact.email : undefined,
                     socialLinks,
+                    getImage: (imageId) => builtinImageMap().get(imageId) ?? null,
                   }}
                 />
               </SiteRoot>

@@ -7,6 +7,7 @@ import {
   scanSampleLeaks,
   variableValues,
 } from "./variables";
+import { withTemplateImages } from "./art-images";
 
 export type MaterializedPage = {
   id: string;
@@ -35,6 +36,13 @@ export type MaterializeOptions = {
   /** Plan page limit. The home page is always kept. */
   maxPages?: number | null;
   compositionId?: string;
+  /**
+   * Allows the sample profile to appear in the result. Only template previews
+   * should use this: a real website must replace every sample business fact.
+   */
+  allowSampleContent?: boolean;
+  /** Keeps the built-in pictures stable for one website. */
+  imageSeed?: string;
 };
 
 function clone<T>(value: T): T {
@@ -155,12 +163,16 @@ export function materializeTemplate(
       .map((block: Block) =>
         markSampleOnly(fixPageLinks(freshBlock(block), homeId) as Block),
       );
-    const leaks = scanSampleLeaks(blocks, pkg.sampleProfile);
+    const leaks = options.allowSampleContent ? [] : scanSampleLeaks(blocks, pkg.sampleProfile);
     if (leaks.length > 0) {
       throw new Error(
         `TEMPLATE_SAMPLE_LEAK:${pkg.meta.slug}:${page.key}:${leaks.map((leak) => leak.value).join(",")}`,
       );
     }
+    const pictured = withTemplateImages(blocks, {
+      slug: pkg.meta.slug,
+      seed: `${options.imageSeed ?? pkg.meta.slug}:${page.key}`,
+    });
     const title = String(resolveDeep(page.title, values, missing));
     const seoTitle = String(resolveDeep(page.seo.title, values, missing));
     const seoDescription = String(resolveDeep(page.seo.description, values, missing));
@@ -175,7 +187,7 @@ export function materializeTemplate(
       menuLabel: page.menuLabel ?? title,
       seoTitle,
       seoDescription,
-      blocks,
+      blocks: pictured,
     };
   });
 

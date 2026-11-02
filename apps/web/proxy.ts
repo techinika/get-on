@@ -39,6 +39,16 @@ export async function proxy(request: NextRequest) {
   const verified = emailConfirmed && sessionId ? await isSessionUsable(sessionId, user.id) : false;
 
   if (!verified) {
+    const reason = !emailConfirmed
+      ? "email-unconfirmed"
+      : !sessionId
+        ? "no-session-id"
+        : "session-not-usable";
+    console.warn("[auth] protected route blocked", {
+      path,
+      userId: user.id,
+      reason,
+    });
     const target = emailConfirmed ? "/mfa" : "/verify-email";
     const url = new URL(target, request.url);
     url.searchParams.set("next", path);
