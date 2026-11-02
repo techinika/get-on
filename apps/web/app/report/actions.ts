@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { abuseReportAlertEmail } from "@get-on/email";
 import { enqueueEmail } from "@/lib/email/enqueue";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
+import { isTurnstileEnabled } from "@/lib/security/turnstile-flag";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeSiteName, reportSchema, REPORT_REASON_LABELS } from "@/lib/report";
 
@@ -21,6 +22,7 @@ function text(form: FormData, key: string): string {
 }
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  if (!isTurnstileEnabled()) return true;
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true;
   if (!token) return false;
@@ -50,7 +52,7 @@ export async function submitReport(form: FormData): Promise<ReportResult> {
     return { ok: false, code: "SERVER" };
   }
 
-  if (process.env.TURNSTILE_SECRET_KEY) {
+  if (isTurnstileEnabled() && process.env.TURNSTILE_SECRET_KEY) {
     const valid = await verifyTurnstile(text(form, "turnstileToken"), ip);
     if (!valid) return { ok: false, code: "SERVER" };
   }

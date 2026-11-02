@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { isTurnstileEnabled } from "@/lib/security/turnstile-flag";
 
 type TurnstileWidget = {
   render: (
@@ -25,16 +26,16 @@ declare global {
 const SCRIPT_ID = "cf-turnstile-script";
 
 /**
- * Cloudflare Turnstile. It only runs when a site key is set. The widget asks
- * for a token as soon as it renders and only shows a challenge when Cloudflare
- * needs the visitor to prove they are human.
+ * Cloudflare Turnstile. It stays hidden until `NEXT_PUBLIC_TURNSTILE_ENABLED`
+ * is true and a site key is set.
  */
 export function Turnstile({ onToken }: { onToken: (token: string) => void }) {
+  const enabled = isTurnstileEnabled();
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   const container = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => {
-    if (!siteKey) return;
+    if (!enabled || !siteKey) return;
 
     function render() {
       if (!container.current || !window.turnstile) return;
@@ -66,9 +67,9 @@ export function Turnstile({ onToken }: { onToken: (token: string) => void }) {
       };
     }
     return;
-  }, [siteKey, onToken]);
+  }, [enabled, siteKey, onToken]);
 
-  if (!siteKey) return null;
+  if (!enabled || !siteKey) return null;
 
   return <div ref={container} />;
 }

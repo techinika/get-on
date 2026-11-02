@@ -61,7 +61,8 @@ This repository contains the app: Next.js web app, Supabase schema and migration
    - `FORM_TOKEN_SECRET`: secret used to sign the form timing token
    - `EMAIL_PROVIDER`, AWS SES keys and the three `SES_CONFIGURATION_SET_*` names: Amazon SES for all platform emails (see `docs/ses-setup.md` and `docs/email-system.md`). Without credentials email is logged to the console.
    - `TEAM_EMAIL`: the human Reply-To and legal/support contact. Sender addresses are fixed per stream and must not be set in the environment.
-   - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys. When the secret is set, the form must pass Turnstile
+   - `NEXT_PUBLIC_TURNSTILE_ENABLED`: `true` turns on Cloudflare Turnstile; off by default
+   - `TURNSTILE_SECRET_KEY` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY`: Cloudflare Turnstile keys, required when it is enabled
    - `NEXT_PUBLIC_COOKIE_CONSENT`: set to `true` to show the cookie notice
 
    AI (see `apps/web/.env.example` for the full list):

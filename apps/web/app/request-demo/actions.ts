@@ -5,6 +5,7 @@ import { demoRequestSchema, RATE_LIMIT_PER_DAY, RATE_LIMIT_PER_HOUR } from "@/li
 import { demoRequestAckEmail, demoRequestAlertEmail } from "@get-on/email";
 import { enqueueEmail } from "@/lib/email/enqueue";
 import { hashIp, verifyTimeToken } from "@/lib/spam";
+import { isTurnstileEnabled } from "@/lib/security/turnstile-flag";
 import { createAdminClient } from "@/lib/supabase/admin";
 import env from "@/lib/env";
 
@@ -22,6 +23,7 @@ function text(form: FormData, key: string): string {
 }
 
 async function verifyTurnstile(token: string, ip: string): Promise<boolean> {
+  if (!isTurnstileEnabled()) return true;
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true;
   if (!token) return false;
@@ -60,7 +62,7 @@ export async function submitDemoRequest(form: FormData): Promise<DemoRequestResu
   }
 
   const turnstileToken = text(form, "turnstileToken");
-  if (process.env.TURNSTILE_SECRET_KEY) {
+  if (isTurnstileEnabled() && process.env.TURNSTILE_SECRET_KEY) {
     const valid = await verifyTurnstile(turnstileToken, ip);
     if (!valid) {
       return { ok: false, code: "SERVER" };

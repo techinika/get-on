@@ -3,6 +3,7 @@ import { verifyTurnstile } from "@/lib/security/turnstile";
 
 const origSecret = process.env.TURNSTILE_SECRET_KEY;
 const origSiteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
+const origEnabled = process.env.NEXT_PUBLIC_TURNSTILE_ENABLED;
 
 function setEnv(name: string, value: string | null | undefined) {
   if (value === null || value === undefined) {
@@ -13,6 +14,7 @@ function setEnv(name: string, value: string | null | undefined) {
 }
 
 function env(secret: string | null | undefined, siteKey: string | null | undefined) {
+  setEnv("NEXT_PUBLIC_TURNSTILE_ENABLED", "true");
   setEnv("TURNSTILE_SECRET_KEY", secret);
   setEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", siteKey);
 }
@@ -29,11 +31,20 @@ function mockFetch(response: Response) {
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  setEnv("NEXT_PUBLIC_TURNSTILE_ENABLED", origEnabled);
   setEnv("TURNSTILE_SECRET_KEY", origSecret);
   setEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", origSiteKey);
 });
 
 describe("verifyTurnstile", () => {
+  it("skips verification unless explicitly enabled", async () => {
+    setEnv("NEXT_PUBLIC_TURNSTILE_ENABLED", "false");
+    setEnv("TURNSTILE_SECRET_KEY", "secret-key");
+    setEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-key");
+    const result = await verifyTurnstile(null);
+    expect(result).toEqual({ ok: true });
+  });
+
   it("skips verification when neither key is configured", async () => {
     env(null, null);
     const result = await verifyTurnstile("any-token");

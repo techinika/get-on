@@ -35,7 +35,7 @@ Get-On (get-on.tech) helps non-technical small business owners create a website 
 - The IP is stored only as a salted hash, using `IP_HASH_SALT`.
 - `SUPABASE_SERVICE_ROLE_KEY` is only used server side, to write to `demo_requests` (RLS is on and no policies are exposed to the browser).
 - All platform emails are queued in the notification outbox (`email_enqueue`) and sent by `scripts/jobs/notifications.ts`. `enqueueEmail` never throws, so a mail outage cannot break the form.
-- Turnstile is required as soon as `TURNSTILE_SECRET_KEY` is set.
+- Turnstile is off by default. Set `NEXT_PUBLIC_TURNSTILE_ENABLED=true` with both keys to require it.
 
 ## Legal pages
 - The content lives in `apps/web/lib/legal-content.ts` and the company details in `apps/web/lib/company.ts`.
