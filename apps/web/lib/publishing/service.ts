@@ -15,6 +15,7 @@ import {
   type SourceProject,
   type SourceSettings,
 } from "./build-input";
+import { builtinTemplateImages } from "./builtin-images";
 import {
   pauseFromSettings,
   redirectsFromRows,
@@ -288,8 +289,15 @@ export async function publishProject(
 
   try {
     const wantedImages = usedImageIds(pages);
-    const usedMedia = media.filter((item) => wantedImages.has(item.id));
-    const imageBytes = await readImageBytes(ctx.supabase, usedMedia);
+    const builtin = await builtinTemplateImages(pages);
+    const usedMedia = [
+      ...media.filter((item) => wantedImages.has(item.id)),
+      ...builtin.media,
+    ];
+    const imageBytes = new Map([
+      ...(await readImageBytes(ctx.supabase, usedMedia)),
+      ...builtin.bytes,
+    ]);
     const builtAt = new Date();
 
     const input = buildSiteInput({

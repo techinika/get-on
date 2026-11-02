@@ -223,6 +223,7 @@ export async function applyTemplateToProject({
   const materialized = materializeTemplate(pkg, {
     profile: profileOf(project),
     maxPages: mode === "add" ? null : maxPages,
+    imageSeed: project.id,
   });
   const home = materialized.pages.find((page) => page.isHome) ?? materialized.pages[0]!;
 

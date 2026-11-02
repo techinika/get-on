@@ -22,6 +22,7 @@ import {
   type LinkTarget,
   type RichNode,
 } from "@get-on/blocks";
+import { templateImageById } from "@get-on/templates";
 import { cn } from "@/lib/utils";
 import { nodeLabel } from "@/lib/editor/registry";
 import { useEditorStore, type Device, type StateKey } from "@/lib/editor/v5-store";
@@ -495,6 +496,9 @@ function ImageField({ node, projectId }: { node: ContentNode; projectId: string 
   }
 
   const current = media.find((item) => item.id === currentId);
+  const builtin = currentId ? templateImageById(currentId) : null;
+  const previewSrc = current?.src ?? builtin?.src;
+  const previewAlt = current?.alt || builtin?.alt || "";
 
   return (
     <Field label="Picture">
@@ -504,19 +508,21 @@ function ImageField({ node, projectId }: { node: ContentNode; projectId: string 
         className="flex w-full items-center gap-2 rounded-input border border-border bg-surface p-2 text-left hover:border-primary"
       >
         <span className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-input bg-surface-muted text-text-muted">
-          {current ? (
+          {previewSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={current.src} alt="" className="h-full w-full object-cover" />
+            <img src={previewSrc} alt={previewAlt} className="h-full w-full object-cover" />
           ) : (
             <ImageIcon size={20} />
           )}
         </span>
         <span className="min-w-0">
-          <span className="block text-sm font-semibold text-text">{current ? current.alt || "Picture selected" : "Choose a picture"}</span>
+          <span className="block text-sm font-semibold text-text">
+            {current ? current.alt || "Picture selected" : builtin ? "Included picture" : "Choose a picture"}
+          </span>
           <span className="block text-xs text-text-muted">{currentId ? "Change picture" : "From your Images library"}</span>
         </span>
       </button>
-      {currentId && !current ? (
+      {currentId && !current && !builtin ? (
         <p className="mt-1 text-[11px] text-text-muted">This picture is no longer in your library. Choose another one.</p>
       ) : null}
 

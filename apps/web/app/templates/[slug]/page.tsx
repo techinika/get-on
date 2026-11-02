@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ArrowRight } from "lucide-react";
-import { requireSystemTemplate, materializeTemplate } from "@get-on/templates";
+import { builtinImageMap, requireSystemTemplate, materializeTemplate } from "@get-on/templates";
 import { templateBySlug } from "@/lib/templates/catalog";
 import { RenderPage, SiteFooter, SiteHeader, SiteRoot } from "@get-on/renderer";
 import { buttonVariants } from "@/components/ui/button";
@@ -45,7 +45,9 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
   const preview = materializeTemplate(pkg, {
     profile: pkg.sampleProfile,
     allowSampleContent: true,
+    imageSeed: slug,
   });
+  const images = builtinImageMap();
   const requestedPath = typeof pageParam === "string" ? pageParam : "/";
   const page = preview.pages.find((candidate) => candidate.path === requestedPath) ?? preview.pages[0]!;
 
@@ -140,6 +142,7 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
               phone: contact.phone,
               email: contact.email,
               socialLinks: contact.social,
+              getImage: (imageId) => images.get(imageId) ?? null,
               getPageHref: (pageId) => {
                 const linked = preview.pages.find((candidate) => candidate.id === pageId);
                 return linked

@@ -3,6 +3,7 @@ import { generateStarterContent } from "@get-on/blocks";
 import {
   materializeTemplate,
   requireSystemTemplate,
+  withDefaultImages,
   type Block,
 } from "@get-on/templates";
 import { createClient } from "@/lib/supabase/server";
@@ -184,6 +185,7 @@ export async function POST(request: Request) {
   if (templateSlug) {
     const pkg = requireSystemTemplate(templateSlug);
     const materialized = materializeTemplate(pkg, {
+      imageSeed: project.id,
       profile: {
         businessName: name,
         tagline: typeof body.tagline === "string" ? body.tagline : "",
@@ -283,6 +285,7 @@ export async function POST(request: Request) {
         profile,
         maxPages: plan.maxPagesPerSite,
         compositionId: decision.compositionId,
+        imageSeed: project.id,
       });
       const starter = generateStarterContent({
         businessName: name,
@@ -444,7 +447,7 @@ export async function POST(request: Request) {
         path: "/",
         position: 0,
         is_homepage: true,
-        blocks: fallback.blocks,
+        blocks: withDefaultImages(fallback.blocks, project.id),
         seo_title: name.slice(0, 60),
         seo_description: about.trim().slice(0, 155) || null,
       });
@@ -522,7 +525,7 @@ export async function POST(request: Request) {
       path: "/",
       position: 0,
       is_homepage: true,
-      blocks: content.blocks,
+      blocks: withDefaultImages(content.blocks, project.id),
     })
     .select("id")
     .single();

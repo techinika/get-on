@@ -237,7 +237,14 @@ export function usedImageIds(pages: SourcePage[]): Set<string> {
     }
     if (!value || typeof value !== "object") return;
     for (const [key, child] of Object.entries(value)) {
-      if (key === "imageId" && typeof child === "string") {
+      if (
+        (key === "imageId" ||
+          key === "photoId" ||
+          key === "posterId" ||
+          key === "beforeId" ||
+          key === "afterId") &&
+        typeof child === "string"
+      ) {
         found.add(child);
       } else if (key === "imageIds" && Array.isArray(child)) {
         for (const id of child) {
