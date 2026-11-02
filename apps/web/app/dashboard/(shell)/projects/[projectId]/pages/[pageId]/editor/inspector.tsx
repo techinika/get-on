@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   STYLE_GROUPS,
+  STYLE_SELECT_OPTIONS,
   THEME_TOKENS,
   findNode,
   richTextFromPlain,
@@ -768,6 +769,36 @@ function BackgroundChips({ node }: { node: ContentNode }) {
   );
 }
 
+const LENGTH_SUGGESTIONS = [
+  "auto",
+  "0",
+  "0.25rem",
+  "0.5rem",
+  "0.75rem",
+  "1rem",
+  "1.5rem",
+  "2rem",
+  "3rem",
+  "4rem",
+  "50%",
+  "100%",
+  "fit-content",
+  "max-content",
+];
+
+function readStyleValue(value: string): string {
+  if (value.startsWith("{") && value.endsWith("}")) {
+    return value.slice(1, -1).replace(/-/g, " ").replace(/^./, (char) => char.toUpperCase());
+  }
+  return value.replace(/-/g, " ").replace(/^./, (char) => char.toUpperCase());
+}
+
+function selectOptions(prop: string, value: string | number | undefined): readonly string[] {
+  const known = STYLE_SELECT_OPTIONS[prop] ?? [];
+  if (value == null || value === "" || known.includes(String(value))) return known;
+  return [String(value), ...known];
+}
+
 function StyleTab({ node }: { node: ContentNode }) {
   const device = useEditorStore((state) => state.device);
   const stateKey = useEditorStore((state) => state.stateKey);
@@ -800,16 +831,40 @@ function StyleTab({ node }: { node: ContentNode }) {
                   <label htmlFor={`style-${node.id}-${item.prop}`} className="w-28 shrink-0 text-[11px] text-text-muted">
                     {item.label}
                   </label>
-                  <input
-                    id={`style-${node.id}-${item.prop}`}
-                    value={value == null ? "" : String(value)}
-                    placeholder={placeholder}
-                    list={item.control === "colour" ? "gs-theme-tokens" : undefined}
-                    onChange={(event) =>
-                      updateStyles(node.id, activeKey, item.prop, event.target.value === "" ? null : event.target.value)
-                    }
-                    className="h-8 min-w-0 flex-1 rounded-input border border-border bg-surface px-2 text-xs"
-                  />
+                  {item.control === "select" && (STYLE_SELECT_OPTIONS[item.prop]?.length ?? 0) > 0 ? (
+                    <select
+                      id={`style-${node.id}-${item.prop}`}
+                      value={value == null ? "" : String(value)}
+                      onChange={(event) =>
+                        updateStyles(node.id, activeKey, item.prop, event.target.value === "" ? null : event.target.value)
+                      }
+                      className="h-8 min-w-0 flex-1 rounded-input border border-border bg-surface px-1.5 text-xs"
+                    >
+                      <option value="">{placeholder ? `Inherited: ${readStyleValue(placeholder)}` : "Not set"}</option>
+                      {selectOptions(item.prop, value).map((option) => (
+                        <option key={option} value={option}>
+                          {readStyleValue(option)}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      id={`style-${node.id}-${item.prop}`}
+                      value={value == null ? "" : String(value)}
+                      placeholder={placeholder}
+                      list={
+                        item.control === "colour"
+                          ? "gs-theme-tokens"
+                          : item.control === "length"
+                            ? "gs-length-values"
+                            : undefined
+                      }
+                      onChange={(event) =>
+                        updateStyles(node.id, activeKey, item.prop, event.target.value === "" ? null : event.target.value)
+                      }
+                      className="h-8 min-w-0 flex-1 rounded-input border border-border bg-surface px-2 text-xs"
+                    />
+                  )}
                   {value != null ? (
                     <button
                       type="button"
@@ -829,6 +884,11 @@ function StyleTab({ node }: { node: ContentNode }) {
       <datalist id="gs-theme-tokens">
         {THEME_TOKENS.map((token) => (
           <option key={token} value={`{${token}}`} />
+        ))}
+      </datalist>
+      <datalist id="gs-length-values">
+        {LENGTH_SUGGESTIONS.map((length) => (
+          <option key={length} value={length} />
         ))}
       </datalist>
       <p className="text-[11px] text-text-muted">

@@ -1,4 +1,5 @@
 import { safeFetch } from "@/lib/security/safe-fetch";
+import { isTurnstileEnabled } from "@/lib/security/turnstile-flag";
 
 const TEST_SECRETS = new Set(["1x0000000000000000000000000000000AA", "2x0000000000000000000000000000000AA"]);
 
@@ -8,16 +9,15 @@ export type TurnstileResult = { ok: true } | { ok: false; reason: "missing" | "f
  * Server-side Turnstile check. Tokens are single use and are bound to the
  * action and hostname we expect.
  *
- * Verification only runs when BOTH sides of the integration are configured:
- * `TURNSTILE_SECRET_KEY` (server) and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (client).
- * If only one is set the widget either cannot render (no site key) or cannot
- * be verified (no secret), so requiring a token would either break registration
- * or accept an unverified token. In either case the check is skipped.
+ * Verification only runs when `NEXT_PUBLIC_TURNSTILE_ENABLED=true` and both
+ * sides of the integration are configured: `TURNSTILE_SECRET_KEY` (server) and
+ * `NEXT_PUBLIC_TURNSTILE_SITE_KEY` (client). Turnstile is disabled by default.
  */
 export async function verifyTurnstile(
   token: string | null | undefined,
   options: { ip?: string | null; action?: string; hostname?: string | null } = {},
 ): Promise<TurnstileResult> {
+  if (!isTurnstileEnabled()) return { ok: true };
   const secret = process.env.TURNSTILE_SECRET_KEY;
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
   if (!secret || !siteKey) return { ok: true };

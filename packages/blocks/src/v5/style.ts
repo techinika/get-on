@@ -199,6 +199,18 @@ const KEYWORDS: Record<string, readonly string[]> = {
   'text-emphasis-style': ['none', 'dot', 'circle', 'double-circle', 'triangle', 'sesame', 'filled', 'open'],
 };
 
+/**
+ * Choices the editor may show for properties with a known set of values.
+ * These are also the values the style validator accepts.
+ */
+export const STYLE_SELECT_OPTIONS: Record<string, readonly string[]> = {
+  ...KEYWORDS,
+  'font-family': ['{heading}', '{body}', 'inherit', 'initial', 'unset'],
+  'font-weight': ['300', '400', '500', '600', '700', '800', '900'],
+  'line-height': ['1', '1.2', '1.4', '1.5', '1.6', '1.8', '2'],
+  opacity: ['0', '0.25', '0.5', '0.75', '0.9', '1'],
+};
+
 const ALLOWED_PROPS = new Set<string>([
   ...Object.keys(KEYWORDS),
   ...COLOUR_PROPS,
@@ -274,6 +286,16 @@ export const STYLE_GROUPS: StyleGroup[] = [
       { prop: 'left', label: 'Left', control: 'length' },
       { prop: 'z-index', label: 'Layer order', control: 'number' },
       { prop: 'overflow', label: 'Overflow', control: 'select' },
+      { prop: 'flex-direction', label: 'Direction', control: 'select' },
+      { prop: 'flex-wrap', label: 'Wrap', control: 'select' },
+      { prop: 'justify-content', label: 'Across', control: 'select' },
+      { prop: 'align-items', label: 'Align items', control: 'select' },
+      { prop: 'align-content', label: 'Align rows', control: 'select' },
+      { prop: 'align-self', label: 'Align this item', control: 'select' },
+      { prop: 'justify-items', label: 'Justify items', control: 'select' },
+      { prop: 'justify-self', label: 'Justify this item', control: 'select' },
+      { prop: 'place-items', label: 'Place items', control: 'select' },
+      { prop: 'place-content', label: 'Place content', control: 'select' },
       { prop: 'aspect-ratio', label: 'Aspect ratio', control: 'text' },
     ],
   },
@@ -298,8 +320,8 @@ export const STYLE_GROUPS: StyleGroup[] = [
     props: [
       { prop: 'font-family', label: 'Font', control: 'select' },
       { prop: 'font-size', label: 'Size', control: 'length' },
-      { prop: 'font-weight', label: 'Weight', control: 'number' },
-      { prop: 'line-height', label: 'Line height', control: 'number' },
+      { prop: 'font-weight', label: 'Weight', control: 'select' },
+      { prop: 'line-height', label: 'Line height', control: 'select' },
       { prop: 'letter-spacing', label: 'Letter spacing', control: 'length' },
       { prop: 'text-align', label: 'Align', control: 'select' },
       { prop: 'text-transform', label: 'Case', control: 'select' },
@@ -313,8 +335,10 @@ export const STYLE_GROUPS: StyleGroup[] = [
       { prop: 'background-color', label: 'Colour', control: 'colour' },
       { prop: 'background-image', label: 'Image or gradient', control: 'text' },
       { prop: 'background-size', label: 'Size', control: 'select' },
-      { prop: 'background-position', label: 'Position', control: 'text' },
+      { prop: 'background-position', label: 'Position', control: 'select' },
       { prop: 'background-repeat', label: 'Repeat', control: 'select' },
+      { prop: 'object-fit', label: 'Picture fit', control: 'select' },
+      { prop: 'object-position', label: 'Picture position', control: 'select' },
     ],
   },
   {
@@ -332,7 +356,7 @@ export const STYLE_GROUPS: StyleGroup[] = [
     id: 'effects',
     label: 'Effects',
     props: [
-      { prop: 'opacity', label: 'Opacity', control: 'number' },
+      { prop: 'opacity', label: 'Opacity', control: 'select' },
       { prop: 'transform', label: 'Move and scale', control: 'transform' },
       { prop: 'filter', label: 'Filter', control: 'text' },
       { prop: 'clip-path', label: 'Shape', control: 'text' },
