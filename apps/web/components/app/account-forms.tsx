@@ -7,6 +7,7 @@ import { Input, Label } from "@/components/ui/input";
 import { PasswordInput } from "@/components/auth/password-input";
 import { useToast } from "@/components/ui/toast";
 import { Switch } from "@/components/ui/switch";
+import { PASSWORD_ERROR_MESSAGES } from "@/lib/security/messages";
 import {
   updateMarketingConsent,
   updatePassword,
@@ -90,11 +91,13 @@ export function PasswordForm() {
   const [confirm, setConfirm] = React.useState("");
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [passwordErrors, setPasswordErrors] = React.useState<string[]>([]);
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSaving(true);
     setError(null);
+    setPasswordErrors([]);
     const formData = new FormData();
     formData.set("password", password);
     formData.set("confirm", confirm);
@@ -106,6 +109,7 @@ export function PasswordForm() {
       toast("Your password was changed.", "success");
     } else {
       setError(result.error);
+      setPasswordErrors(result.passwordErrors ?? []);
     }
   }
 
@@ -118,6 +122,8 @@ export function PasswordForm() {
         value={password}
         onChange={(event) => setPassword(event.target.value)}
         autoComplete="new-password"
+        minLength={10}
+        maxLength={128}
       />
       <Label htmlFor="confirm-password" className="mt-4 block">
         Confirm password
@@ -128,12 +134,26 @@ export function PasswordForm() {
         value={confirm}
         onChange={(event) => setConfirm(event.target.value)}
         autoComplete="new-password"
+        minLength={10}
+        maxLength={128}
       />
-      <p className="mt-1.5 text-sm text-text-muted">At least 8 characters.</p>
+      <p className="mt-1.5 text-sm text-text-muted">
+        At least 10 characters, with uppercase, lowercase, a number and a symbol.
+      </p>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-danger-text">
-          {error}
-        </p>
+        <div role="alert" className="mt-2 text-sm text-danger-text">
+          <p>{error}</p>
+          {passwordErrors.length > 0 ? (
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {passwordErrors.map((code) => (
+                <li key={code}>
+                  {PASSWORD_ERROR_MESSAGES[code as keyof typeof PASSWORD_ERROR_MESSAGES] ??
+                    "Please choose a stronger password."}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
       ) : null}
       <Button
         type="submit"

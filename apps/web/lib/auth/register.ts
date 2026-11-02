@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { attributeReferral } from "@/lib/referrals";
 import { canonicalEmail } from "@/lib/security/canonical-email";
 import { validateEmailAddress, isDisposableDomain, isBlockedDomain } from "@/lib/security/email-address";
-import { checkPasswordPolicy, isPasswordBreached } from "@/lib/security/passwords";
+import { checkPasswordPolicy, isPasswordBreached, passwordErrorsFromMessage } from "@/lib/security/passwords";
 import { hashEmail, maskEmail } from "@/lib/security/otp";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getSecuritySettings } from "@/lib/security/settings";
@@ -161,6 +161,10 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
   });
 
   if (error || !created.user) {
+    const passwordErrors = passwordErrorsFromMessage(error?.message);
+    if (passwordErrors.length > 0) {
+      return fail("AUTH_PASSWORD_WEAK", "password", { passwordErrors });
+    }
     if (/already|exists|registered/i.test(error?.message ?? "")) {
       return fail("AUTH_EMAIL_EXISTS", "email");
     }

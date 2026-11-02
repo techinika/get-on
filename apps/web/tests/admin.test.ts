@@ -21,6 +21,9 @@ describe("staff permissions", () => {
     expect(staffCan("customer_success", "billing.refund.request")).toBe(true);
     expect(staffCan("customer_success", "billing.refund.approve")).toBe(false);
     expect(staffCan("customer_success", "billing.refund.direct")).toBe(false);
+    expect(staffCan("customer_success", "ai.credits.request")).toBe(true);
+    expect(staffCan("customer_success", "ai.credits.direct")).toBe(false);
+    expect(staffCan("super_admin", "ai.credits.direct")).toBe(true);
     expect(staffCan("customer_success", "staff.manage")).toBe(false);
     expect(staffCan("customer_success", "marketing.campaign.send")).toBe(false);
     expect(staffCan("customer_success", "finance.close")).toBe(false);

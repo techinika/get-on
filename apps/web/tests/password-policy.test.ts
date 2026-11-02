@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { checkPasswordPolicy, passwordScore } from "@/lib/security/passwords";
+import { checkPasswordPolicy, passwordErrorsFromMessage, passwordScore } from "@/lib/security/passwords";
 
 describe("password policy", () => {
   it("accepts a long, unique passphrase", () => {
-    const result = checkPasswordPolicy("quiet-river-paper-lamp", { email: "amina@example.com", name: "Amina" });
+    const result = checkPasswordPolicy("Quiet-River-Paper-Lamp9", { email: "amina@example.com", name: "Amina" });
     expect(result.ok).toBe(true);
     expect(result.errors).toEqual([]);
   });
@@ -40,10 +40,28 @@ describe("password policy", () => {
   it("reports a strength score between 0 and 4", () => {
     expect(passwordScore("")).toBe(0);
     expect(passwordScore("password")).toBe(0);
-    expect(passwordScore("quiet-river-paper-lamp")).toBeGreaterThanOrEqual(2);
+    expect(passwordScore("Quiet-River-Paper-Lamp9")).toBeGreaterThanOrEqual(2);
   });
 
   it("honours a configured minimum length", () => {
     expect(checkPasswordPolicy("twelve-chars", { minLength: 20 }).errors).toContain("TOO_SHORT");
+  });
+
+  it("requires the same four character groups as Supabase", () => {
+    expect(checkPasswordPolicy("lowercase1!").errors).toEqual(["NEEDS_UPPER"]);
+    expect(checkPasswordPolicy("UPPERCASE1!").errors).toEqual(["NEEDS_LOWER"]);
+    expect(checkPasswordPolicy("NoNumber!!").errors).toEqual(["NEEDS_NUMBER"]);
+    expect(checkPasswordPolicy("NoSymbol123").errors).toEqual(["NEEDS_SYMBOL"]);
+  });
+
+  it("reads Supabase password messages", () => {
+    expect(
+      passwordErrorsFromMessage(
+        "Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789, !@#$%^&*()_+-=[]{};'\":|<>?,./`~",
+      ),
+    ).toEqual(["NEEDS_LOWER", "NEEDS_UPPER", "NEEDS_NUMBER", "NEEDS_SYMBOL"]);
+    expect(passwordErrorsFromMessage("Password should be at least 12 characters.")).toEqual(["TOO_SHORT"]);
+    expect(passwordErrorsFromMessage("Password is too weak")).toEqual(["COMMON"]);
+    expect(passwordErrorsFromMessage("The email address is already registered")).toEqual([]);
   });
 });

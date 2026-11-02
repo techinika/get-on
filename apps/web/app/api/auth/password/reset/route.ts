@@ -17,10 +17,11 @@ import { recordSecurityEvent } from "@/lib/security/events";
 
 export const dynamic = "force-dynamic";
 
-function back(request: Request, token: string, code: string) {
+function back(request: Request, token: string, code: string, passwordErrors: readonly string[] = []) {
   const url = new URL("/reset-password", request.url);
   url.searchParams.set("t", token);
   url.searchParams.set("error", code);
+  if (passwordErrors.length > 0) url.searchParams.set("rules", passwordErrors.join(","));
   return NextResponse.redirect(url, 303);
 }
 
@@ -54,9 +55,7 @@ export async function POST(request: Request) {
     minLength: settings.minPasswordLength,
   });
   if (!check.ok) {
-    if (check.errors.includes("CONTAINS_PERSONAL")) return back(request, token, "AUTH_PASSWORD_PERSONAL");
-    if (check.errors.includes("TOO_SHORT") && check.errors.length === 1) return back(request, token, "AUTH_PASSWORD_TOO_SHORT");
-    return back(request, token, "AUTH_PASSWORD_WEAK");
+    return back(request, token, "AUTH_PASSWORD_WEAK", check.errors);
   }
 
   const breach = await isPasswordBreached(password, settings.hibpEnabled);

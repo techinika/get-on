@@ -8,8 +8,11 @@ import { Section } from "@/components/app/section";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Input, Label } from "@/components/ui/input";
-import { getAiOverview } from "@/lib/admin";
+import { getAiOverview, listTeams } from "@/lib/admin";
+import { canStaff, requireStaff } from "@/lib/admin/staff";
+import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 import { cn } from "@/lib/utils";
+import { AiCreditForm } from "./ai-credit-form";
 import { saveAiSettings, toggleAiModel } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -46,7 +49,17 @@ export default async function AdminAiPage({
   searchParams: Promise<{ saved?: string; error?: string }>;
 }) {
   const params = await searchParams;
-  const { settings, models, daily, failures } = await getAiOverview();
+  const staff = await requireStaff();
+  const canDirectCredits = canStaff(staff.role, "ai.credits.direct");
+  const canRequestCredits = canStaff(staff.role, "ai.credits.request");
+  const [{ settings, models, daily, failures }, teamRows] = await Promise.all([
+    getAiOverview(),
+    canDirectCredits ? listTeams(500) : Promise.resolve([]),
+  ]);
+  const teams = (teamRows as Array<{ id: string; name: string }>).map((team) => ({
+    id: String(team.id),
+    name: String(team.name),
+  }));
   const today = daily.find((row) => row.day === new Date().toISOString().slice(0, 10));
   const weekCredits = daily.reduce((sum, row) => sum + Number(row.credits ?? 0), 0);
   const weekRequests = daily.reduce((sum, row) => sum + Number(row.requests ?? 0), 0);
@@ -265,6 +278,33 @@ export default async function AdminAiPage({
               </p>
             </div>
           </form>
+        </AppCard>
+      </Section>
+
+      <Section
+        title="Credits for a team"
+        description="Add AI credits to any team. Every grant needs a reason and is written to the staff audit log."
+      >
+        <AppCard className="p-6">
+          {canDirectCredits ? (
+            <AiCreditForm teams={teams} />
+          ) : canRequestCredits ? (
+            <div>
+              <p className="text-sm text-text-muted">
+                A Super admin adds credits directly. You can start a request with
+                the team and a reason.
+              </p>
+              <RequestApprovalLink
+                kind="ai_credits"
+                label="Request AI credits"
+                className="mt-3"
+              />
+            </div>
+          ) : (
+            <p className="text-sm text-text-muted">
+              You do not have permission to add AI credits.
+            </p>
+          )}
         </AppCard>
       </Section>
 

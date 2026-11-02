@@ -16,6 +16,7 @@ const jobs = [
   "scripts/jobs/team-reconcile.ts",
   "scripts/jobs/redirects-resync.ts",
   "scripts/jobs/billing.ts",
+  "scripts/jobs/ai.ts",
   "scripts/jobs/links-expire.ts",
   "scripts/jobs/links-kv-resync.ts",
   "scripts/jobs/link-stats-rollup.ts",

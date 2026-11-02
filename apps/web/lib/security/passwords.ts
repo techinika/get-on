@@ -4,15 +4,20 @@ import { safeFetch } from "@/lib/security/safe-fetch";
  * Password policy. Codes are returned instead of English text so the UI can
  * translate each reason into plain language once.
  *
- * Rules: at least `minLength` (10 by default), at most 128 characters, no
- * composition rules. Rejected: common passwords, passwords that contain the
- * email local part or the display name, repeated or sequential patterns, and
- * passwords found in the Have I Been Pwned range API.
+ * Rules: at least `minLength` (10 by default), at most 128 characters, and at
+ * least one lowercase letter, uppercase letter, number and symbol. Also
+ * rejected: common passwords, passwords that contain the email local part or
+ * the display name, repeated or sequential patterns, and passwords found in
+ * the Have I Been Pwned range API. These match the Supabase auth policy.
  */
 
 export type PasswordErrorCode =
   | "TOO_SHORT"
   | "TOO_LONG"
+  | "NEEDS_LOWER"
+  | "NEEDS_UPPER"
+  | "NEEDS_NUMBER"
+  | "NEEDS_SYMBOL"
   | "COMMON"
   | "CONTAINS_PERSONAL"
   | "REPEATED"
@@ -64,6 +69,10 @@ function isSequential(lower: string): boolean {
     }
   }
   return false;
+}
+
+function hasSymbol(value: string): boolean {
+  return /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(value);
 }
 
 function isRepeated(lower: string): boolean {
@@ -124,6 +133,10 @@ export function checkPasswordPolicy(
 
   if (value.length < minLength) errors.push("TOO_SHORT");
   if (value.length > 128) errors.push("TOO_LONG");
+  if (!/[a-z]/.test(value)) errors.push("NEEDS_LOWER");
+  if (!/[A-Z]/.test(value)) errors.push("NEEDS_UPPER");
+  if (!/[0-9]/.test(value)) errors.push("NEEDS_NUMBER");
+  if (!hasSymbol(value)) errors.push("NEEDS_SYMBOL");
   if (COMMON_PASSWORDS.has(lower)) errors.push("COMMON");
   if (isRepeated(lower)) errors.push("REPEATED");
   if (isSequential(lower)) errors.push("SEQUENTIAL");
@@ -170,4 +183,39 @@ export async function isPasswordBreached(password: string, enabled = true): Prom
     console.warn("[security] password breach check unavailable:", (error as Error)?.message ?? error);
     return { breached: false, checked: false };
   }
+}
+
+/**
+ * Turns the auth provider's password message into the same codes the form
+ * already knows. This is a fallback in case the provider policy changes before
+ * our local policy does.
+ */
+export function passwordErrorsFromMessage(message: string | null | undefined): PasswordErrorCode[] {
+  const text = String(message ?? "");
+  if (!text) return [];
+  const errors = new Set<PasswordErrorCode>();
+  const lower = text.toLowerCase();
+
+  const required = lower.includes("contain at least one character of each")
+    ? text.slice(text.indexOf(":") + 1)
+    : "";
+  if (required.includes("abcdefghijklmnopqrstuvwxyz")) errors.add("NEEDS_LOWER");
+  if (required.includes("ABCDEFGHIJKLMNOPQRSTUVWXYZ")) errors.add("NEEDS_UPPER");
+  if (required.includes("0123456789")) errors.add("NEEDS_NUMBER");
+  if (required.includes("!@#$%^&*()")) errors.add("NEEDS_SYMBOL");
+
+  if (/at least one (lowercase|lower case|small letter)/.test(lower)) errors.add("NEEDS_LOWER");
+  if (/at least one (uppercase|upper case|capital letter)/.test(lower)) errors.add("NEEDS_UPPER");
+  if (/at least one (number|digit)/.test(lower)) errors.add("NEEDS_NUMBER");
+  if (/at least one (symbol|special character)/.test(lower)) errors.add("NEEDS_SYMBOL");
+  if (/password.*at least \d+ characters?/.test(lower) || /password.*too short/.test(lower)) {
+    errors.add("TOO_SHORT");
+  }
+  if (/password.*(too long|at most \d+ characters?|less than \d+ characters?)/.test(lower)) {
+    errors.add("TOO_LONG");
+  }
+  if (/common|too weak|weak password|breach|pwned/.test(lower)) errors.add("COMMON");
+  if (/same as (your )?(email|name|username)/.test(lower)) errors.add("CONTAINS_PERSONAL");
+
+  return [...errors];
 }
