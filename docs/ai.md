@@ -36,7 +36,7 @@ Status: foundation in progress. The provider adapter, credit maths, prompt compo
 `WorkersAiProvider` calls Cloudflare through AI Gateway:
 
 - Text: `POST /accounts/{account_id}/ai/v1/chat/completions`.
-- Image and Llama Guard: `POST /accounts/{account_id}/ai/run`.
+- Image and Llama Guard: `POST /accounts/{account_id}/ai/run/{model}`. The model must be in the path, and Llama Guard expects `messages` (`{ role: "user", content }`), not `prompt`.
 - Required headers: `Authorization`, `cf-aig-gateway-id`, `cf-aig-skip-cache: true`, `cf-aig-collect-log-payload: false`, `cf-aig-max-attempts: 1`, `cf-aig-request-timeout`.
 - Optional metadata: hashed team id, task id and opaque request id. No user id, email or content.
 - `response_format` is sent only when the caller supplies a JSON schema and the selected model supports JSON.

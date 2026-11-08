@@ -26,13 +26,13 @@ Rules:
 ## Supabase Auth email
 Paste these into Supabase Auth → Email Templates. Supabase sends auth mail through SMTP; point it at Resend (domain `mail.get-on.tech`). It does not use `packages/email`.
 
-- Confirm signup: subject `Your Get-On code`. This is the signup code email, so the body must show `{{ .Token }}` and **not** only a confirmation link.
+- Confirm signup: subject `Confirm your Get-On email`. The body must show a button linking to `{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup`. Do not show a six-digit code; the app no longer has a code box.
 - Reset password: subject `Reset your Get-On password`.
 - Magic link: subject `Your Get-On login link`.
 - Change email: subject `Confirm your new email`.
 - Invite: subject `You have been invited to Get-On`.
 
-Supabase Auth does not offer an email second factor. Customer sign-in uses TOTP authenticator codes; the signup code above is the only Supabase-sent code.
+Supabase Auth does not offer an email second factor. Customer sign-in uses TOTP authenticator codes; the signup confirmation link above is the only Supabase-sent auth message.
 
 ## Template checks
 - `sanitizeLine` removes line breaks and stray markup from names and site titles.

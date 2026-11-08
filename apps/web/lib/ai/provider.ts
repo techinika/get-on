@@ -287,8 +287,13 @@ export class WorkersAiProvider implements AiProvider {
 
   async generateImage(input: GenerateImageInput): Promise<AiImageResult> {
     const timeoutMs = input.timeoutMs ?? 60000;
+    if (!input.modelId) {
+      throw new AiError("AI_PROVIDER_ERROR", {
+        details: { reason: "image_model_missing" },
+      });
+    }
     const response = await this.request(
-      "/ai/run",
+      `/ai/run/${input.modelId}`,
       { prompt: input.prompt, steps: input.steps },
       timeoutMs,
       input.metadata,
@@ -321,9 +326,14 @@ export class WorkersAiProvider implements AiProvider {
 
   async moderate(input: ModerateInput): Promise<AiModerationResult> {
     const timeoutMs = input.timeoutMs ?? 45000;
+    if (!input.modelId) {
+      throw new AiError("AI_PROVIDER_ERROR", {
+        details: { reason: "guard_model_missing" },
+      });
+    }
     const response = await this.request(
-      "/ai/run",
-      { prompt: input.text },
+      `/ai/run/${input.modelId}`,
+      { messages: [{ role: "user", content: input.text }] },
       timeoutMs,
       input.metadata,
     );

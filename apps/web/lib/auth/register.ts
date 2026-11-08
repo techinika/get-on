@@ -7,7 +7,7 @@ import { hashEmail, maskEmail } from "@/lib/security/otp";
 import { rateLimit } from "@/lib/security/rate-limit";
 import { getSecuritySettings } from "@/lib/security/settings";
 import { verifyTurnstile } from "@/lib/security/turnstile";
-import { sendSignupCode } from "@/lib/auth/email-otp";
+import { sendSignupEmail } from "@/lib/auth/signup-email";
 import { recordSecurityEvent } from "@/lib/security/events";
 
 export type RegisterInput = {
@@ -49,7 +49,7 @@ export type RegisterResult =
       field?: "email" | "password" | "terms" | "form";
       passwordErrors?: string[];
       retryAfter?: number;
-      /** Set when an unverified account already exists and a new code was sent. */
+      /** Set when an unverified account already exists and a new email was sent. */
       pending?: {
         email: string;
         maskedEmail: string;
@@ -136,8 +136,8 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
       return fail(isGoogle ? "AUTH_EMAIL_EXISTS_GOOGLE" : "AUTH_EMAIL_EXISTS", "email");
     }
 
-    // Unverified account: send a fresh code, never create a second row.
-    if (!(await sendSignupCode(email))) return fail("SOMETHING_WRONG", "form");
+    // Unverified account: send a fresh confirmation email, never create a second row.
+    if (!(await sendSignupEmail(email))) return fail("SOMETHING_WRONG", "form");
     await admin
       .from("profiles")
       .update({ terms_accepted_at: new Date().toISOString(), timezone: input.timezone ?? "UTC" })
@@ -217,14 +217,14 @@ export async function registerAccount(input: RegisterInput): Promise<RegisterRes
     category: "account",
     event: "registration_started",
     severity: "info",
-    summary: "New account created, waiting for the email code",
+    summary: "New account created, waiting for the email confirmation",
     ipHash: input.ipHash,
     uaFamily: input.uaFamily,
     visibleToUser: true,
     meta: {},
   });
 
-  if (!(await sendSignupCode(email))) return fail("SOMETHING_WRONG", "form");
+  if (!(await sendSignupEmail(email))) return fail("SOMETHING_WRONG", "form");
 
   return { ok: true, email, maskedEmail: maskEmail(email) };
 }

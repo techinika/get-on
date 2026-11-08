@@ -10,8 +10,8 @@ screens; `docs/security-audit.md` records the route, RLS and secret inventory.
 1. **No access without a verified email and a completed second step.** A
    session counts only when `profiles.email_verified_at` is set **and** the
    session has a `totp` verification in `session_security` after Supabase MFA.
-   The signup email code only proves the address; it does not replace the
-   authenticator. This is enforced in `proxy.ts`, in server helpers and, once
+   The signup email confirmation link only proves the address; it does not
+   replace the authenticator. This is enforced in `proxy.ts`, in server helpers and, once
    the restrictive policies are applied, in the database through
    `session_verified()`.
 2. **One person, one account per email.** The canonical key
@@ -19,11 +19,13 @@ screens; `docs/security-audit.md` records the route, RLS and secret inventory.
    is unique among non-duplicate profiles. Every signup path refuses a key that
    already exists.
 3. **One-time secrets are single use.** Supabase Auth owns the signup email
-   code (short lived, single use, hashed by Supabase). Our own reset and
-   not-me links are random tokens stored only as SHA-256 hashes in
+   confirmation link (short lived, single use, hashed by Supabase). Our own
+   reset and not-me links are random tokens stored only as SHA-256 hashes in
    `auth_tokens`, with a single-use conditional update.
-4. **No one-time action is consumed by a page view.** Verification and reset
-   links only render a page; the state change is always a `POST`.
+4. **No one-time action is consumed by a page view.** Reset and not-me links
+   only render a page; the state change is always a `POST`. The signup
+   confirmation link is the one exception: opening it verifies the address in
+   Supabase and returns the person to login.
 5. **Sensitive actions still need a fresh check.** Staff actions require
    Supabase AAL2. Customer step-up can build on the same authenticator flow;
    there is no emailed login code.
@@ -50,13 +52,13 @@ hook), because the public anon key would otherwise bypass these rules.
 Order of checks: origin, body, registration switch, email syntax, disposable and
 blocked domains, terms, password policy, Have I Been Pwned, per-IP rate limits,
 Turnstile, canonical uniqueness, then `auth.admin.createUser({ email_confirm: false })`.
-The auth service sends the signup code through its SMTP settings, which point
-at Resend on `mail.get-on.tech`. We store only the address in a signed pending
-cookie; there is no local challenge row.
+The auth service sends the signup confirmation email through its SMTP settings,
+which point at Resend on `mail.get-on.tech`. We store only the address in a
+signed pending cookie; there is no local challenge row.
 
 An existing **unverified** account with the same canonical email is never
-duplicated: a new code is sent and the existing account is kept (its password is
-not replaced). A verified account returns `AUTH_EMAIL_EXISTS`; a Google account
+duplicated: a new confirmation email is sent and the existing account is kept
+(its password is not replaced). A verified account returns `AUTH_EMAIL_EXISTS`; a Google account
 returns `AUTH_EMAIL_EXISTS_GOOGLE`.
 
 Responses take a minimum of about 250 ms plus 200–400 ms of jitter so timing
@@ -64,14 +66,15 @@ does not reveal which branch ran.
 
 ## 3. Verification
 
-`/verify-email` shows six boxes. `POST /api/auth/verify-email` calls Supabase
-`verifyOtp({ type: "signup" })`, which confirms the address and returns the
-session. We then set `profiles.email_verified_at`, create the
-`session_security` row, and send the person to `/mfa/setup`.
+`/verify-email` tells the person to open the link in their email. The Supabase
+signup template must contain a link to `/auth/confirm` using `{{ .TokenHash }}`.
+That route calls `verifyOtp({ type: "signup", token_hash })`, records the
+confirmation, signs the temporary session out and returns the person to
+`/login?verified=1`.
 
-There are **no verification links**. Supabase's signup template must show
-`{{ .Token }}`. Expired and wrong codes verify nothing; a new code invalidates
-the old one. `POST /api/auth/signup/resend` sends another code.
+There is no code box after signup. Expired or reused links verify nothing;
+`POST /api/auth/signup/resend` sends a new confirmation email. After login the
+normal flow opens `/mfa/setup` when the account has no authenticator.
 
 ## 4. Sign-in
 
@@ -95,14 +98,14 @@ therefore unverified: the next page load asks for the authenticator code.
 
 ## 5. One-time secrets
 
-- **Signup code:** sent by Supabase Auth; six digits, short lived, hashed and
-  rate limited by Supabase. We add per-email and per-network sends.
+- **Signup confirmation link:** sent by Supabase Auth; single use, short lived,
+  hashed and rate limited by Supabase. We add per-email and per-network sends.
 - **Reset and not-me links:** 43-character random tokens in `auth_tokens`,
   stored as SHA-256 hashes, single use, `POST`-only for the state change.
   Lifetimes: reset 30 minutes, not-me 24 hours, email-change undo 72 hours.
 
 Supabase Auth does not offer an email MFA factor. Customer sign-in uses TOTP;
-the signup code is the only Supabase-sent code.
+the signup confirmation link is the only Supabase-sent auth message.
 
 ## 6. Passwords
 

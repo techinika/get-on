@@ -99,26 +99,30 @@ describe("Workers AI provider", () => {
     expect(result.value).toEqual({ title: "Hi" });
   });
 
-  it("parses moderation and image responses", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        jsonResponse({ result: { response: "unsafe\nS1" } }),
-      ),
+  it("calls the model-specific run endpoint for moderation and images", async () => {
+    const moderationFetch = vi.fn(async () =>
+      jsonResponse({ result: { response: "unsafe\nS1" } }),
     );
+    vi.stubGlobal("fetch", moderationFetch);
     const moderation = await new WorkersAiProvider(config).moderate({
-      modelId: "guard",
+      modelId: "@cf/meta/llama-guard-3-8b",
       text: "Bad",
     });
     expect(moderation.safe).toBe(false);
     expect(moderation.categories).toContain("S1");
+    const [moderationUrl, moderationInit] = moderationFetch.mock
+      .calls[0] as unknown as [string, RequestInit];
+    expect(moderationUrl).toContain("/ai/run/@cf/meta/llama-guard-3-8b");
+    expect(JSON.parse(String(moderationInit.body))).toEqual({
+      messages: [{ role: "user", content: "Bad" }],
+    });
 
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () => jsonResponse({ result: { image: "abc123" } })),
+    const imageFetch = vi.fn(async () =>
+      jsonResponse({ result: { image: "abc123" } }),
     );
+    vi.stubGlobal("fetch", imageFetch);
     const image = await new WorkersAiProvider(config).generateImage({
-      modelId: "flux",
+      modelId: "@cf/black-forest-labs/flux-1-schnell",
       prompt: "A bakery",
       width: 512,
       height: 512,
@@ -126,5 +130,16 @@ describe("Workers AI provider", () => {
     });
     expect(image.imageBase64).toBe("abc123");
     expect(image.usage.images).toBe(1);
+    const [imageUrl, imageInit] = imageFetch.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(imageUrl).toContain(
+      "/ai/run/@cf/black-forest-labs/flux-1-schnell",
+    );
+    expect(JSON.parse(String(imageInit.body))).toEqual({
+      prompt: "A bakery",
+      steps: 4,
+    });
   });
 });

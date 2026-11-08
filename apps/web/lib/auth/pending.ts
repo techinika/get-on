@@ -10,8 +10,9 @@ export type PendingSignup = {
 };
 
 /**
- * The signup code is sent by Supabase, so we only need the address and where
- * to go afterwards in the signed cookie. There is no local challenge row.
+ * The signup confirmation email is sent by Supabase, so we only need the
+ * address and where to go afterwards in the signed cookie. There is no local
+ * challenge row.
  */
 export async function readPendingSignup(): Promise<PendingSignup | null> {
   const cookieStore = await cookies();

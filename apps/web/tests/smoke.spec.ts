@@ -21,8 +21,8 @@ test("landing header points to the dashboard and the account when signed in", as
   await page.getByLabel("Email").fill(email);
   await page.getByRole("textbox", { name: "Password" }).fill("testpass123");
   await page.getByRole("button", { name: "Create my account" }).click();
-  await page.waitForURL(/\/(dashboard|login)/, { timeout: 15_000 });
-  if (new URL(page.url()).pathname === "/login") {
+  await page.waitForURL(/\/(dashboard|login|verify-email)/, { timeout: 15_000 });
+  if (new URL(page.url()).pathname === "/verify-email") {
     test.skip(true, "The project asks for email confirmation.");
   }
 
@@ -43,10 +43,11 @@ test("signup page reaches dashboard after submit", async ({ page }) => {
   await page.getByRole("button", { name: "Create my account" }).click();
 
   // A local Supabase signs the user straight in. A hosted project with email
-  // confirmation sends them to the login screen with a message instead.
-  await page.waitForURL(/\/(dashboard|login)/, { timeout: 15_000 });
-  if (new URL(page.url()).pathname === "/login") {
-    await expect(page.getByText(/confirm your account/i)).toBeVisible();
+  // confirmation asks them to open the link before they can log in.
+  await page.waitForURL(/\/(dashboard|login|verify-email)/, { timeout: 15_000 });
+  if (new URL(page.url()).pathname === "/verify-email") {
+    await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+    await expect(page.getByText(/confirmation link/i)).toBeVisible();
     return;
   }
   await expect(page).toHaveURL(/\/dashboard/);

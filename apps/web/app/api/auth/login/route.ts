@@ -16,6 +16,9 @@ import { POLICIES } from "@/lib/security/policies";
 import { newBindingValue } from "@/lib/security/otp";
 import { recordSecurityEvent } from "@/lib/security/events";
 import { getSecuritySettings } from "@/lib/security/settings";
+import { enqueueEmail } from "@/lib/email/enqueue";
+import { welcomeEmail } from "@/lib/email/account-emails";
+import { grantFreeEntitlements } from "@/lib/provisioning";
 import { createHash } from "node:crypto";
 
 export const dynamic = "force-dynamic";
@@ -134,6 +137,19 @@ export async function POST(request: Request) {
     console.error("Could not sync the profile email confirmation", error);
     return loginFailed(request, "SOMETHING_WRONG", next);
   }
+
+  const welcome = welcomeEmail(null);
+  await enqueueEmail({
+    kind: "welcome",
+    stream: "transactional",
+    userId,
+    toEmail: email,
+    relatedType: "account",
+    relatedId: userId,
+    dedupeKey: `welcome:${userId}`,
+    payload: { subject: welcome.subject, text: welcome.text, html: welcome.html },
+  });
+  await grantFreeEntitlements(userId);
 
   const cookieStore = await cookies();
 
