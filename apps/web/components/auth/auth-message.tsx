@@ -8,6 +8,7 @@ export function AuthMessage() {
   const searchParams = useSearchParams();
   const error = searchParams.get("error");
   const message = searchParams.get("message");
+  const verified = searchParams.get("verified");
 
   if (error) {
     const text = (SECURITY_MESSAGES as Record<string, string>)[error] ?? error;
@@ -18,6 +19,18 @@ export function AuthMessage() {
       >
         <AlertCircle size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-danger" />
         <span>{text}</span>
+      </div>
+    );
+  }
+
+  if (verified === "1") {
+    return (
+      <div
+        role="status"
+        className="mt-6 flex items-start gap-2.5 rounded-input border border-success bg-success-soft px-3.5 py-3 text-sm text-success-text"
+      >
+        <CheckCircle2 size={18} strokeWidth={1.75} aria-hidden className="mt-0.5 shrink-0 text-success" />
+        <span>Email confirmed. Log in to set up two-step sign-in.</span>
       </div>
     );
   }

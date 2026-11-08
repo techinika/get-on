@@ -18,7 +18,7 @@ export const SECURITY_MESSAGES = {
   AUTH_INVALID_CREDENTIALS: "Email or password is incorrect.",
   AUTH_LOCKED: "Too many tries. Please wait a few minutes and try again.",
   AUTH_EMAIL_EXISTS: "An account with this email already exists. Log in, or reset your password if you forgot it.",
-  AUTH_EMAIL_EXISTS_UNVERIFIED: "You already started signing up with this email. We sent a new code.",
+  AUTH_EMAIL_EXISTS_UNVERIFIED: "You already started signing up with this email. We sent a new confirmation email.",
   AUTH_EMAIL_EXISTS_GOOGLE: "This email is already used with Google sign-in. Continue with Google.",
   AUTH_EMAIL_DISPOSABLE: "Please use a permanent email address.",
   AUTH_EMAIL_INVALID: "That email address does not look right.",

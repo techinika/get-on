@@ -3,6 +3,8 @@
 Date: 2026-10-29. Branch: `feature/security`.
 Source: task prompt Section 2, Phase 0.
 
+> Superseded for signup: the current flow uses an emailed confirmation link and has no code box. See `docs/security.md` section 3. The incident notes below are kept for history.
+
 ## Symptom
 After signup, verifying the email shows an error that the code/link is expired, yet afterwards the user can still sign in. So unverified accounts can sign in and the verification step is unreliable.
 

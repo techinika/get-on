@@ -90,6 +90,25 @@ export function failure(error: unknown, requestId?: string): RunTextTaskFailure 
   };
 }
 
+function logTaskFailure(
+  taskId: AiTaskId,
+  requestId: string | undefined,
+  error: unknown,
+): void {
+  const ai = isAiError(error)
+    ? error
+    : new AiError("AI_PROVIDER_ERROR", { cause: error });
+  console.error("[ai] task failed", {
+    task: taskId,
+    requestId,
+    code: ai.code,
+    status: ai.status,
+    providerCode: ai.providerCode,
+    reason:
+      typeof ai.details.reason === "string" ? ai.details.reason : undefined,
+  });
+}
+
 export function mapDbError(error: { message?: string } | null): AiError {
   const message = error?.message ?? "";
   for (const code of AI_ERROR_CODES) {
@@ -610,6 +629,7 @@ async function runTextTaskWithConfig(
       }
     } catch (error) {
       const mapped = isAiError(error) ? error : new AiError("AI_PROVIDER_ERROR", { cause: error });
+      logTaskFailure(task.taskId, requestId, mapped);
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {
         status: mapped.code === "AI_REFUSED" ? "refused" : "failed",
@@ -658,6 +678,7 @@ async function runTextTaskWithConfig(
         const mapped = isAiError(error)
           ? error
           : new AiError("AI_PROVIDER_ERROR", { cause: error });
+        logTaskFailure(task.taskId, requestId, mapped);
         await releaseRequest(admin, requestId);
         await updateRequest(admin, requestId, {
           status: "failed",
@@ -745,6 +766,7 @@ async function runTextTaskWithConfig(
     const mapped = isAiError(error)
       ? error
       : new AiError("AI_PROVIDER_ERROR", { cause: error });
+    if (task) logTaskFailure(task.taskId, requestId, mapped);
     if (requestId) {
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {

@@ -9,22 +9,28 @@ function read(path: string) {
 }
 
 describe("security: email verification (Problem A)", () => {
-  it("(4/5) the verify-email page exists and requires a typed code", () => {
+  it("(4/5) the verify-email page explains the emailed link and has no code box", () => {
     const src = read("app/verify-email/page.tsx");
-    expect(src).toMatch(/CodeStep/);
     expect(src).toMatch(/readPendingSignup/);
+    expect(src).toMatch(/confirmation link/i);
+    expect(src).not.toMatch(/CodeStep|OtpInput|api\/auth\/verify-email/);
   });
 
-  it("(1/4) no verification links exist: the endpoint only accepts POST codes", () => {
-    const route = read("app/api/auth/verify-email/route.ts");
-    expect(route).not.toMatch(/confirmation_url|token_hash.*GET/i);
-    expect(route).toMatch(/export async function POST/);
-    expect(route).not.toMatch(/export async function GET/);
+  it("(1/4) the email link verifies through the token hash route", () => {
+    const route = read("app/auth/confirm/route.ts");
+    expect(route).toMatch(/export async function GET/);
+    expect(route).toMatch(/token_hash/);
+    expect(route).toMatch(/verifyOtp/);
+    expect(route).toMatch(/type: "signup"/);
   });
 
   it("(8) the page does not verify on render", () => {
     const page = read("app/verify-email/page.tsx");
-    expect(page).not.toMatch(/verifyOtp|emailOtpProvider\.verify/);
+    expect(page).not.toMatch(/verifyOtp|exchangeCodeForSession/);
+  });
+
+  it("(4/5) the old typed-code endpoint is gone", () => {
+    expect(existsSync(resolve(WEB, "app/api/auth/verify-email/route.ts"))).toBe(false);
   });
 
   it("(5) the middleware checks a completed second step, not just a user", () => {

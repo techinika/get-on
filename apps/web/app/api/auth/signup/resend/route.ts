@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { createHash } from "node:crypto";
 import { readPendingSignup } from "@/lib/auth/pending";
-import { sendSignupCode } from "@/lib/auth/email-otp";
+import { sendSignupEmail } from "@/lib/auth/signup-email";
 import { PENDING_COOKIE, pendingCookieOptions } from "@/lib/auth/cookies";
 import { getIpHash, isSameOrigin, uaFamily } from "@/lib/security/request";
 import { rateLimit } from "@/lib/security/rate-limit";
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (!(await sendSignupCode(pending.email))) {
+  if (!(await sendSignupEmail(pending.email))) {
     return NextResponse.json(
       { ok: false, code: "SOMETHING_WRONG", message: securityMessage("SOMETHING_WRONG") },
       { status: 500 },
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     category: "account",
     event: "signup_code_resent",
     severity: "info",
-    summary: "A new signup code was sent",
+    summary: "A new signup confirmation email was sent",
     ipHash,
     uaFamily: ua,
     visibleToUser: true,
