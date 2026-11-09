@@ -1,4 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
+import { siteStateOf } from "@/lib/publishing/status";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -247,6 +249,82 @@ export async function getAgentBalance(
       : {};
   const total = Number(value.total ?? 0);
   return Number.isFinite(total) && total > 0 ? total : 0;
+}
+
+export type AgentProjectContext = {
+  projectName?: string;
+  siteState?: string;
+  published?: boolean;
+  hasUnpublishedChanges?: boolean;
+  pageCount?: number;
+  primaryAddress?: string;
+  tagline?: string;
+};
+
+export async function getAgentProjectContext(
+  admin: Admin,
+  teamId: string,
+  projectId: string,
+): Promise<AgentProjectContext | null> {
+  if (!(await verifyAgentProject(admin, teamId, projectId))) return null;
+
+  const config = readPublishConfig();
+  const [{ data: project }, { data: pages }] = await Promise.all([
+    admin
+      .from("projects")
+      .select(
+        "name,status,subdomain,primary_host,settings,review_state,suspended_at",
+      )
+      .eq("id", projectId)
+      .maybeSingle(),
+    admin
+      .from("pages")
+      .select("id,title,path,is_homepage")
+      .eq("project_id", projectId)
+      .order("position", { ascending: true }),
+  ]);
+  if (!project) return null;
+
+  const published = project.status === "published";
+  const { data: hasChangesData } = await admin.rpc(
+    "project_has_unpublished_changes",
+    { p_project_id: projectId },
+  );
+  const hasChanges = Boolean(hasChangesData);
+  const { data: liveRow } = await admin
+    .from("publishes")
+    .select("status")
+    .eq("project_id", projectId)
+    .eq("status", "live")
+    .maybeSingle();
+  const hasLiveVersion = Boolean(liveRow);
+
+  const settings =
+    project.settings && typeof project.settings === "object"
+      ? (project.settings as Record<string, unknown>)
+      : {};
+  const tagline =
+    typeof settings.tagline === "string" ? settings.tagline : undefined;
+
+  return {
+    projectName: project.name,
+    siteState: siteStateOf({
+      published,
+      hasLiveVersion,
+      hasChanges,
+      reviewState: project.review_state,
+      suspendedAt: project.suspended_at,
+    }),
+    published,
+    hasUnpublishedChanges: hasChanges,
+    pageCount: Array.isArray(pages) ? pages.length : 0,
+    primaryAddress: primaryAddress(
+      config,
+      project.subdomain,
+      project.primary_host ?? null,
+    ),
+    tagline,
+  };
 }
 
 export async function verifyAgentProject(

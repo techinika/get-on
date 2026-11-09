@@ -10,6 +10,7 @@ import {
   finishAgentRun,
   getAgentBalance,
   getAgentConversation,
+  getAgentProjectContext,
   listAgentMessages,
   startAgentRun,
 } from "@/lib/agent/conversations";
@@ -150,13 +151,29 @@ export async function POST(
     );
   }
 
-  const fallbackContext: AgentPageContext = {
+  const projectContext =
+    conversation.projectId
+      ? await getAgentProjectContext(
+          admin,
+          actor.teamId,
+          conversation.projectId,
+        ).catch(() => null)
+      : null;
+
+  const baseContext: AgentPageContext = {
     route: "",
     pageTitle: conversation.title,
-    projectName: "",
+    projectName: projectContext?.projectName ?? conversation.title,
     teamName: actor.teamName,
   };
-  const context = normaliseAgentContext(parsed.data.context, fallbackContext);
+  let context = normaliseAgentContext(parsed.data.context, baseContext);
+  if (projectContext) {
+    context = {
+      ...context,
+      ...projectContext,
+      projectName: projectContext.projectName ?? context.projectName,
+    };
+  }
 
   return streamResponse(async (send) => {
     let runFinished = false;
