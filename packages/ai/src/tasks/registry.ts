@@ -180,6 +180,15 @@ export const AI_TASKS: Record<AiTaskId, AiTaskDefinition> = {
     safety: "standard",
     review: "on_flags",
   },
+  "agent.chat": {
+    id: "agent.chat",
+    purposes: ["writer"],
+    targetCredits: 1,
+    capCredits: 3,
+    timeoutMs: 60000,
+    safety: "standard",
+    review: "on_flags",
+  },
   "image.generate": {
     id: "image.generate",
     purposes: ["image"],

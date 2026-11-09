@@ -44,3 +44,9 @@ export type ShellUsage = {
   storageBytes?: number;
   aiCredits?: number;
 };
+
+export type ShellAssistant = {
+  open: boolean;
+  width: number;
+  tab: "assistant" | "help";
+};

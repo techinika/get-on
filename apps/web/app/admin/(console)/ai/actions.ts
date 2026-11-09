@@ -6,6 +6,7 @@ import {
   grantTeamAiCredits as grantTeamAiCreditsRpc,
   requireStaffAction,
   saveAiSettings as saveAiSettingsRpc,
+  setAssistantEnabled as setAssistantEnabledRpc,
   toggleAiModel as toggleAiModelRpc,
 } from "@/lib/admin";
 
@@ -65,6 +66,20 @@ export async function saveAiSettings(form: FormData) {
   revalidatePath("/admin/ai");
   revalidatePath("/dashboard/ai");
   redirect("/admin/ai?saved=settings");
+}
+
+export async function toggleAssistant(form: FormData) {
+  await requireStaffAction("ai.settings");
+  const enabled = form.get("enabled") === "true";
+  try {
+    await setAssistantEnabledRpc(enabled);
+  } catch {
+    invalid("ASSISTANT_SAVE_FAILED");
+  }
+
+  revalidatePath("/admin/ai");
+  revalidatePath("/dashboard");
+  redirect(`/admin/ai?saved=${enabled ? "assistant-on" : "assistant-off"}`);
 }
 
 export async function toggleAiModel(form: FormData) {

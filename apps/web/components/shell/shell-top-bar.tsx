@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, LifeBuoy, Search } from "lucide-react";
+import { ArrowLeft, LifeBuoy, Search, Sparkles } from "lucide-react";
 import { Wordmark } from "@/components/logo";
 import { TeamSwitcher } from "@/components/shell/team-switcher";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -18,6 +18,10 @@ export type ShellTopBarProps = {
   project: ShellProject | null;
   onOpenQuickFind: () => void;
   onOpenHelp: () => void;
+  assistantEnabled?: boolean;
+  assistantOpen?: boolean;
+  onToggleAssistant?: () => void;
+  assistantButtonRef?: React.RefObject<HTMLButtonElement | null>;
   quickFindButtonRef: React.RefObject<HTMLButtonElement | null>;
 };
 
@@ -29,6 +33,10 @@ export function ShellTopBar({
   project,
   onOpenQuickFind,
   onOpenHelp,
+  assistantEnabled = true,
+  assistantOpen = false,
+  onToggleAssistant,
+  assistantButtonRef,
   quickFindButtonRef,
 }: ShellTopBarProps) {
   const isMobile = useMediaQuery("(max-width: 639px)");
@@ -112,6 +120,26 @@ export function ShellTopBar({
           >
             <LifeBuoy size={20} strokeWidth={1.75} aria-hidden />
             {isWide ? <span className="text-base font-semibold">Help</span> : null}
+          </button>
+        ) : null}
+
+        {assistantEnabled && onToggleAssistant ? (
+          <button
+            type="button"
+            ref={assistantButtonRef}
+            onClick={onToggleAssistant}
+            aria-label={assistantOpen ? "Close assistant" : "Open assistant"}
+            aria-pressed={assistantOpen}
+            title="Assistant (Ctrl J)"
+            className={cn(
+              "flex h-11 items-center justify-center gap-2 rounded-input px-2 transition-colors min-[1280px]:px-3",
+              assistantOpen
+                ? "bg-primary/10 text-primary"
+                : "text-text hover:bg-row-hover",
+            )}
+          >
+            <Sparkles size={20} strokeWidth={1.75} aria-hidden />
+            {isWide ? <span className="text-base font-semibold">Assistant</span> : null}
           </button>
         ) : null}
 

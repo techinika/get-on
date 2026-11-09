@@ -25,6 +25,7 @@ export type AiTaskId =
   | "profile.write"
   | "tips.fix"
   | "image.generate"
+  | "agent.chat"
   | "repair";
 
 export type AiRole = "system" | "user" | "assistant";
