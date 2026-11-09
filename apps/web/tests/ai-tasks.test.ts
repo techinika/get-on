@@ -23,6 +23,13 @@ describe("AI text task definitions", () => {
     expect(TEXT_TASKS["design.suggest"]?.purpose).toBe("brief");
   });
 
+  it("has an assistant chat text task", () => {
+    const task = textTask("agent.chat");
+    expect(task?.taskId).toBe("agent.chat");
+    expect(task?.purpose).toBe("writer");
+    expect(task?.maxChars).toBe(4000);
+  });
+
   it("has a character limit and a task version for every task", () => {
     for (const task of Object.values(TEXT_TASKS)) {
       expect(task?.maxChars).toBeGreaterThan(0);

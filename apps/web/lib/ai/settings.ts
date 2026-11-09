@@ -15,6 +15,9 @@ export type AiSettings = {
   payloadRetentionDays: number;
   gatewayId: string | null;
   defaultLanguage: string;
+  assistantEnabled: boolean;
+  assistantConfirmCredits: number;
+  assistantTurnCapCredits: number;
 };
 
 export type BrandContext = {
@@ -35,6 +38,9 @@ export const DEFAULT_AI_SETTINGS: AiSettings = {
   payloadRetentionDays: 30,
   gatewayId: null,
   defaultLanguage: "en",
+  assistantEnabled: true,
+  assistantConfirmCredits: 5,
+  assistantTurnCapCredits: 3,
 };
 
 function numeric(value: unknown, fallback: number): number {
@@ -75,6 +81,15 @@ export async function loadAiSettings(admin: Admin): Promise<AiSettings> {
       typeof data.default_language === "string"
         ? data.default_language
         : DEFAULT_AI_SETTINGS.defaultLanguage,
+    assistantEnabled: data.assistant_enabled !== false,
+    assistantConfirmCredits: numeric(
+      data.assistant_confirm_credits,
+      DEFAULT_AI_SETTINGS.assistantConfirmCredits,
+    ),
+    assistantTurnCapCredits: numeric(
+      data.assistant_turn_cap_credits,
+      DEFAULT_AI_SETTINGS.assistantTurnCapCredits,
+    ),
   };
 }
 

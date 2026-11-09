@@ -4,6 +4,7 @@ import { AppShell } from "@/components/shell/app-shell";
 import { ToastProvider } from "@/components/ui/toast";
 import { OfflineListener } from "@/components/offline-listener";
 import { getShellData, getSidebarState } from "@/lib/dashboard";
+import { getAssistantFeature } from "@/lib/agent/settings";
 import { getStaffSession } from "@/lib/admin";
 
 /**
@@ -17,8 +18,11 @@ export default async function ShellLayout({ children }: { children: ReactNode })
     redirect("/login");
   }
 
-  const sidebar = await getSidebarState();
-  const staff = await getStaffSession();
+  const [sidebar, staff, assistantFeature] = await Promise.all([
+    getSidebarState(),
+    getStaffSession(),
+    getAssistantFeature(),
+  ]);
 
   return (
     <ToastProvider>
@@ -28,6 +32,8 @@ export default async function ShellLayout({ children }: { children: ReactNode })
         currentTeam={data.currentTeam}
         projects={data.projects}
         usage={data.usage}
+        assistant={data.assistant}
+        assistantEnabled={assistantFeature.enabled}
         sidebar={sidebar}
         isAdmin={Boolean(staff)}
         isSuperAdmin={staff?.role === "super_admin"}

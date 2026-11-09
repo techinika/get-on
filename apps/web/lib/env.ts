@@ -10,6 +10,7 @@ interface Env {
   formTokenSecretPrevious: string;
   ipHashSalt: string;
   enableGoogleAuth: boolean;
+  assistantEnabled: boolean;
   supportWhatsapp: string;
   supabaseUrl: string;
   supabaseAnonKey: string;
@@ -33,6 +34,7 @@ function getEnv(): Env {
     formTokenSecretPrevious: process.env.FORM_TOKEN_SECRET_PREVIOUS ?? "",
     ipHashSalt: process.env.IP_HASH_SALT ?? "dev-salt",
     enableGoogleAuth: process.env.NEXT_PUBLIC_ENABLE_GOOGLE_AUTH === "true",
+    assistantEnabled: process.env.ASSISTANT_ENABLED !== "false",
     supportWhatsapp: process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP ?? "",
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "",

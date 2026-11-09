@@ -7,13 +7,20 @@ import { ShellSidebar } from "@/components/shell/shell-sidebar";
 import { ShellBottomTabs } from "@/components/shell/shell-bottom-tabs";
 import { NavigationProgress } from "@/components/shell/navigation-progress";
 import { QuickFind } from "@/components/shell/quick-find";
-import { HelpPanel } from "@/components/shell/help-panel";
+import { AssistantDock } from "@/components/agent/assistant-dock";
 import type {
+  ShellAssistant,
   ShellProject,
   ShellTeam,
   ShellUsage,
   ShellUser,
 } from "@/components/shell/types";
+import {
+  ASSISTANT_DEFAULT_WIDTH,
+  clampAssistantWidth,
+  type AssistantTab,
+} from "@/lib/agent/constants";
+import { saveAssistantPreferences } from "@/lib/agent/preferences-client";
 import { cn } from "@/lib/utils";
 
 export const SIDEBAR_COOKIE = "gs_sidebar";
@@ -26,6 +33,8 @@ export type AppShellProps = {
   usage: ShellUsage;
   /** Server-rendered sidebar state (from the `gs_sidebar` cookie). */
   sidebar: "expanded" | "collapsed";
+  assistant?: ShellAssistant;
+  assistantEnabled?: boolean;
   isAdmin?: boolean;
   isSuperAdmin?: boolean;
   children: React.ReactNode;
@@ -48,6 +57,8 @@ export function AppShell({
   projects,
   usage,
   sidebar,
+  assistant,
+  assistantEnabled = true,
   isAdmin = false,
   isSuperAdmin = false,
   children,
@@ -55,11 +66,57 @@ export function AppShell({
   const pathname = usePathname();
   const [collapsed, setCollapsed] = React.useState(sidebar === "collapsed");
   const [quickFindOpen, setQuickFindOpen] = React.useState(false);
-  const [helpOpen, setHelpOpen] = React.useState(false);
+  const [assistantOpen, setAssistantOpen] = React.useState(assistant?.open ?? false);
+  const [assistantTab, setAssistantTab] = React.useState<AssistantTab>(
+    assistantEnabled ? (assistant?.tab ?? "assistant") : "help",
+  );
+  const [assistantWidth, setAssistantWidth] = React.useState(
+    assistant?.width ?? ASSISTANT_DEFAULT_WIDTH,
+  );
   const quickFindButtonRef = React.useRef<HTMLButtonElement>(null);
+  const assistantButtonRef = React.useRef<HTMLButtonElement>(null);
+  const prefsMountedRef = React.useRef(false);
 
   const projectId = projectIdFromPath(pathname);
   const project = projectId ? (projects.find((item) => item.id === projectId) ?? null) : null;
+
+  React.useEffect(() => {
+    prefsMountedRef.current = true;
+  }, []);
+
+  React.useEffect(() => {
+    if (!prefsMountedRef.current) return;
+    const timeout = window.setTimeout(() => {
+      void saveAssistantPreferences({
+        open: assistantOpen,
+        tab: assistantTab,
+        width: assistantWidth,
+      });
+    }, 350);
+    return () => window.clearTimeout(timeout);
+  }, [assistantOpen, assistantTab, assistantWidth]);
+
+  function openAssistant(tab: AssistantTab = assistantEnabled ? "assistant" : "help") {
+    setAssistantTab(tab);
+    setAssistantOpen(true);
+  }
+
+  function toggleAssistant() {
+    if (assistantOpen) {
+      setAssistantOpen(false);
+      return;
+    }
+    openAssistant(assistantEnabled ? "assistant" : "help");
+  }
+
+  const closeAssistant = React.useCallback(() => {
+    setAssistantOpen(false);
+    assistantButtonRef.current?.focus();
+  }, []);
+
+  const changeAssistantWidth = React.useCallback((value: number) => {
+    setAssistantWidth(clampAssistantWidth(value));
+  }, []);
 
   function toggleSidebar() {
     setCollapsed((value) => {
@@ -84,6 +141,12 @@ export function AppShell({
         setQuickFindOpen(true);
         return;
       }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        setAssistantOpen((value) => !value);
+        setAssistantTab(assistantEnabled ? "assistant" : "help");
+        return;
+      }
       if (event.key === "/" && !typing) {
         event.preventDefault();
         setQuickFindOpen(true);
@@ -96,11 +159,12 @@ export function AppShell({
     }
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, []);
+  }, [assistantEnabled]);
 
   React.useEffect(() => {
     function openHelp() {
-      setHelpOpen(true);
+      setAssistantTab("help");
+      setAssistantOpen(true);
     }
     window.addEventListener("get-on:help", openHelp);
     return () => window.removeEventListener("get-on:help", openHelp);
@@ -124,7 +188,11 @@ export function AppShell({
         currentTeamId={currentTeam.id}
         project={project}
         onOpenQuickFind={() => setQuickFindOpen(true)}
-        onOpenHelp={() => setHelpOpen(true)}
+        onOpenHelp={() => openAssistant("help")}
+        assistantEnabled={assistantEnabled}
+        assistantOpen={assistantOpen}
+        onToggleAssistant={toggleAssistant}
+        assistantButtonRef={assistantButtonRef}
         quickFindButtonRef={quickFindButtonRef}
       />
 
@@ -145,12 +213,14 @@ export function AppShell({
         className={cn(
           "min-h-[calc(100dvh-56px)] min-[640px]:min-h-[calc(100dvh-64px)] pt-14 min-[640px]:pt-16",
           "min-[1024px]:ml-[var(--sidebar-w)]",
+          assistantOpen && "min-[1024px]:pr-[var(--assistant-w)]",
         )}
+        style={{ "--assistant-w": `${assistantWidth}px` } as React.CSSProperties}
       >
         {children}
       </main>
 
-      <ShellBottomTabs project={project} onOpenHelp={() => setHelpOpen(true)} />
+      <ShellBottomTabs project={project} onOpenHelp={() => openAssistant("help")} />
 
       <NavigationProgress />
 
@@ -164,11 +234,22 @@ export function AppShell({
         returnFocusRef={quickFindButtonRef}
       />
 
-      <HelpPanel
-        open={helpOpen}
-        onClose={() => setHelpOpen(false)}
+      <AssistantDock
+        open={assistantOpen}
+        tab={assistantTab}
+        width={assistantWidth}
+        enabled={assistantEnabled}
+        role={currentTeam.role}
         planId={currentTeam.planId}
         teamName={currentTeam.name}
+        userId={user.id}
+        projectId={projectId}
+        projectName={project?.name ?? ""}
+        credits={usage.aiCredits ?? 0}
+        onClose={closeAssistant}
+        onTabChange={setAssistantTab}
+        onWidthChange={changeAssistantWidth}
+        returnFocusRef={assistantButtonRef}
       />
     </div>
   );

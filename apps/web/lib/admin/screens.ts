@@ -143,6 +143,7 @@ export type AdminAiSettings = {
   payloadRetentionDays: number;
   gatewayId: string | null;
   defaultLanguage: string;
+  assistantEnabled: boolean;
 };
 
 export type AdminAiOverview = {
@@ -269,6 +270,7 @@ const DEFAULT_AI_SETTINGS: AdminAiSettings = {
   payloadRetentionDays: 30,
   gatewayId: null,
   defaultLanguage: "en",
+  assistantEnabled: true,
 };
 
 function numeric(value: unknown, fallback: number): number {
@@ -304,6 +306,7 @@ function aiSettings(value: Record<string, unknown> | null): AdminAiSettings {
       typeof value.default_language === "string"
         ? value.default_language
         : DEFAULT_AI_SETTINGS.defaultLanguage,
+    assistantEnabled: value.assistant_enabled !== false,
   };
 }
 
@@ -473,6 +476,10 @@ export async function grantTeamAiCredits(input: {
 
 export async function toggleAiModel(id: string, enabled: boolean): Promise<void> {
   await rpc("admin_ai_toggle_model", { p_model: id, p_enabled: enabled });
+}
+
+export async function setAssistantEnabled(enabled: boolean): Promise<void> {
+  await rpc("admin_agent_set_enabled", { p_enabled: enabled });
 }
 
 export async function getAiDesignOverview(): Promise<AdminAiDesignOverview> {

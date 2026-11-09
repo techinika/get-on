@@ -13,7 +13,7 @@ import { canStaff, requireStaff } from "@/lib/admin/staff";
 import { RequestApprovalLink } from "@/components/admin/request-approval-link";
 import { cn } from "@/lib/utils";
 import { AiCreditForm } from "./ai-credit-form";
-import { saveAiSettings, toggleAiModel } from "./actions";
+import { saveAiSettings, toggleAiModel, toggleAssistant } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ const ERROR_COPY: Record<string, string> = {
   PROMPT_CHARS: "The prompt limit must be between 100 and 200,000.",
   RETENTION: "Payload retention must be between 1 and 365 days.",
   SAVE_FAILED: "Settings could not be saved.",
+  ASSISTANT_SAVE_FAILED: "The assistant could not be changed.",
   MODEL: "That model is not valid.",
   MODEL_SAVE_FAILED: "The model could not be changed.",
 };
@@ -94,7 +95,13 @@ export default async function AdminAiPage({
 
       {params.saved ? (
         <InfoBox variant="success" className="mb-6">
-          {params.saved === "model" ? "Model updated." : "AI settings saved."}
+          {params.saved === "model"
+            ? "Model updated."
+            : params.saved === "assistant-on"
+              ? "Assistant switched on."
+              : params.saved === "assistant-off"
+                ? "Assistant switched off."
+                : "AI settings saved."}
         </InfoBox>
       ) : null}
       {params.error ? (
@@ -106,6 +113,11 @@ export default async function AdminAiPage({
       {!settings.enabled ? (
         <InfoBox variant="danger" className="mb-6">
           AI is switched off for everyone. Existing content is unchanged.
+        </InfoBox>
+      ) : null}
+      {!settings.assistantEnabled ? (
+        <InfoBox variant="danger" className="mb-6">
+          The assistant is switched off. People can still use the Help tab.
         </InfoBox>
       ) : null}
 
@@ -278,6 +290,33 @@ export default async function AdminAiPage({
               </p>
             </div>
           </form>
+        </AppCard>
+
+        <AppCard className="mt-4 p-6">
+          <div className="flex flex-col gap-4 min-[768px]:flex-row min-[768px]:items-center min-[768px]:justify-between">
+            <div>
+              <p className="font-semibold text-text">Assistant dock</p>
+              <p className="mt-1 text-sm text-text-muted">
+                {settings.assistantEnabled
+                  ? "The assistant is available on signed-in pages. Turning it off hides the Assistant tab and stops new chat messages."
+                  : "The assistant is switched off for everyone. The Help tab still works."}
+              </p>
+            </div>
+            <form action={toggleAssistant}>
+              <input type="hidden" name="enabled" value={settings.assistantEnabled ? "false" : "true"} />
+              <button
+                type="submit"
+                className={cn(
+                  buttonVariants({
+                    variant: settings.assistantEnabled ? "danger-outline" : "secondary",
+                    size: "md",
+                  }),
+                )}
+              >
+                {settings.assistantEnabled ? "Turn assistant off" : "Turn assistant on"}
+              </button>
+            </form>
+          </div>
         </AppCard>
       </Section>
 

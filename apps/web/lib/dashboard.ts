@@ -5,12 +5,21 @@ import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 import { initialsFrom } from "@/lib/viewer";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import type {
+  ShellAssistant,
   ShellProject,
   ShellRole,
   ShellTeam,
   ShellUsage,
   ShellUser,
 } from "@/components/shell/types";
+import {
+  ASSISTANT_OPEN_COOKIE,
+  ASSISTANT_TAB_COOKIE,
+  ASSISTANT_WIDTH_COOKIE,
+  asAssistantTab,
+  assistantOpenFromCookie,
+  assistantWidthFromCookie,
+} from "@/lib/agent/constants";
 
 export const TEAM_COOKIE = "gs_team";
 export const SIDEBAR_COOKIE = "gs_sidebar";
@@ -38,6 +47,7 @@ export type ShellData = {
   projects: ShellProject[];
   deletedProjects: ShellDeletedProject[];
   usage: ShellUsage;
+  assistant: ShellAssistant;
 };
 
 /**
@@ -52,15 +62,22 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
   } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const [{ data: profile }, { data: memberships }] = await Promise.all([
-    supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
-    supabase
-      .from("team_members")
-      .select("team_id, role")
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .order("team_id", { ascending: true }),
-  ]);
+  const cookieStore = await cookies();
+  const [{ data: profile }, { data: memberships }, { data: assistantPrefs }] =
+    await Promise.all([
+      supabase.from("profiles").select("full_name").eq("id", user.id).maybeSingle(),
+      supabase
+        .from("team_members")
+        .select("team_id, role")
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .order("team_id", { ascending: true }),
+      supabase
+        .from("user_preferences")
+        .select("assistant_open, assistant_width, assistant_tab")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]);
 
   const rows = (memberships ?? []) as MembershipRow[];
   const teamIds = rows.map((row) => row.team_id);
@@ -103,7 +120,6 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     return null;
   }
 
-  const cookieStore = await cookies();
   const wantedTeam = cookieStore.get(TEAM_COOKIE)?.value;
   const currentTeam =
     teams.find((team) => team.id === wantedTeam) ??
@@ -253,6 +269,21 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
       members: memberCount ?? 0,
       storageBytes,
       aiCredits: Number.isFinite(aiCredits) ? aiCredits : 0,
+    },
+    assistant: {
+      open: cookieStore.get(ASSISTANT_OPEN_COOKIE)?.value
+        ? assistantOpenFromCookie(cookieStore.get(ASSISTANT_OPEN_COOKIE)?.value)
+        : Boolean(assistantPrefs?.assistant_open),
+      width: cookieStore.get(ASSISTANT_WIDTH_COOKIE)?.value
+        ? assistantWidthFromCookie(cookieStore.get(ASSISTANT_WIDTH_COOKIE)?.value)
+        : assistantWidthFromCookie(
+            assistantPrefs?.assistant_width
+              ? String(assistantPrefs.assistant_width)
+              : undefined,
+          ),
+      tab: cookieStore.get(ASSISTANT_TAB_COOKIE)?.value
+        ? asAssistantTab(cookieStore.get(ASSISTANT_TAB_COOKIE)?.value)
+        : asAssistantTab(assistantPrefs?.assistant_tab),
     },
   };
 });
