@@ -3,7 +3,8 @@ export type AgentStreamEvent =
   | "status"
   | "delta"
   | "done"
-  | "error";
+  | "error"
+  | "confirmation_required";
 
 export function encodeSse(event: AgentStreamEvent, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;

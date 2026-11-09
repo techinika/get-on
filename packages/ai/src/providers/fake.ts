@@ -1,11 +1,15 @@
 import { AiError } from "../errors";
 import { estimateTokens } from "../prompts/composer";
 import type {
+  AgentToolCall,
+  AgentToolResult,
   AiImageResult,
   AiModerationResult,
   AiProvider,
   AiResult,
   AiUsage,
+  ChatWithToolsInput,
+  ChatWithToolsOutput,
   DescribeImageInput,
   GenerateImageInput,
   GenerateStructuredInput,
@@ -25,7 +29,8 @@ export type FakeMode =
   | "refusal"
   | "partial"
   | "slow"
-  | "unsafe";
+  | "unsafe"
+  | "tool_calls";
 
 export type FakeAiScript = {
   mode?: FakeMode;
@@ -34,6 +39,7 @@ export type FakeAiScript = {
   structuredValue?: unknown;
   imageBase64?: string;
   categories?: string[];
+  toolCalls?: AgentToolCall[];
 };
 
 function hash(value: string): number {
@@ -253,6 +259,40 @@ export class FakeAiProvider implements AiProvider {
       safe: true,
       categories: [],
       raw: { fake: true, mode: this.script.mode ?? "ok" },
+    };
+  }
+
+  async chatWithTools(
+    input: ChatWithToolsInput,
+  ): Promise<ChatWithToolsOutput> {
+    await this.wait();
+    this.failForMode();
+
+    const seed = hash(inputText(input));
+    const toolCalls =
+      this.script.toolCalls ??
+      (this.script.mode === "tool_calls"
+        ? [
+            {
+              id: `call_${seed}`,
+              name: "update_create_site_brief",
+              arguments: { name: "Acme Bakery", address: "acme-bakery" },
+            },
+          ]
+        : []);
+
+    const text =
+      this.script.text ??
+      (toolCalls.length > 0
+        ? "I'll help you set that up."
+        : `A clear, friendly sentence for this business (${seed}).`);
+
+    return {
+      text,
+      toolCalls,
+      usage: usageFor(inputText(input), text),
+      modelId: input.modelId,
+      raw: { fake: true, mode: this.script.mode ?? "ok", seed, toolCalls },
     };
   }
 }

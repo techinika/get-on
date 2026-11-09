@@ -130,6 +130,44 @@ export type ModerateInput = {
   metadata?: Record<string, string>;
 };
 
+export type AgentTool = {
+  name: string;
+  description: string;
+  inputSchema: unknown;
+};
+
+export type AgentToolCall = {
+  id: string;
+  name: string;
+  arguments: unknown;
+};
+
+export type AgentToolResult = {
+  id: string;
+  name: string;
+  output: unknown;
+  error?: string;
+};
+
+export type ChatWithToolsInput = {
+  modelId: string;
+  messages: AiMessage[];
+  tools: AgentTool[];
+  toolChoice?: "none" | "required" | "auto";
+  maxTokens?: number;
+  temperature?: number;
+  timeoutMs?: number;
+  metadata?: Record<string, string>;
+};
+
+export type ChatWithToolsOutput = {
+  text: string;
+  toolCalls: AgentToolCall[];
+  usage: AiUsage;
+  modelId: string;
+  raw?: unknown;
+};
+
 export type AiProvider = {
   readonly id: string;
   generateText(input: GenerateTextInput): Promise<AiResult<string>>;
@@ -139,6 +177,7 @@ export type AiProvider = {
   describeImage(input: DescribeImageInput): Promise<AiResult<string>>;
   generateImage(input: GenerateImageInput): Promise<AiImageResult>;
   moderate(input: ModerateInput): Promise<AiModerationResult>;
+  chatWithTools(input: ChatWithToolsInput): Promise<ChatWithToolsOutput>;
 };
 
 export type CreditSettings = {
