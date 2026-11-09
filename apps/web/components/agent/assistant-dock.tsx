@@ -13,6 +13,7 @@ import {
   X,
 } from "lucide-react";
 import { HelpContent } from "@/components/shell/help-panel";
+import { AssistantMessage } from "@/components/agent/assistant-message";
 import { CreateSiteFlow } from "@/components/agent/create-site-flow";
 import type { ShellRole } from "@/components/shell/types";
 import type { PlanId } from "@/lib/plans";
@@ -897,13 +898,19 @@ export function AssistantDock({
                     <div
                       key={message.id}
                       className={cn(
-                        "max-w-[88%] rounded-[14px] px-3.5 py-2.5 text-[15px]",
+                        "max-w-[88%] rounded-[14px] px-3.5 py-2.5",
                         message.role === "user"
                           ? "self-end bg-primary text-on-primary"
                           : "self-start bg-surface-muted text-text",
                       )}
                     >
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      {message.role === "assistant" ? (
+                        <AssistantMessage text={message.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap break-words text-[15px]">
+                          {message.content}
+                        </p>
+                      )}
                       {message.role === "assistant" && (message.credits ?? 0) > 0 ? (
                         <p className="mt-1 text-xs opacity-70">
                           {message.credits} credit{message.credits === 1 ? "" : "s"} used

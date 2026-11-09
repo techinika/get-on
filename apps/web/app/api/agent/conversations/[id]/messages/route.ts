@@ -19,7 +19,7 @@ import {
 import { getAssistantFeature } from "@/lib/agent/settings";
 import { chunkText, encodeSse, type AgentStreamEvent } from "@/lib/agent/sse";
 import { runAgentLoop } from "@/lib/agent/loop";
-import { createSiteTools } from "@/lib/agent/tools";
+import { assistantTools } from "@/lib/agent/tools";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -192,7 +192,7 @@ export async function POST(
         teamId: actor.teamId,
         userId: actor.userId,
         projectId: conversation.projectId,
-        tools: Object.values(createSiteTools),
+        tools: Object.values(assistantTools),
         context: {
           route: context.route,
           pageTitle: context.pageTitle,
