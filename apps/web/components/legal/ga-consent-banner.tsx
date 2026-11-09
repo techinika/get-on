@@ -44,37 +44,39 @@ export function GaConsentBanner() {
   }
 
   const onAccept = () => {
-    // Set __Host-gs_consent cookie (12 months, Secure, SameSite=Lax)
-    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-    const date = new Date(Date.now() + oneYearMs);
-    document.cookie = `__Host-gs_consent=a1; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
-    localStorage.setItem("gs_consent_v1", "a1");
-    // Update gtag consent
-    if (window.gtag) {
-      window.gtag("consent", "update", {
-        analytics_storage: "granted",
-      });
+    try {
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const date = new Date(Date.now() + oneYearMs);
+      document.cookie = `__Host-gs_consent=a1; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
+      localStorage.setItem("gs_consent_v1", "a1");
+      if (window.gtag) {
+        window.gtag("consent", "update", {
+          analytics_storage: "granted",
+        });
+      }
+    } catch {
+      // Cookie or gtag failure must not block the consent choice.
+    } finally {
+      notifyConsentChange();
     }
-    notifyConsentChange();
   };
 
   const onDecline = () => {
-    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-    const date = new Date(Date.now() + oneYearMs);
-    document.cookie = `__Host-gs_consent=a0; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
-    localStorage.setItem("gs_consent_v1", "a0");
-    // Update gtag consent
-    if (window.gtag) {
-      window.gtag("consent", "update", {
-        analytics_storage: "denied",
-      });
-      // Remove _ga and _ga_* cookies
-      document.cookie =
-        "_ga=; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax";
-      document.cookie =
-        "_ga_*=; Path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; Secure; SameSite=Lax";
+    try {
+      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+      const date = new Date(Date.now() + oneYearMs);
+      document.cookie = `__Host-gs_consent=a0; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
+      localStorage.setItem("gs_consent_v1", "a0");
+      if (window.gtag) {
+        window.gtag("consent", "update", {
+          analytics_storage: "denied",
+        });
+      }
+    } catch {
+      // Cookie or gtag failure must not block the consent choice.
+    } finally {
+      notifyConsentChange();
     }
-    notifyConsentChange();
   };
 
   return (
