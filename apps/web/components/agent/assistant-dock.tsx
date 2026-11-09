@@ -8,10 +8,13 @@ import {
   History,
   Loader2,
   MessageSquarePlus,
+  Plus,
   Sparkles,
   X,
 } from "lucide-react";
 import { HelpContent } from "@/components/shell/help-panel";
+import { AssistantMessage } from "@/components/agent/assistant-message";
+import { CreateSiteFlow } from "@/components/agent/create-site-flow";
 import type { ShellRole } from "@/components/shell/types";
 import type { PlanId } from "@/lib/plans";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -166,6 +169,22 @@ export function AssistantDock({
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [remoteBusy, setRemoteBusy] = React.useState(false);
   const [balance, setBalance] = React.useState(credits);
+  const [createSiteOpen, setCreateSiteOpen] = React.useState(false);
+  const [pendingConfirmation, setPendingConfirmation] = React.useState<{
+    id: string;
+    tool: string;
+    summary: string;
+    estimatedCredits: number;
+    expiresAt: string;
+  } | null>(null);
+  const [editingBrief, setEditingBrief] = React.useState(false);
+  const [briefForm, setBriefForm] = React.useState<{
+    name: string;
+    address: string;
+    businessType: string;
+    about: string;
+    style: string;
+  }>({ name: "", address: "", businessType: "", about: "", style: "" });
   const needsCredits = balance < ASSISTANT_CHAT_CREDITS;
 
   const draftKey = `get-on:assistant:draft:${userId}`;
@@ -399,9 +418,35 @@ export function AssistantDock({
     closeRef.current?.focus();
   }
 
+  async function openCreateSite() {
+    if (sending) return;
+    let cid = conversationId;
+    if (!cid) {
+      const created = await fetch("/api/agent/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId: null }),
+      });
+      const data = (await created.json().catch(() => ({}))) as {
+        conversation?: Conversation | null;
+      };
+      if (!created.ok || !data.conversation?.id) {
+        setError("We could not start a chat.");
+        return;
+      }
+      cid = data.conversation.id;
+      setConversationId(cid);
+      setConversations((current) => [data.conversation!, ...current]);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem(activeKey, cid);
+      }
+    }
+    setCreateSiteOpen(true);
+  }
+
   async function send() {
     const text = draft.trim();
-    if (!text || sending || needsCredits || !enabled || !canUse) return;
+    if (!text || sending || needsCredits || !enabled || !canUse || pendingConfirmation) return;
 
     sendingRef.current = true;
     setSending(true);
@@ -491,6 +536,24 @@ export function AssistantDock({
           setStreamingText((current) => current + data.text);
           return;
         }
+        if (event === "confirmation_required") {
+          setStreamingText("");
+          setStatusLabel("");
+          setSending(false);
+          sendingRef.current = false;
+          abortRef.current = null;
+          const action = data.action as Record<string, unknown> | undefined;
+          if (action) {
+            setPendingConfirmation({
+              id: String(action.id ?? ""),
+              tool: String(action.tool ?? ""),
+              summary: String(action.summary ?? ""),
+              estimatedCredits: Number(action.estimatedCredits ?? 0),
+              expiresAt: String(action.expiresAt ?? ""),
+            });
+          }
+          return;
+        }
         if (event === "error") {
           setError(
             typeof data.message === "string"
@@ -546,6 +609,43 @@ export function AssistantDock({
       setSending(false);
       abortRef.current = null;
       optimisticIdRef.current = null;
+    }
+  }
+
+  async function confirmAction() {
+    if (!pendingConfirmation || sending) return;
+    setSending(true);
+    try {
+      const response = await fetch(`/api/agent/actions/${pendingConfirmation.id}/confirm`, {
+        method: "POST",
+      });
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!response.ok) {
+        setError(typeof data.error === "string" ? data.error : "We could not confirm that action.");
+        return;
+      }
+      setPendingConfirmation(null);
+      setEditingBrief(false);
+      setError(null);
+      if (conversationIdRef.current) void loadConversation(conversationIdRef.current);
+    } catch {
+      setError("We could not confirm that action. Please try again.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function cancelAction() {
+    if (!pendingConfirmation || sending) return;
+    setSending(true);
+    try {
+      await fetch(`/api/agent/actions/${pendingConfirmation.id}/cancel`, { method: "POST" });
+    } catch {
+      // Ignore; we clear the card either way.
+    } finally {
+      setPendingConfirmation(null);
+      setEditingBrief(false);
+      setSending(false);
     }
   }
 
@@ -658,6 +758,18 @@ export function AssistantDock({
               >
                 <MessageSquarePlus size={19} strokeWidth={1.75} aria-hidden />
               </button>
+              {canUse ? (
+                <button
+                  type="button"
+                  onClick={openCreateSite}
+                  disabled={sending}
+                  aria-label="Create website"
+                  title="Create website"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-input text-text-muted hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                >
+                  <Plus size={19} strokeWidth={2} aria-hidden />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => setHistoryOpen((value) => !value)}
@@ -714,7 +826,16 @@ export function AssistantDock({
           </div>
         ) : null}
 
-        {!showChat ? (
+        {createSiteOpen && conversationId ? (
+          <CreateSiteFlow
+            conversationId={conversationId}
+            onComplete={() => {
+              setCreateSiteOpen(false);
+              void loadConversation(conversationId);
+            }}
+            onClose={() => setCreateSiteOpen(false)}
+          />
+        ) : !showChat ? (
           <div className="flex-1 overflow-y-auto p-6">
             <HelpContent planId={planId} teamName={teamName} />
           </div>
@@ -772,13 +893,19 @@ export function AssistantDock({
                     <div
                       key={message.id}
                       className={cn(
-                        "max-w-[88%] rounded-[14px] px-3.5 py-2.5 text-[15px]",
+                        "max-w-[88%] rounded-[14px] px-3.5 py-2.5",
                         message.role === "user"
                           ? "self-end bg-primary text-on-primary"
                           : "self-start bg-surface-muted text-text",
                       )}
                     >
-                      <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                      {message.role === "assistant" ? (
+                        <AssistantMessage text={message.content} />
+                      ) : (
+                        <p className="whitespace-pre-wrap break-words text-[15px]">
+                          {message.content}
+                        </p>
+                      )}
                       {message.role === "assistant" && (message.credits ?? 0) > 0 ? (
                         <p className="mt-1 text-xs opacity-70">
                           {message.credits} credit{message.credits === 1 ? "" : "s"} used
@@ -786,12 +913,114 @@ export function AssistantDock({
                       ) : null}
                     </div>
                   ))}
+                  {editingBrief && pendingConfirmation ? (
+                    <div className="max-w-[88%] self-start rounded-[14px] bg-surface p-3 mb-3">
+                      <p className="text-xs font-semibold text-text-muted mb-2">Edit the website details</p>
+                      <div className="space-y-2">
+                        <label className="text-[12px] font-semibold text-text-muted">Website name</label>
+                        <input
+                          value={briefForm.name}
+                          onChange={(event) => setBriefForm({ ...briefForm, name: event.target.value })}
+                          className="h-9 w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        />
+                        <label className="text-[12px] font-semibold text-text-muted">Web address</label>
+                        <input
+                          value={briefForm.address}
+                          onChange={(event) => setBriefForm({ ...briefForm, address: event.target.value })}
+                          placeholder="something.get-on.tech"
+                          className="h-9 w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        />
+                        <label className="text-[12px] font-semibold text-text-muted">Business type</label>
+                        <input
+                          value={briefForm.businessType}
+                          onChange={(event) => setBriefForm({ ...briefForm, businessType: event.target.value })}
+                          placeholder="e.g. Bakery"
+                          className="h-9 w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        />
+                        <label className="text-[12px] font-semibold text-text-muted">About</label>
+                        <input
+                          value={briefForm.about}
+                          onChange={(event) => setBriefForm({ ...briefForm, about: event.target.value })}
+                          className="h-9 w-full rounded-input border border-border bg-surface px-2.5 py-1.5 text-sm text-text placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+                        />
+                      </div>
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setDraft(
+                              `Update the website brief: name "${briefForm.name}", address "${briefForm.address}", business type "${briefForm.businessType}", about "${briefForm.about}".`,
+                            );
+                            setEditingBrief(false);
+                            await new Promise((resolve) => setTimeout(resolve, 0));
+                            void send();
+                          }}
+                          disabled={sending}
+                          className="flex-1 h-9 rounded-input border border-border bg-surface px-3 text-sm text-text transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Save brief
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingBrief(false)}
+                          className="h-9 rounded-input border border-border bg-surface px-3 text-sm text-text-muted transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
                   {streamingText ? (
                     <div className="max-w-[88%] self-start rounded-[14px] bg-surface-muted px-3.5 py-2.5 text-[15px] text-text">
                       <p className="whitespace-pre-wrap break-words">{streamingText}</p>
                     </div>
                   ) : null}
-                  {(sending || remoteBusy) && !streamingText ? (
+                  {pendingConfirmation ? (
+                    <div className="max-w-[88%] self-start rounded-[14px] bg-warning-soft p-3 mb-3 border border-warning-border">
+                      <p className="text-sm font-semibold text-warning-text mb-1">
+                        {pendingConfirmation.summary}
+                      </p>
+                      <p className="text-xs text-warning-text mb-3">
+                        Estimated {pendingConfirmation.estimatedCredits} credit{pendingConfirmation.estimatedCredits === 1 ? "" : "s"}.
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={confirmAction}
+                          disabled={sending}
+                          className="flex-1 h-9 rounded-input border border-warning-border bg-warning text-warning-text px-3 font-semibold text-[13px] transition-colors hover:bg-warning-hover disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Confirm
+                        </button>
+                        <button
+                          type="button"
+                          onClick={cancelAction}
+                          disabled={sending}
+                          className="h-9 rounded-input border border-border bg-surface px-3 text-sm text-text transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingBrief(true);
+                            setBriefForm({
+                              name: "",
+                              address: "",
+                              businessType: "",
+                              about: "",
+                              style: "",
+                            });
+                          }}
+                          disabled={sending}
+                          className="h-9 rounded-input border border-border bg-surface px-3 text-sm text-text-muted transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                        >
+                          Edit
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {(sending || remoteBusy) && !streamingText && !pendingConfirmation ? (
                     <div className="flex items-center gap-2 self-start rounded-[14px] bg-surface-muted px-3.5 py-2.5 text-sm text-text-muted">
                       <Loader2 size={16} strokeWidth={1.75} className="animate-spin" aria-hidden />
                       {statusLabel || "Assistant is answering"}

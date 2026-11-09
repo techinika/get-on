@@ -1,4 +1,5 @@
 import {
+  AgentToolCall,
   AiError,
   toAiError,
   type AiImageResult,
@@ -7,6 +8,8 @@ import {
   type AiProvider,
   type AiResult,
   type AiUsage,
+  type ChatWithToolsInput,
+  type ChatWithToolsOutput,
   type DescribeImageInput,
   type GenerateImageInput,
   type GenerateStructuredInput,
@@ -370,5 +373,90 @@ export class WorkersAiProvider implements AiProvider {
       .filter((part) => /^S\d{1,2}$/i.test(part))
       .map((part) => part.toUpperCase());
     return { safe, categories, raw: response };
+  }
+
+  async chatWithTools(
+    input: ChatWithToolsInput,
+  ): Promise<ChatWithToolsOutput> {
+    const timeoutMs = input.timeoutMs ?? 45000;
+    const body: Record<string, unknown> = {
+      model: input.modelId,
+      messages: input.messages,
+    };
+    if (input.tools && input.tools.length > 0) {
+      body.tools = input.tools.map((tool) => ({
+        type: "function",
+        function: {
+          name: tool.name,
+          description: tool.description,
+          parameters: tool.inputSchema,
+        },
+      }));
+    }
+    if (input.toolChoice) {
+      body.tool_choice = input.toolChoice;
+    }
+    if (input.maxTokens) body.max_tokens = input.maxTokens;
+    if (input.temperature !== undefined) body.temperature = input.temperature;
+
+    const response = await this.request(
+      "/ai/v1/chat/completions",
+      body,
+      timeoutMs,
+      input.metadata,
+    );
+    const envelope =
+      response && typeof response === "object"
+        ? (response as Record<string, unknown>)
+        : {};
+    const choices = Array.isArray(envelope.choices) ? envelope.choices : [];
+    const first = choices[0] as Record<string, unknown> | undefined;
+    const message =
+      first && typeof first.message === "object"
+        ? (first.message as Record<string, unknown>)
+        : {};
+    const content = messageContent(message.content);
+    const toolCalls: AgentToolCall[] = [];
+    const rawToolCalls =
+      message.tool_calls &&
+      Array.isArray(message.tool_calls)
+        ? (message.tool_calls as unknown[])
+        : [];
+    for (const call of rawToolCalls) {
+      if (!call || typeof call !== "object") continue;
+      const row = call as Record<string, unknown>;
+      const id =
+        typeof row.id === "string" ? row.id : crypto.randomUUID();
+      const functionCall =
+        row.function && typeof row.function === "object"
+          ? (row.function as Record<string, unknown>)
+          : {};
+      const name =
+        typeof functionCall.name === "string"
+          ? functionCall.name
+          : undefined;
+      let argumentsValue: unknown = {};
+      const rawArgs = functionCall.arguments;
+      if (typeof rawArgs === "string") {
+        try {
+          argumentsValue = JSON.parse(rawArgs);
+        } catch {
+          argumentsValue = { _raw: rawArgs };
+        }
+      } else if (rawArgs && typeof rawArgs === "object") {
+        argumentsValue = rawArgs;
+      }
+      if (name) {
+        toolCalls.push({ id, name, arguments: argumentsValue });
+      }
+    }
+
+    return {
+      text: content,
+      toolCalls,
+      usage: usageFrom(envelope.usage),
+      modelId: input.modelId,
+      raw: response,
+    };
   }
 }

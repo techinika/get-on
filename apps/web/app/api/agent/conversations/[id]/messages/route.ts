@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { aiErrorMessage } from "@get-on/ai";
-import { runTask } from "@/lib/ai/pipeline";
 import { sanitiseText } from "@/lib/ai/guards";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseAssistant, getAgentActor } from "@/lib/agent/auth";
@@ -11,16 +10,16 @@ import {
   getAgentBalance,
   getAgentConversation,
   getAgentProjectContext,
-  listAgentMessages,
   startAgentRun,
 } from "@/lib/agent/conversations";
 import {
-  buildAgentPrompt,
   normaliseAgentContext,
   type AgentPageContext,
 } from "@/lib/agent/prompt";
 import { getAssistantFeature } from "@/lib/agent/settings";
 import { chunkText, encodeSse, type AgentStreamEvent } from "@/lib/agent/sse";
+import { runAgentLoop } from "@/lib/agent/loop";
+import { assistantTools } from "@/lib/agent/tools";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -188,12 +187,18 @@ export async function POST(
       send("message", userMessage);
       send("status", { label: "Thinking" });
 
-      const history = await listAgentMessages(admin, conversation.id);
-      const result = await runTask("agent.chat", {
+      const result = await runAgentLoop({
+        conversationId: conversation.id,
         teamId: actor.teamId,
         userId: actor.userId,
         projectId: conversation.projectId,
-        userInput: buildAgentPrompt(history, context),
+        tools: Object.values(assistantTools),
+        context: {
+          route: context.route,
+          pageTitle: context.pageTitle,
+          projectName: context.projectName,
+          teamName: context.teamName,
+        },
       });
 
       if (!result.ok) {
@@ -204,6 +209,22 @@ export async function POST(
         });
         runFinished = true;
         send("error", { code: result.code, message: result.message });
+        return;
+      }
+
+      if (result.confirmation) {
+        // Waiting for the user to confirm a risky action. Keep the run open so
+        // the confirm endpoint can resolve it, and surface the card to the UI.
+        await admin
+          .from("agent_runs")
+          .update({ status: "running" })
+          .eq("id", run.id);
+        runFinished = true;
+        send("confirmation_required", {
+          action: result.confirmation,
+          credits: result.credits,
+          requestId: result.requestId,
+        });
         return;
       }
 
