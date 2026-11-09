@@ -100,7 +100,7 @@ export function domainCodeFromMessage(message: string | undefined): DomainErrorC
   for (const code of DOMAIN_ERROR_CODES) {
     if (text.includes(code)) return code;
   }
-  return "DOMAIN_INVALID";
+  return "PROVIDER_ERROR";
 }
 
 export function asDomainError(error: unknown): DomainError {
@@ -109,5 +109,10 @@ export function asDomainError(error: unknown): DomainError {
     return new DomainError(error.code, error.message);
   }
   const message = error instanceof Error ? error.message : String(error ?? "");
+  // Log the raw error so unexpected failures are visible in server logs
+  // instead of being silently remapped to a user-facing code.
+  if (!(error instanceof DomainError) && !(error instanceof ProviderError)) {
+    console.error("[domains] unexpected error", error);
+  }
   return new DomainError(domainCodeFromMessage(message));
 }
