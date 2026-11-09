@@ -240,7 +240,6 @@ export function AppShell({
         width={assistantWidth}
         enabled={assistantEnabled}
         role={currentTeam.role}
-        teamId={currentTeam.id}
         planId={currentTeam.planId}
         teamName={currentTeam.name}
         userId={user.id}

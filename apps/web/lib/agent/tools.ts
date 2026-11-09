@@ -403,7 +403,7 @@ export const getPage: ToolExecutor<z.infer<typeof getPageSchema>, { page: { id: 
     properties: { pageId: JSON_SCHEMA_STRING },
     required: ["pageId"],
   },
-  execute: async (input, ctx) => {
+  execute: async (input) => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     const fields = input as { pageId: string };
@@ -478,7 +478,7 @@ export const getUsage: ToolExecutor<z.infer<typeof getUsageSchema>, { plan: stri
   description: "Return the current plan, credit balance and usage limits.",
   schema: getUsageSchema,
   jsonSchema: JSON_SCHEMA_OBJECT,
-  execute: async (_input, ctx) => {
+  execute: async () => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     const admin = createAdminClient();
@@ -506,7 +506,7 @@ export const listTemplates: ToolExecutor<z.infer<typeof listTemplatesSchema>, { 
   description: "List available website templates by business type.",
   schema: listTemplatesSchema,
   jsonSchema: JSON_SCHEMA_OBJECT,
-  execute: async (_input, ctx) => {
+  execute: async () => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     return {
@@ -533,7 +533,7 @@ export const checkSubdomain: ToolExecutor<z.infer<typeof checkSubdomainSchema>, 
     properties: { address: JSON_SCHEMA_STRING },
     required: ["address"],
   },
-  execute: async (input, ctx) => {
+  execute: async (input) => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     const fields = input as { address: string };
@@ -615,7 +615,7 @@ export const listContactMessages: ToolExecutor<z.infer<typeof listContactMessage
     type: "object",
     properties: { projectId: JSON_SCHEMA_STRING },
   },
-  execute: async (input, ctx) => {
+  execute: async (input) => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     if (!can(actor.role, "messages.read")) {
@@ -1505,7 +1505,7 @@ export const generatePage: ToolExecutor<GeneratePageInput, { page: { id: string;
     properties: { projectId: JSON_SCHEMA_STRING, brief: JSON_SCHEMA_STRING },
     required: ["projectId", "brief"],
   },
-  execute: async (input, ctx) => {
+  execute: async (input) => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     if (!can(actor.role, "page.edit")) {

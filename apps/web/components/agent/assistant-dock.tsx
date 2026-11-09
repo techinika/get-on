@@ -52,7 +52,6 @@ export type AssistantDockProps = {
   enabled: boolean;
   role: ShellRole;
   planId: PlanId;
-  teamId: string;
   teamName: string;
   userId: string;
   projectId: string | null;
@@ -133,7 +132,6 @@ export function AssistantDock({
   enabled,
   role,
   planId,
-  teamId,
   teamName,
   userId,
   projectId,
@@ -831,9 +829,6 @@ export function AssistantDock({
         {createSiteOpen && conversationId ? (
           <CreateSiteFlow
             conversationId={conversationId}
-            teamId={teamId}
-            userId={userId}
-            planId={planId}
             onComplete={() => {
               setCreateSiteOpen(false);
               void loadConversation(conversationId);

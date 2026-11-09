@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseAssistant, getAgentActor } from "@/lib/agent/auth";
 import { executeSiteDraft } from "@/lib/agent/site-draft";
-import { createSiteFromBrief } from "@/lib/agent/site-generation";
+import { createSiteFromBrief, type SiteBrief } from "@/lib/agent/site-generation";
 import { appendAgentMessage, finishAgentRun } from "@/lib/agent/conversations";
 import { getAssistantFeature } from "@/lib/agent/settings";
 
@@ -62,7 +62,7 @@ export async function POST(
     if (!brief) {
       return NextResponse.json({ error: "This action is missing its details." }, { status: 409 });
     }
-    const result = await createSiteFromBrief(admin, actor, String(action.conversation_id), brief as any);
+    const result = await createSiteFromBrief(admin, actor, String(action.conversation_id), brief as SiteBrief);
     if (!result.ok) {
       return NextResponse.json({ error: result.code, message: result.message, upgrade_hint: result.upgrade_hint }, { status: 409 });
     }

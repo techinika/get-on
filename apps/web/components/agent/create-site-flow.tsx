@@ -8,14 +8,10 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import type { PlanId } from "@/lib/plans";
 import { cn } from "@/lib/utils";
 
 type CreateSiteFlowProps = {
   conversationId: string;
-  teamId: string;
-  userId: string;
-  planId: PlanId;
   onComplete: (project: {
     id: string;
     name: string;
@@ -28,9 +24,6 @@ type Step = "form" | "preview" | "success" | "error";
 
 export function CreateSiteFlow({
   conversationId,
-  teamId,
-  userId,
-  planId,
   onComplete,
   onClose,
 }: CreateSiteFlowProps) {
@@ -179,7 +172,6 @@ export function CreateSiteFlow({
             setName={setName}
             address={address}
             setAddress={setAddress}
-            planId={planId}
             templateName={templateName}
             disabled={submitting}
             onSubmit={createPreview}
@@ -204,7 +196,6 @@ function CreateSiteForm({
   setName,
   address,
   setAddress,
-  planId,
   templateName,
   disabled,
   onSubmit,
@@ -213,7 +204,6 @@ function CreateSiteForm({
   setName: (value: string) => void;
   address: string;
   setAddress: (value: string) => void;
-  planId: PlanId;
   templateName: string;
   disabled: boolean;
   onSubmit: () => void;
