@@ -43,12 +43,22 @@ export function GaConsentBanner() {
     return null;
   }
 
+  function setConsentCookie(value: "a1" | "a0") {
+    const oneYearMs = 365 * 24 * 60 * 60 * 1000;
+    const date = new Date(Date.now() + oneYearMs);
+    const secure = `; expires=${date.toUTCString()}; Path=/; SameSite=Lax`;
+    // __Host- cookies require a secure origin. Fall back to a regular cookie so
+    // consent persists (and the banner closes) on localhost / HTTP too.
+    document.cookie = `__Host-gs_consent=${value}${secure}${location.protocol === "https:" ? "; Secure" : ""}`;
+    if (location.protocol !== "https:") {
+      document.cookie = `gs_consent=${value}${secure}`;
+    }
+    localStorage.setItem("gs_consent_v1", value);
+  }
+
   const onAccept = () => {
     try {
-      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-      const date = new Date(Date.now() + oneYearMs);
-      document.cookie = `__Host-gs_consent=a1; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
-      localStorage.setItem("gs_consent_v1", "a1");
+      setConsentCookie("a1");
       if (window.gtag) {
         window.gtag("consent", "update", {
           analytics_storage: "granted",
@@ -63,10 +73,7 @@ export function GaConsentBanner() {
 
   const onDecline = () => {
     try {
-      const oneYearMs = 365 * 24 * 60 * 60 * 1000;
-      const date = new Date(Date.now() + oneYearMs);
-      document.cookie = `__Host-gs_consent=a0; Path=/; expires=${date.toUTCString()}; Secure; SameSite=Lax`;
-      localStorage.setItem("gs_consent_v1", "a0");
+      setConsentCookie("a0");
       if (window.gtag) {
         window.gtag("consent", "update", {
           analytics_storage: "denied",
@@ -74,6 +81,16 @@ export function GaConsentBanner() {
       }
     } catch {
       // Cookie or gtag failure must not block the consent choice.
+    } finally {
+      notifyConsentChange();
+    }
+  };
+
+  const onDismiss = () => {
+    try {
+      setConsentCookie("a0");
+    } catch {
+      // Dismissal must not break the page.
     } finally {
       notifyConsentChange();
     }
@@ -98,6 +115,27 @@ export function GaConsentBanner() {
         <h3 id="ga-consent-title" className="text-[16px] font-semibold text-text mb-3">
           Cookies on get-on.tech
         </h3>
+        <button
+          aria-label="Close cookie notice"
+          onClick={onDismiss}
+          className="absolute top-3 right-3 rounded-sm p-1.5 hover:bg-surface-muted transition-colors"
+        >
+          <span className="sr-only">Close</span>
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="text-text-muted"
+          >
+            <path d="M18 6L6 18" />
+            <path d="M6 6l12 12" />
+          </svg>
+        </button>
         <p className="text-[14px] leading-relaxed text-text-muted mb-6">
           We use Google Analytics to count visits and see which pages people read.
           It sets cookies. We do not use it for advertising.
