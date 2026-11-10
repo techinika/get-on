@@ -66,6 +66,15 @@ export type AssistantDockProps = {
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+const MAX_MESSAGES = 300;
+const MAX_CONVERSATIONS = 50;
+const MAX_STREAM_TEXT = 100_000;
+const MAX_SSE_BUFFER = 4 * 1024 * 1024;
+
+function keepLast<T>(items: T[], limit: number): T[] {
+  return items.length > limit ? items.slice(items.length - limit) : items;
+}
+
 async function readSse(
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: Record<string, unknown>) => void,
@@ -78,6 +87,12 @@ async function readSse(
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
+
+    // Drop a runaway buffer so a malformed stream cannot grow memory forever.
+    if (buffer.length > MAX_SSE_BUFFER) {
+      const tail = buffer.lastIndexOf("\n\n");
+      buffer = tail >= 0 ? buffer.slice(tail + 2) : "";
+    }
 
     let boundary = buffer.indexOf("\n\n");
     while (boundary >= 0) {
@@ -224,9 +239,12 @@ export function AssistantDock({
         setRemoteBusy(false);
         setConversationId(id);
         setMessages(
-          rows
-            .map(messageFrom)
-            .filter((message): message is ChatMessage => message !== null),
+          keepLast(
+            rows
+              .map(messageFrom)
+              .filter((message): message is ChatMessage => message !== null),
+            MAX_MESSAGES,
+          ),
         );
         if (typeof data.balance === "number") setBalance(data.balance);
         window.localStorage.setItem(activeKey, id);
@@ -268,7 +286,7 @@ export function AssistantDock({
                 typeof (item as Record<string, unknown>).id === "string",
             );
           });
-        setConversations(list);
+        setConversations(list.slice(0, MAX_CONVERSATIONS));
         const saved =
           typeof window !== "undefined" ? window.localStorage.getItem(activeKey) : null;
         const next = list.find((item) => item.id === saved) ?? list[0];
@@ -315,11 +333,10 @@ export function AssistantDock({
           if (sendingRef.current) return;
           const saved = messageFrom(payload.new);
           if (!saved) return;
-          setMessages((current) =>
-            current.some((message) => message.id === saved.id)
-              ? current
-              : [...current, saved],
-          );
+          setMessages((current) => {
+            if (current.some((message) => message.id === saved.id)) return current;
+            return keepLast([...current, saved], MAX_MESSAGES);
+          });
           if (saved.role === "assistant") {
             setStreamingText("");
             setRemoteBusy(false);
@@ -457,10 +474,9 @@ export function AssistantDock({
     abortRef.current = controller;
     const optimisticId = `local-${Date.now()}`;
     optimisticIdRef.current = optimisticId;
-    setMessages((current) => [
-      ...current,
-      { id: optimisticId, role: "user", content: text },
-    ]);
+    setMessages((current) =>
+      keepLast([...current, { id: optimisticId, role: "user", content: text }], MAX_MESSAGES),
+    );
     setDraft("");
 
     try {
@@ -533,7 +549,7 @@ export function AssistantDock({
           return;
         }
         if (event === "delta" && typeof data.text === "string") {
-          setStreamingText((current) => current + data.text);
+          setStreamingText((current) => (current + data.text).slice(0, MAX_STREAM_TEXT));
           return;
         }
         if (event === "confirmation_required") {
@@ -566,7 +582,7 @@ export function AssistantDock({
         if (event === "done") {
           const saved = messageFrom(data.message);
           if (saved) {
-            setMessages((current) => [...current, saved]);
+            setMessages((current) => keepLast([...current, saved], MAX_MESSAGES));
             setStreamingText("");
             setConversations((current) =>
               current

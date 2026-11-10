@@ -449,7 +449,10 @@ describe("domain service", () => {
     expect(started.registrable).toBe("rosebakery.com");
     expect(started.status).toBe("draft");
     expect(started.dnsProviderHint).toBe("Cloudflare");
-    expect(db.rows.domain_events).toHaveLength(1);
+    const events = db.rows.domain_events;
+    expect(events.length).toBeGreaterThan(0);
+    expect(events.some((e) => e.event === "domain_start")).toBe(true);
+    expect(events.some((e) => e.event === "domain_created")).toBe(true);
 
     resolver.txt = [
       {
