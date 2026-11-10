@@ -12,8 +12,10 @@ function readCookie(name: string): string {
 export function readConsent(): ConsentDecision {
   if (typeof document === "undefined") return null;
 
-  // Read __Host-gs_consent cookie (value a1=accepted, a0=declined)
-  const cookieValue = readCookie("__Host-gs_consent");
+  // __Host-gs_consent is rejected on non-HTTPS origins (e.g. localhost), so
+  // also read a regular gs_consent cookie as a fallback. localStorage always
+  // works and is the source of truth on insecure origins.
+  const cookieValue = readCookie("__Host-gs_consent") ?? readCookie("gs_consent");
   let lsValue: string | null = null;
   try {
     lsValue = localStorage.getItem("gs_consent_v1");
