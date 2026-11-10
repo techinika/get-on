@@ -535,7 +535,7 @@ begin
     raise exception 'DOMAIN_STARTS_TODAY';
   end if;
 
-  v_value := 'geton-verify=' || encode(gen_random_bytes(16), 'hex');
+  v_value := 'geton-verify=' || encode(extensions.gen_random_bytes(16), 'hex');
 
   insert into public.domains (
     team_id, project_id, registrable, display_name, verification_value,

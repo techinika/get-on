@@ -44,8 +44,10 @@ const STEPS = ["Your domain", "Choose your address", "Prove it is yours", "Conne
 
 function initialStep(domain: Domain | null, hosts: DomainHostname[]): Step {
   if (!domain) return 1;
-  if (hosts.length === 0) return 2;
+  // Prove ownership before choosing an address; an unverified domain cannot
+  // have an address added to it.
   if (!domain.verifiedAt) return 3;
+  if (hosts.length === 0) return 2;
   return 4;
 }
 
@@ -197,7 +199,7 @@ export function ConnectWizard({
         setDomain(result.data.domain);
         if (result.data.domain.verifiedAt) {
           setNotice("Domain verified");
-          setStep(4);
+          setStep(hosts.length === 0 ? 2 : 4);
         } else if (result.data.status === "wrong") {
           setNotice("We found a record, but the value is different. Copy the value again.");
         }
@@ -208,7 +210,7 @@ export function ConnectWizard({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [step, domain, projectId]);
+  }, [step, domain, projectId, hosts.length]);
 
   async function start() {
     setBusy("start");
@@ -271,7 +273,7 @@ export function ConnectWizard({
     setDomain(result.data.domain);
     if (result.data.domain.verifiedAt) {
       setNotice("Domain verified");
-      setStep(4);
+      setStep(hosts.length === 0 ? 2 : 4);
     } else if (result.data.status === "wrong") {
       setNotice("We found a record, but the value is different. Copy the value again.");
     } else {
@@ -737,7 +739,7 @@ export function ConnectWizard({
         {step === 3 ? (
           <div className="flex items-center gap-2">
             <Button type="button" variant="ghost" onClick={() => router.push(addressHref)}>I will do this later</Button>
-            <Button type="button" size="lg" onClick={() => setStep(4)} disabled={!verified}>Continue</Button>
+            <Button type="button" size="lg" onClick={() => setStep(hosts.length === 0 ? 2 : 4)} disabled={!verified}>Continue</Button>
           </div>
         ) : null}
         {step === 4 && !liveHost ? (
