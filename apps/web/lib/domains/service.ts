@@ -139,7 +139,12 @@ export class DomainService {
 
   private async rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
     const { data, error } = await this.supabase.rpc(name, args);
-    if (error) throw new DomainError(domainCodeFromMessage(error.message));
+    if (error) {
+      // Log the raw provider/database error before it is remapped to a stable
+      // user-facing code, so the real cause is visible in server logs.
+      console.error("[domains] rpc", name, "failed", String(error?.message ?? error));
+      throw new DomainError(domainCodeFromMessage(error.message));
+    }
     return data as T;
   }
 
@@ -270,6 +275,12 @@ export class DomainService {
       });
       throw new DomainError("DOMAIN_BLOCKED");
     }
+
+    await this.logStep(input.projectId, null, "domain_screened", "Domain passed screening", {
+      sld: normalized.domain.sld,
+      action: screening.action,
+      reason: screening.reason ?? null,
+    });
 
     const domainId = await this.rpc<string>("start_domain", {
       p_project_id: input.projectId,
