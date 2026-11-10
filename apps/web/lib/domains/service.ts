@@ -73,6 +73,64 @@ export type VerifyResult = {
   records: string[];
 };
 
+export type DnsCheck = {
+  status: "found" | "wrong" | "missing";
+  records: string[];
+  target: string;
+  error: string | null;
+};
+
+export type KvCheck = {
+  exists: boolean;
+  siteId: string | null;
+  key: string;
+};
+
+export type HealthCheck = {
+  ok: boolean;
+  checkedAt: string | null;
+};
+
+export type ProviderCheck = {
+  ok: boolean;
+  status: string | null;
+  error: string | null;
+};
+
+export type HostnameDiagnostic = {
+  hostnameId: string;
+  hostname: string;
+  role: string;
+  mode: string;
+  status: string;
+  providerId: string | null;
+  providerStatus: string | null;
+  sslStatus: string | null;
+  dns: DnsCheck;
+  provider: ProviderCheck;
+  kv: KvCheck;
+  health: HealthCheck;
+  fixed: boolean;
+  fixReason: string | null;
+};
+
+export type DomainDiagnosticSummary = {
+  total: number;
+  kvMissing: number;
+  fixed: number;
+  dnsMissing: number;
+  healthy: number;
+};
+
+export type DomainDiagnosticReport = {
+  domainId: string;
+  registrable: string;
+  domainStatus: string;
+  generatedAt: string;
+  hostnames: HostnameDiagnostic[];
+  summary: DomainDiagnosticSummary;
+};
+
 export type StartDomainInput = {
   projectId: string;
   domain: string;
@@ -809,6 +867,130 @@ export class DomainService {
       domain: await this.loadDomain(domainId),
       status: "found",
       records: [],
+    };
+  }
+
+  async diagnoseDomain(domainId: string): Promise<DomainDiagnosticReport> {
+    const domain = await this.loadDomain(domainId);
+    const { data } = await this.supabase
+      .from("domain_hostnames")
+      .select(HOSTNAME_COLUMNS)
+      .eq("domain_id", domainId)
+      .neq("status", "removed");
+    const hosts = (data ?? []).map(asHostname);
+
+    const results: HostnameDiagnostic[] = [];
+    for (const host of hosts) {
+      const cnameTarget = host.cnameTarget || this.cnameTarget();
+      let dns: DnsCheck = { status: "missing", records: [], target: cnameTarget, error: null };
+      try {
+        const check = await checkCnameRecord(this.resolver, host.hostname, cnameTarget);
+        dns = { status: check.status, records: check.records, target: cnameTarget, error: null };
+      } catch (error) {
+        dns.error = error instanceof Error ? error.message : String(error);
+      }
+
+      let providerOk = false;
+      let providerStatus: string | null = null;
+      let providerError: string | null = null;
+      if (host.providerId) {
+        try {
+          const provider = await this.provider.getHostname(host.providerId, host.mode);
+          if (provider) {
+            providerOk = true;
+            providerStatus = provider.status;
+          }
+        } catch (error) {
+          providerError = error instanceof Error ? error.message : String(error);
+        }
+      }
+
+      let kvExists = false;
+      let kvSiteId: string | null = null;
+      try {
+        const pointer = await this.pointers.getPointer(host.hostname);
+        if (pointer) {
+          kvExists = true;
+          kvSiteId = pointer.siteId;
+        }
+      } catch {
+        // treat as missing
+      }
+
+      const shouldHavePointer = host.status === "live" || host.status === "active";
+      const canFix =
+        !kvExists &&
+        shouldHavePointer &&
+        dns.status === "found" &&
+        (providerOk || host.status === "live");
+
+      let fixed = false;
+      let fixReason: string | null = null;
+      if (!kvExists && canFix) {
+        const projectId = host.projectId ?? domain.projectId;
+        if (projectId) {
+          try {
+            await this.pointers.writeHostPointer(host.hostname, projectId);
+            fixed = true;
+            fixReason = "Created missing KV host pointer.";
+            kvExists = true;
+            kvSiteId = projectId;
+          } catch (error) {
+            fixReason = `Could not create KV pointer: ${error instanceof Error ? error.message : String(error)}`;
+          }
+        } else {
+          fixReason = "No project to point to.";
+        }
+      }
+
+      let health: HealthCheck = { ok: false, checkedAt: null };
+      if (kvExists) {
+        try {
+          const ok = await this.healthCheck(host.hostname);
+          health = { ok, checkedAt: new Date().toISOString() };
+        } catch {
+          health = { ok: false, checkedAt: new Date().toISOString() };
+        }
+      }
+
+      results.push({
+        hostnameId: host.id,
+        hostname: host.hostname,
+        role: host.role,
+        mode: host.mode,
+        status: host.status,
+        providerId: host.providerId,
+        providerStatus: host.providerStatus,
+        sslStatus: host.sslStatus,
+        dns,
+        provider: { ok: providerOk, status: providerStatus, error: providerError },
+        kv: { exists: kvExists, siteId: kvSiteId, key: `host:${host.hostname}` },
+        health,
+        fixed,
+        fixReason,
+      });
+    }
+
+    const summary: DomainDiagnosticSummary = {
+      total: results.length,
+      kvMissing: results.filter((r) => !r.kv.exists).length,
+      fixed: results.filter((r) => r.fixed).length,
+      dnsMissing: results.filter((r) => r.dns.status === "missing").length,
+      healthy: results.filter((r) => r.health.ok).length,
+    };
+
+    await this.event(domainId, "diagnostic_run", "Admin ran domain self-diagnostic", undefined, {
+      hostnames: results.length,
+      fixed: summary.fixed,
+    });
+
+    return {
+      domainId: domain.id,
+      registrable: domain.registrable,
+      domainStatus: domain.status,
+      generatedAt: new Date().toISOString(),
+      hostnames: results,
+      summary,
     };
   }
 
