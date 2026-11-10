@@ -1,6 +1,9 @@
 -- Custom domains: TXT ownership proof plus CNAME connection.
 -- Customers keep their DNS. No zone, nameserver or record hosting.
 
+-- pgcrypto is required for gen_random_bytes (domain verification values).
+create extension if not exists "pgcrypto";
+
 -- Plans ---------------------------------------------------------------------
 
 alter table public.plans
