@@ -1,6 +1,9 @@
 -- Custom domains: TXT ownership proof plus CNAME connection.
 -- Customers keep their DNS. No zone, nameserver or record hosting.
 
+-- pgcrypto is required for gen_random_bytes (domain verification values).
+create extension if not exists "pgcrypto";
+
 -- Plans ---------------------------------------------------------------------
 
 alter table public.plans
@@ -532,7 +535,7 @@ begin
     raise exception 'DOMAIN_STARTS_TODAY';
   end if;
 
-  v_value := 'geton-verify=' || encode(gen_random_bytes(16), 'hex');
+  v_value := 'geton-verify=' || encode(extensions.gen_random_bytes(16), 'hex');
 
   insert into public.domains (
     team_id, project_id, registrable, display_name, verification_value,
