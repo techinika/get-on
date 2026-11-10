@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { DomainService } from "@/lib/domains/service";
+import type { DomainDiagnosticReport } from "@/lib/domains/service";
 
 export type DomainActionResult = { ok: true } | { ok: false; error: string };
 
@@ -42,6 +43,15 @@ export async function recheckDomain(domainId: string): Promise<DomainActionResul
   return { ok: true };
 }
 
+export async function diagnoseDomain(domainId: string): Promise<{
+  ok: true;
+  report: DomainDiagnosticReport;
+} | { ok: false; error: string }> {
+  const { admin, domain } = await domainRow(domainId);
+  if (!domain) return { ok: false, error: "We could not find that domain." };
+  const report = await new DomainService({ supabase: admin }).diagnoseDomain(domainId);
+  return { ok: true, report };
+}
 export async function retryHostname(hostnameId: string): Promise<DomainActionResult & { domainId?: string }> {
   const { admin, host } = await hostRow(hostnameId);
   if (!host) return { ok: false, error: "We could not find that address." };

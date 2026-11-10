@@ -7,9 +7,11 @@ import { Dialog } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/toast";
 import { RequestApprovalLink } from "@/components/admin/request-approval-link";
+import type { DomainDiagnosticReport } from "@/lib/domains/service";
 import {
   approveDomainAction,
   deleteProviderHostnameAction,
+  diagnoseDomainAction,
   pauseDomainAction,
   reassignHostnameAction,
   recheckDomainAction,
@@ -45,6 +47,11 @@ export function AdminDomainActions({
   const { toast } = useToast();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [diagnostic, setDiagnostic] = useState<{
+    ok: boolean;
+    report?: DomainDiagnosticReport;
+    error?: string;
+  } | null>(null);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [reason, setReason] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -88,6 +95,25 @@ export function AdminDomainActions({
           }
         >
           Re-check now
+        </Button>
+        <Button
+          type="button"
+          variant="secondary"
+          loading={busy === "diagnose"}
+          loadingLabel="Diagnosing..."
+          onClick={() =>
+            void run(
+              "diagnose",
+              async () => {
+                const result = await diagnoseDomainAction(domainId);
+                if (result.ok && result.report) setDiagnostic({ ok: true, report: result.report });
+                return result;
+              },
+              "Diagnostic complete"
+            )
+          }
+        >
+          Run self-diagnostic
         </Button>
         {hostnames.map((host) => (
           <Button
@@ -169,6 +195,92 @@ export function AdminDomainActions({
         ) : null}
       </div>
       {error ? <p className="mt-2 text-sm text-danger-text" role="alert">{error}</p> : null}
+
+      {diagnostic && diagnostic.ok && diagnostic.report ? (
+        <section className="mt-6">
+          <h3 className="text-[15px] font-semibold text-text mb-3">Self-diagnostic results</h3>
+          <p className="text-[13px] text-text-muted mb-3">
+            Checked {diagnostic.report.summary.total} addresses ·{" "}
+            {diagnostic.report.summary.fixed} KV pointer(s) created ·{" "}
+            {diagnostic.report.summary.dnsMissing} missing CNAME ·{" "}
+            {diagnostic.report.summary.healthy} healthy
+          </p>          <div className="rounded-card border border-border bg-surface p-4">
+            <table className="w-full text-left text-[13px] border-collapse">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="pb-2 text-text-muted font-medium">Address</th>
+                  <th className="pb-2 text-text-muted font-medium">Status</th>
+                  <th className="pb-2 text-text-muted font-medium">CNAME</th>
+                  <th className="pb-2 text-text-muted font-medium">Provider</th>
+                  <th className="pb-2 text-text-muted font-medium">KV pointer</th>
+                  <th className="pb-2 text-text-muted font-medium">Health</th>
+                  <th className="pb-2 text-text-muted font-medium">Fixed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diagnostic.report.hostnames.map((row) => (
+                  <tr key={row.hostnameId} className="border-b border-border">
+                    <td className="py-2 break-all font-mono text-text">{row.hostname}</td>
+                    <td className="py-2 text-text">{row.status}</td>
+                    <td className="py-2">
+                      {row.dns.status === "found" ? (
+                        <span className="text-success-text">found → {row.dns.target}</span>
+                      ) : row.dns.status === "wrong" ? (
+                        <span className="text-danger-text">wrong value</span>
+                      ) : (
+                        <span className="text-danger-text">missing</span>
+                      )}
+                      {row.dns.error ? (
+                        <span className="block text-[11px] text-danger-text mt-1">{row.dns.error}</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2 text-text">
+                      {row.provider.ok ? row.provider.status : "error"}
+                      {row.provider.error ? (
+                        <span className="block text-[11px] text-danger-text mt-1">{row.provider.error}</span>
+                      ) : null}
+                    </td>
+                    <td className="py-2">
+                      {row.kv.exists ? (
+                        <span className="text-success-text">yes → {row.kv.siteId}</span>
+                      ) : (
+                        <span className="text-danger-text">missing</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      {row.health.checkedAt ? (
+                        row.health.ok ? (
+                          <span className="text-success-text">healthy</span>
+                        ) : (
+                          <span className="text-danger-text">failed</span>
+                        )
+                      ) : (
+                        <span className="text-text-muted">not checked</span>
+                      )}
+                    </td>
+                    <td className="py-2">
+                      {row.fixed ? (
+                        <span className="text-success-text">created</span>
+                      ) : row.fixReason ? (
+                        <span className="text-[11px] text-danger-text">{row.fixReason}</span>
+                      ) : (
+                        <span className="text-text-muted">—</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {diagnostic.report.summary.fixed > 0 && (
+            <p className="mt-3 text-[13px] text-success-text">
+              Missing KV pointer(s) were created automatically. Visitors should start
+              reaching the site once Cloudflare propagates the CNAME and the health
+              check passes.
+            </p>
+          )}
+        </section>
+      ) : null}
 
       <Dialog
         open={pauseOpen}

@@ -6,6 +6,7 @@ import { asDomainError } from "@/lib/domains/errors";
 import {
   approveDomain,
   deleteProviderHostname,
+  diagnoseDomain,
   pauseDomain,
   reassignHostname,
   recheckDomain,
@@ -15,6 +16,7 @@ import {
   retryHostname,
   simulatePlanLapse,
 } from "@/lib/domains/admin-actions";
+import type { DomainDiagnosticReport } from "@/lib/domains/service";
 
 export type AdminDomainResult = { ok: true } | { ok: false; error: string };
 
@@ -23,7 +25,7 @@ function refresh(domainId: string) {
   revalidatePath(`/admin/domains/${domainId}`);
 }
 
-function failed(error: unknown): AdminDomainResult {
+function failed(error: unknown): { ok: false; error: string } {
   return { ok: false, error: asDomainError(error).message };
 }
 
@@ -42,6 +44,28 @@ export async function recheckDomainAction(domainId: string): Promise<AdminDomain
   });
   refresh(domainId);
   return { ok: true };
+}
+
+export async function diagnoseDomainAction(domainId: string): Promise<{
+  ok: true;
+  report: DomainDiagnosticReport;
+} | { ok: false; error: string }> {
+  await requireStaffAction("domain.recheck");
+  let report: DomainDiagnosticReport;
+  try {
+    const result = await diagnoseDomain(domainId);
+    if (!result.ok) return { ok: false, error: result.error };
+    report = result.report;
+  } catch (error) {
+    return failed(error);
+  }
+  await recordStaffAction({
+    action: "domain.recheck",
+    targetType: "domain",
+    targetId: domainId,
+  });
+  refresh(domainId);
+  return { ok: true, report };
 }
 
 export async function retryHostnameAction(hostnameId: string): Promise<AdminDomainResult> {
