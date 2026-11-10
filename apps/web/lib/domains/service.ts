@@ -203,26 +203,73 @@ export class DomainService {
     domainId: string,
     event: string,
     summary: string,
-    hostnameId?: string,
+    hostnameId?: string | null,
+    meta?: Record<string, unknown>,
   ): Promise<void> {
     await this.supabase.from("domain_events").insert({
       domain_id: domainId,
       hostname_id: hostnameId ?? null,
       event,
       summary,
+      meta: meta ?? null,
     });
   }
 
+  /**
+   * Records one step of the domain connection workflow: a console.log for live
+   * debugging plus a row in domain_events so the full sequence is inspectable
+   * later (kept and trimmed like every other domain event).
+   */
+  async logStep(
+    domainId: string,
+    hostnameId: string | null,
+    event: string,
+    summary: string,
+    meta?: Record<string, unknown>,
+  ): Promise<void> {
+    const payload = {
+      domainId,
+      hostnameId,
+      event,
+      summary,
+      meta,
+      at: new Date().toISOString(),
+    };
+    console.log("[domains] step", JSON.stringify(payload));
+    await this.event(domainId, event, summary, hostnameId, meta);
+  }
+
   async startDomain(input: StartDomainInput): Promise<Domain> {
+    await this.logStep(input.projectId, null, "domain_start", "Connection started", {
+      input: input.domain,
+      projectId: input.projectId,
+    });
+
     const normalized = normalizeDomainInput(input.domain);
     if (!normalized.ok) {
+      await this.logStep(input.projectId, null, "domain_start_failed", "Invalid domain input", {
+        input: input.domain,
+        reason: normalized.reason,
+      });
       throw new DomainError(
         normalized.reason === "reserved" ? "DOMAIN_BLOCKED" : "DOMAIN_INVALID",
       );
     }
 
+    await this.logStep(input.projectId, null, "domain_normalized", "Domain normalized", {
+      registrable: normalized.domain.registrable,
+      hostname: normalized.domain.hostname,
+      subdomain: normalized.domain.subdomain,
+    });
+
     const screening = screenDomain(normalized.domain.sld);
-    if (screening.action === "block") throw new DomainError("DOMAIN_BLOCKED");
+    if (screening.action === "block") {
+      await this.logStep(input.projectId, null, "domain_blocked", "Domain blocked by screening", {
+        sld: normalized.domain.sld,
+        reason: screening.reason,
+      });
+      throw new DomainError("DOMAIN_BLOCKED");
+    }
 
     const domainId = await this.rpc<string>("start_domain", {
       p_project_id: input.projectId,
@@ -230,10 +277,19 @@ export class DomainService {
       p_display: input.displayName?.trim() || normalized.domain.registrable,
     });
 
+    await this.logStep(domainId, null, "domain_created", "Domain record created in database", {
+      registrable: normalized.domain.registrable,
+    });
+
     const [registrar, hint] = await Promise.all([
       this.rdap.lookup(normalized.domain.registrable).catch(() => null),
       dnsProviderHint(this.resolver, normalized.domain.registrable).catch(() => null),
     ]);
+
+    await this.logStep(domainId, null, "domain_lookup", "Registrar and DNS provider looked up", {
+      registrar: registrar ?? null,
+      dnsProviderHint: hint ?? null,
+    });
 
     const current = await this.loadDomain(domainId);
     const patch: Record<string, unknown> = {
@@ -247,12 +303,25 @@ export class DomainService {
     }
     await this.updateDomain(domainId, patch);
 
+    await this.logStep(domainId, null, "domain_updated", "Domain metadata saved", {
+      reviewState: patch.review_state ?? current.reviewState,
+      status: current.status,
+    });
+
     return this.loadDomain(domainId);
   }
 
   async verifyDomain(domainId: string): Promise<VerifyResult> {
     const domain = await this.loadDomain(domainId);
+    await this.logStep(domainId, null, "verify_start", "Verification check started", {
+      registrable: domain.registrable,
+      status: domain.status,
+      reviewState: domain.reviewState,
+    });
     if (domain.reviewState === "pending") {
+      await this.logStep(domainId, null, "verify_blocked", "Verification blocked by pending review", {
+        registrable: domain.registrable,
+      });
       throw new DomainError("DOMAIN_REVIEW_PENDING");
     }
 
@@ -262,10 +331,19 @@ export class DomainService {
       domain.verificationValue,
     );
 
+    await this.logStep(domainId, null, "verify_txt_checked", "TXT verification record checked", {
+      name: verificationName(domain.registrable),
+      status: check.status,
+      records: check.records,
+    });
+
     if (check.status === "found") {
       await this.rpc<void>("mark_domain_verified", { p_domain_id: domainId });
       await this.updateDomain(domainId, {
         last_checked_at: this.now().toISOString(),
+      });
+      await this.logStep(domainId, null, "verify_verified", "Domain verified", {
+        registrable: domain.registrable,
       });
     } else {
       await this.updateDomain(domainId, {
@@ -273,6 +351,11 @@ export class DomainService {
         ...(domain.status === "draft"
           ? { status: "awaiting_txt", status_reason: "txt_missing" }
           : {}),
+      });
+      await this.logStep(domainId, null, "verify_txt_missing", "TXT verification record missing or wrong", {
+        status: check.status,
+        records: check.records,
+        expected: domain.verificationValue,
       });
       await this.event(
         domainId,
@@ -292,30 +375,79 @@ export class DomainService {
 
   async addAddress(input: AddAddressInput): Promise<DomainHostname> {
     const domain = await this.loadDomain(input.domainId);
+    await this.logStep(domain.id, null, "add_address_start", "Address creation started", {
+      domainId: domain.id,
+      registrable: domain.registrable,
+      label: input.label,
+      role: input.role,
+      mode: input.mode,
+      status: domain.status,
+    });
     if (domain.reviewState === "pending") {
+      await this.logStep(domain.id, null, "add_address_blocked", "Address blocked by pending review", {
+        domainId: domain.id,
+        registrable: domain.registrable,
+      });
       throw new DomainError("DOMAIN_REVIEW_PENDING");
     }
     if (!["verified", "connecting", "live", "attention", "stalled"].includes(domain.status)) {
+      await this.logStep(domain.id, null, "add_address_blocked", "Address blocked: domain not verified", {
+        domainId: domain.id,
+        registrable: domain.registrable,
+        status: domain.status,
+      });
       throw new DomainError("DOMAIN_NOT_VERIFIED");
     }
 
     const label = input.label.trim().toLowerCase();
-    if (!isValidHostnameLabel(label)) throw new DomainError("DOMAIN_INVALID");
+    if (!isValidHostnameLabel(label)) {
+      await this.logStep(domain.id, null, "add_address_failed", "Invalid hostname label", {
+        domainId: domain.id,
+        registrable: domain.registrable,
+        label: input.label,
+      });
+      throw new DomainError("DOMAIN_INVALID");
+    }
     if (input.role !== "main" && input.role !== "extra") {
+      await this.logStep(domain.id, null, "add_address_failed", "Invalid hostname role", {
+        domainId: domain.id,
+        registrable: domain.registrable,
+        role: input.role,
+      });
       throw new DomainError("HOSTNAME_LIMIT");
     }
     if (input.mode !== "switch_now" && input.mode !== "prepare_first") {
+      await this.logStep(domain.id, null, "add_address_failed", "Invalid hostname mode", {
+        domainId: domain.id,
+        registrable: domain.registrable,
+        mode: input.mode,
+      });
       throw new DomainError("HOSTNAME_LIMIT");
     }
 
     const hostname = hostnameForLabel(label, domain.registrable);
     const cnameTarget = this.cnameTarget();
+    await this.logStep(domain.id, null, "add_address_resolved", "Hostname and CNAME target resolved", {
+      domainId: domain.id,
+      registrable: domain.registrable,
+      hostname,
+      cnameTarget,
+    });
+
     const hostnameId = await this.rpc<string>("add_hostname", {
       p_domain_id: domain.id,
       p_label: label,
       p_role: input.role,
       p_mode: input.mode,
       p_max_pending: this.config.maxPendingHostnames,
+    });
+
+    await this.logStep(domain.id, hostnameId, "address_created", "Address record created in database", {
+      hostnameId,
+      hostname,
+      label,
+      role: input.role,
+      mode: input.mode,
     });
 
     try {
@@ -328,10 +460,22 @@ export class DomainService {
         cname_target: cnameTarget,
         next_poll_at: new Date(this.now().getTime() + pollDelayMs(0)).toISOString(),
       });
+      await this.logStep(domain.id, hostnameId, "address_provider_created", "Provider hostname created", {
+        hostnameId,
+        hostname,
+        providerId: created.id,
+        providerStatus: created.status,
+        sslStatus: created.sslStatus,
+      });
     } catch (error) {
       await this.updateHostname(hostnameId, {
         status: "error",
         status_reason: "provider",
+      });
+      await this.logStep(domain.id, hostnameId, "address_provider_failed", "Provider hostname creation failed", {
+        hostnameId,
+        hostname,
+        error: error instanceof Error ? error.message : String(error),
       });
       throw asDomainError(error);
     }
@@ -365,9 +509,23 @@ export class DomainService {
 
   async refreshAddress(hostnameId: string): Promise<DomainHostname> {
     const host = await this.loadHostname(hostnameId);
-    if (host.status === "removed") return host;
+    if (host.status === "removed") {
+      await this.logStep(hostnameId, hostnameId, "refresh_removed", "Address already removed, skipping", {
+        hostnameId,
+        hostname: host.hostname,
+      });
+      return host;
+    }
 
     const domain = await this.loadDomain(host.domainId);
+    await this.logStep(domain.id, hostnameId, "refresh_start", "Address refresh started", {
+      hostnameId,
+      hostname: host.hostname,
+      domainId: domain.id,
+      status: host.status,
+      providerId: host.providerId,
+    });
+
     if (
       domain.status === "removing" ||
       domain.status === "removed" ||
@@ -375,6 +533,11 @@ export class DomainService {
       domain.status === "paused" ||
       domain.status === "unassigned"
     ) {
+      await this.logStep(domain.id, hostnameId, "refresh_skipped", "Refresh skipped: domain not in a connectable state", {
+        hostnameId,
+        hostname: host.hostname,
+        domainStatus: domain.status,
+      });
       return host;
     }
 
@@ -395,8 +558,21 @@ export class DomainService {
               this.now().getTime() + pollDelayMs(host.pollAttempts + 1),
             ).toISOString(),
           });
+          await this.logStep(domain.id, hostnameId, "refresh_provider", "Provider hostname polled", {
+            hostnameId,
+            hostname: host.hostname,
+            providerId: host.providerId,
+            providerStatus: provider.status,
+            sslStatus: provider.sslStatus,
+            mappedStatus: providerStatus,
+          });
         }
       } catch {
+        await this.logStep(domain.id, hostnameId, "refresh_provider_failed", "Provider hostname poll failed", {
+          hostnameId,
+          hostname: host.hostname,
+          providerId: host.providerId,
+        });
         providerStatus = host.status;
       }
     }
@@ -413,6 +589,11 @@ export class DomainService {
         status: host.status === "live" ? "live" : providerStatus,
         cname_checked_at: checkedAt.toISOString(),
       });
+      await this.logStep(domain.id, hostnameId, "refresh_cname_unavailable", "CNAME check unavailable", {
+        hostnameId,
+        hostname: host.hostname,
+        status: host.status === "live" ? "live" : providerStatus,
+      });
       return this.loadHostname(host.id);
     }
 
@@ -421,6 +602,16 @@ export class DomainService {
       providerStatus === "active" ||
       providerStatus === "ready_to_switch" ||
       providerStatus === "live";
+
+    await this.logStep(domain.id, hostnameId, "refresh_cname_checked", "CNAME record checked", {
+      hostnameId,
+      hostname: host.hostname,
+      cnameSeen,
+      cnameRecords: cname.records,
+      target: host.cnameTarget || this.cnameTarget(),
+      providerStatus,
+      providerReady,
+    });
 
     let nextStatus: HostnameStatus = providerStatus;
     if (providerStatus === "moved" || providerStatus === "blocked") {
@@ -461,27 +652,45 @@ export class DomainService {
         patch.status_reason = null;
         patch.health_failures = 0;
         await this.linkSitePointer(host, project);
+        await this.logStep(domain.id, hostnameId, "address_live", "Address is live and healthy", {
+          hostnameId,
+          hostname: host.hostname,
+          projectId: project.id,
+          healthCheck: true,
+        });
       } else {
         patch.health_failures = host.healthFailures + 1;
         await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+        await this.logStep(domain.id, hostnameId, "address_health_failed", "Address active but health check failed", {
+          hostnameId,
+          hostname: host.hostname,
+          projectId: project.id,
+          healthFailures: patch.health_failures,
+        });
       }
     }
 
     await this.updateHostname(host.id, patch);
 
     if (live && project && host.status !== "live") {
-      await this.event(
-        domain.id,
-        "hostname_live",
-        "Website connected",
-        host.id,
-      );
+      await this.logStep(domain.id, hostnameId, "hostname_live", "Website connected", {
+        hostnameId,
+        hostname: host.hostname,
+        projectId: project.id,
+        role: host.role,
+      });
       if (host.role === "main") {
         await this.autoPublishLiveDomain(domain.id, project.id);
       }
     }
 
     await this.refreshDomainStatus(domain.id, checkedAt);
+    await this.logStep(domain.id, hostnameId, "refresh_done", "Address refresh complete", {
+      hostnameId,
+      hostname: host.hostname,
+      nextStatus,
+      live,
+    });
     return this.loadHostname(host.id);
   }
 
