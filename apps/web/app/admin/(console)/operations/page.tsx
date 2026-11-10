@@ -6,17 +6,9 @@ import { Badge } from "@/components/ui/badge";
 import { getDomainOps } from "@/lib/admin";
 import { readDomainsConfig } from "@/lib/domains/config";
 import { createHostnameProvider } from "@/lib/domains/provider-factory";
+import { RunDomainJobs } from "./run-jobs";
 
 export const dynamic = "force-dynamic";
-
-const JOB_LABELS: Record<string, string> = {
-  verify: "Verify domains",
-  poll: "Poll addresses",
-  health: "Check live addresses",
-  plan: "Enforce plans",
-  cleanup: "Cleanup",
-  "migrate-pointers": "Migrate pointers",
-};
 
 type RunRow = {
   id: string;
@@ -170,6 +162,8 @@ export default async function AdminOperationsPage() {
         </AppCard>
       </div>
 
+      <RunDomainJobs />
+
       {counts.hostnames !== undefined && counts.hostnames >= config.includedHostnames * 0.8 ? (
         <InfoBox variant="warning" className="mt-5">
           {counts.hostnames} hostnames are close to the included {config.includedHostnames}. Check
@@ -191,7 +185,7 @@ export default async function AdminOperationsPage() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-semibold text-text">
-                      {JOB_LABELS[run.job] ?? run.job}
+                      {run.job}
                     </span>
                     <Badge variant={run.status === "ok" ? "live" : "danger"}>
                       {run.status === "ok" ? "OK" : "Failed"}
