@@ -4,8 +4,14 @@ import {
   validateTemplatePackage,
 } from "@get-on/templates";
 import { createClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/fallback";
 import { StaffError } from "@/lib/admin/staff";
 import { templatePackageBytes, templatePackageHash } from "./package-hash";
+import {
+  getLocalSystemTemplate,
+  listLocalSystemTemplates,
+  syncLocalSystemTemplate,
+} from "./local-sync-store";
 
 export type AdminSystemTemplateRow = {
   id: string;
@@ -74,6 +80,9 @@ async function rpc<T>(fn: string, args: Record<string, unknown>): Promise<T> {
 }
 
 export async function listSystemTemplates(): Promise<AdminSystemTemplateRow[]> {
+  if (!isSupabaseConfigured()) {
+    return listLocalSystemTemplates();
+  }
   const result = await rpc<{ templates: AdminSystemTemplateRow[] }>(
     "admin_system_templates",
     {},
@@ -84,6 +93,9 @@ export async function listSystemTemplates(): Promise<AdminSystemTemplateRow[]> {
 export async function getSystemTemplate(
   templateId: string,
 ): Promise<AdminSystemTemplateDetail | null> {
+  if (!isSupabaseConfigured()) {
+    return getLocalSystemTemplate(templateId);
+  }
   return rpc<AdminSystemTemplateDetail | null>("admin_system_template", {
     p_template: templateId,
   });
@@ -92,6 +104,7 @@ export async function getSystemTemplate(
 export async function syncSystemTemplateCatalog(): Promise<SystemTemplateSyncResult> {
   let imported = 0;
   let unchanged = 0;
+  const useSupabase = isSupabaseConfigured();
 
   for (const [index, pkg] of SYSTEM_TEMPLATES.entries()) {
     const validation = validateTemplatePackage(pkg);
@@ -105,23 +118,45 @@ export async function syncSystemTemplateCatalog(): Promise<SystemTemplateSyncRes
     }
 
     const summary = packageSummary(pkg);
-    const result = await rpc<SystemTemplateSyncRow>("admin_template_sync", {
-      p_slug: pkg.meta.slug,
-      p_meta: pkg.meta,
-      p_package: pkg,
-      p_package_hash: templatePackageHash(pkg),
-      p_summary: "Imported from the code registry.",
-      p_page_count: summary.pageCount,
-      p_block_count: summary.blockCount,
-      p_required_plugins: summary.requiredPlugins,
-      p_fonts: null,
-      p_asset_count: pkg.assets.length,
-      p_bytes: templatePackageBytes(pkg),
-      p_sort: (index + 1) * 10,
-    });
+    const packageHash = templatePackageHash(pkg);
+    const bytes = templatePackageBytes(pkg);
+    const sort = (index + 1) * 10;
 
-    if (result.duplicate) unchanged += 1;
-    else imported += 1;
+    if (useSupabase) {
+      const result = await rpc<SystemTemplateSyncRow>("admin_template_sync", {
+        p_slug: pkg.meta.slug,
+        p_meta: pkg.meta,
+        p_package: pkg,
+        p_package_hash: packageHash,
+        p_summary: "Imported from the code registry.",
+        p_page_count: summary.pageCount,
+        p_block_count: summary.blockCount,
+        p_required_plugins: summary.requiredPlugins,
+        p_fonts: null,
+        p_asset_count: pkg.assets.length,
+        p_bytes: bytes,
+        p_sort: sort,
+      });
+
+      if (result.duplicate) unchanged += 1;
+      else imported += 1;
+    } else {
+      const result = syncLocalSystemTemplate({
+        slug: pkg.meta.slug,
+        meta: pkg.meta,
+        packageHash,
+        summary: "Imported from the code registry.",
+        pageCount: summary.pageCount,
+        blockCount: summary.blockCount,
+        requiredPlugins: summary.requiredPlugins,
+        assetCount: pkg.assets.length,
+        bytes,
+        sort,
+      });
+
+      if (result.duplicate) unchanged += 1;
+      else imported += 1;
+    }
   }
 
   return { imported, unchanged, templates: SYSTEM_TEMPLATES.length };

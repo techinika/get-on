@@ -32,7 +32,7 @@ export async function listEditorTemplates(): Promise<EditorTemplateItem[]> {
     tagline: item.tagline,
     description: item.description,
     category: item.category,
-    tags: item.tags,
+    tags: item.tags ?? [],
     planMin: item.planMin,
     requiredPlan: item.requiredPlan ?? null,
     available: item.available,

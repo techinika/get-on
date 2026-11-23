@@ -10,7 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@get-on/site-server": "workspace:*"
+    "@get-on/site-server": "*"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -1,36 +1,15 @@
-export type LinkTarget =
-  | { type: 'none' }
-  | { type: 'page'; pageId: string }
-  | { type: 'url'; url: string }
-  | { type: 'phone'; number: string }
-  | { type: 'email'; address: string }
-  | { type: 'whatsapp'; number: string }
-  | { type: 'section'; anchor: string }
-  | { type: 'pageSection'; pageId: string; anchor: string };
-
-export type Align = 'left' | 'center';
-export type Corners = 'soft' | 'sharp' | 'round';
-export type ColorMode = 'light' | 'dark' | 'auto';
-export type FontPair = 'friendly' | 'classic' | 'modern' | 'warm';
-export type FontPairId =
-  | FontPair
-  | 'editorial'
-  | 'clean'
-  | 'bold'
-  | 'elegant'
-  | 'playful'
-  | 'handmade'
-  | 'traditional'
-  | 'techy';
-
 export type Palette =
-  | 'fresh-green'
-  | 'ocean'
-  | 'berry'
-  | 'sunset'
-  | 'midnight'
-  | 'charcoal'
-  | string;
+  | "fresh-green"
+  | "ocean"
+  | "berry"
+  | "sunset"
+  | "midnight"
+  | "charcoal";
+
+export type FontPair = "friendly" | "classic" | "modern" | "warm";
+export type Corners = "soft" | "sharp" | "round";
+export type Density = "compact" | "comfortable" | "airy";
+export type Rhythm = "even" | "alternate" | "tinted" | "bold";
 
 export type ThemeColors = {
   primary: string;
@@ -38,185 +17,166 @@ export type ThemeColors = {
   background: string;
   text: string;
   soft: string;
+  onPrimary?: string;
 };
 
-export type FontChoice = { id: string; weight: number };
-
-/** Theme v2. Legacy v1 fields stay optional so old rows and tests still work. */
-export type HeadingCase = 'normal' | 'upper';
-export type HeadingTracking = 'tight' | 'normal' | 'wide';
-export type DisplayScale = 'normal' | 'dramatic';
-export type Rhythm = 'even' | 'alternate' | 'tinted' | 'bold';
-export type ImageStyle = 'rounded' | 'sharp' | 'arch' | 'offset' | 'circle';
-export type EyebrowStyle = 'chip' | 'caps' | 'line' | 'none';
-export type LinkStyle = 'underline' | 'arrow' | 'plain';
-export type RuleStyle = 'none' | 'hairline' | 'bold';
-export type HeaderStyle = 'classic' | 'centered' | 'overlay' | 'split' | 'minimal';
-export type FooterLayout = 'simple' | 'columns' | 'centered' | 'bigbrand';
-
-export type ThemeDesign = {
-  headingCase?: HeadingCase;
-  headingTracking?: HeadingTracking;
-  display?: DisplayScale;
-  rhythm?: Rhythm;
-  imageStyle?: ImageStyle;
-  eyebrowStyle?: EyebrowStyle;
-  linkStyle?: LinkStyle;
-  rules?: RuleStyle;
-  wordmark?: {
-    font?: 'heading' | 'body';
-    weight?: number;
-    case?: 'normal' | 'upper' | 'small';
-    tracking?: number;
-    size?: number;
-    sub?: 'none' | 'type';
-  };
-};
-
-export type ThemeHeader = {
-  style?: HeaderStyle;
-  sticky?: boolean;
-  border?: boolean;
-  background?: 'plain' | 'soft' | 'brand';
-  cta?: { enabled?: boolean; label?: string; link?: LinkTarget; style?: 'solid' | 'outline' };
-  extraLinks?: { label: string; link: LinkTarget }[];
-  announcement?: { enabled?: boolean; text?: string; link?: LinkTarget; bg?: 'brand' | 'accent' | 'dark' | 'custom'; color?: string };
-};
-
-export type ThemeFooter = {
-  layout?: FooterLayout;
-  about?: string;
-  columns?: { title: string; links: { label: string; link: LinkTarget }[] }[];
-  showSocial?: boolean;
-  showContact?: boolean;
-  showHours?: boolean;
-  copyright?: string;
-  background?: 'soft' | 'plain' | 'brand' | 'dark';
-};
-
-/** Theme v2. Legacy v1 fields stay optional so old rows and tests still work. */
 export type Theme = {
-  version?: 2;
-  colors?: ThemeColors;
+  version?: number;
   presetId?: string | null;
+  palette?: Palette | string;
+  fontPair?: FontPair | string;
+  corners?: Corners;
+  colorMode?: "light" | "dark";
+  density?: Density;
+  colors?: Partial<ThemeColors>;
   fonts?: {
-    heading: FontChoice;
-    body: FontChoice;
-    scale: 'compact' | 'comfortable' | 'large';
+    heading: { id: string; weight?: number };
+    body: { id: string; weight?: number };
+    scale?: "compact" | "comfortable" | "large";
   };
   buttons?: {
-    shape: 'square' | 'soft' | 'round' | 'pill';
-    style: 'solid' | 'outline' | 'soft';
-    size: 'normal' | 'large';
-    uppercase: boolean;
-    shadow: boolean;
+    shape?: "square" | "soft" | "round" | "pill";
+    style?: "solid" | "outline" | "soft";
+    size?: "normal" | "large";
+    uppercase?: boolean;
+    shadow?: boolean;
   };
-  cards?: { style: 'flat' | 'outlined' | 'shadow' };
-  corners: Corners;
-  density?: 'compact' | 'comfortable' | 'airy';
-  colorMode?: ColorMode;
-  design?: ThemeDesign;
-  header?: ThemeHeader;
-  footer?: ThemeFooter;
-  /** Legacy v1 fields. */
-  palette?: Palette;
-  fontPair?: FontPairId;
-};
-
-export type LinkContext = {
-  getPageHref?: (pageId: string) => string;
-  getPath?: (pageId: string) => string;
-};
-
-export function linkToHref(link: LinkTarget | undefined | null, ctx: LinkContext = {}): string | null {
-  if (!link) return null;
-  if (link.type === 'none') return null;
-  if (link.type === 'page') {
-    if (ctx.getPageHref) return ctx.getPageHref(link.pageId);
-    return `/pages/${link.pageId}`;
-  }
-  if (link.type === 'section') {
-    return link.anchor ? `#${link.anchor}` : null;
-  }
-  if (link.type === 'pageSection') {
-    const base = ctx.getPath
-      ? ctx.getPath(link.pageId)
-      : ctx.getPageHref
-        ? ctx.getPageHref(link.pageId)
-        : `/pages/${link.pageId}`;
-    return `${base}#${link.anchor}`;
-  }
-  if (link.type === 'url') {
-    try {
-      const url = new URL(link.url);
-      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
-      return link.url;
-    } catch {
-      return null;
-    }
-  }
-  if (link.type === 'phone') {
-    const num = link.number.replace(/[^+\d]/g, '');
-    if (!num) return null;
-    return `tel:${num}`;
-  }
-  if (link.type === 'email') {
-    if (!link.address) return null;
-    return `mailto:${link.address}`;
-  }
-  if (link.type === 'whatsapp') {
-    const num = link.number.replace(/\D/g, '');
-    if (!num) return null;
-    return `https://wa.me/${num}`;
-  }
-  return null;
-}
-
-export const SOCIAL_NETWORKS = [
-  'facebook',
-  'instagram',
-  'x',
-  'tiktok',
-  'youtube',
-  'linkedin',
-  'whatsapp',
-  'telegram',
-  'pinterest',
-  'github',
-  'behance',
-  'dribbble',
-] as const;
-export type SocialNetwork = (typeof SOCIAL_NETWORKS)[number];
-export type SocialLink = { network: SocialNetwork; url: string };
-
-export type HeaderConfig = {
-  logoMode: 'auto' | 'logo' | 'text';
-  logoHeight: number;
-  menuSource: 'pages' | 'sections' | 'both';
-  menuAlign: 'left' | 'center' | 'right';
-  extraLinks: { label: string; link: LinkTarget }[];
-  cta: { enabled: boolean; label: string; link: LinkTarget; style: 'solid' | 'outline' };
-  sticky: boolean;
-  background: 'plain' | 'soft' | 'brand';
-  border: boolean;
-  announcement: {
-    enabled: boolean;
-    text: string;
-    link: LinkTarget;
-    bg: 'brand' | 'accent' | 'dark' | 'custom';
-    color: string;
+  cards?: {
+    style?: "flat" | "outlined" | "shadow";
+  };
+  header?: {
+    style?: string;
+    sticky?: boolean;
+  };
+  footer?: {
+    style?: string;
+  };
+  design?: {
+    rhythm?: Rhythm;
+    buttonShape?: "square" | "soft" | "round" | "pill";
+    buttonStyle?: "solid" | "outline" | "soft";
+    buttonSize?: "normal" | "large";
+    cardStyle?: "flat" | "outlined" | "shadow";
+    imageStyle?: "rounded" | "sharp" | "arch" | "offset" | "circle";
+    align?: "left" | "center";
   };
 };
 
-export type FooterConfig = {
-  layout: 'simple' | 'columns' | 'centered' | 'bigbrand';
-  about: string;
-  columns: { title: string; links: { label: string; link: LinkTarget }[] }[];
-  showSocial: boolean;
-  showContact: boolean;
-  showHours: boolean;
-  copyright: string;
-  background: 'soft' | 'plain' | 'brand' | 'dark';
+export type LinkTarget =
+  | { type: "none" }
+  | { type: "page"; pageId?: string }
+  | { type: "url"; url?: string }
+  | { type: "email"; email?: string; address?: string }
+  | { type: "phone"; phone?: string; number?: string }
+  | { type: "anchor"; anchor?: string }
+  | { type: "section"; anchor?: string };
+
+export type BlockSectionStyle = {
+  anchor?: string;
+  background?: "default" | "soft" | "primary" | "dark";
+  padding?: "none" | "compact" | "normal" | "spacious";
+  shape?: {
+    top?: string;
+    bottom?: string;
+  };
 };
 
-export type { SectionOptions, Hours, DayHours, Period } from './schemas';
+export type Block = {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  sec?: BlockSectionStyle;
+  sampleOnly?: boolean;
+  includeIf?: string;
+};
+
+export type Declarations = Record<string, string>;
+
+export type StyleSet = {
+  base?: Declarations;
+  hover?: Declarations;
+  focus?: Declarations;
+  active?: Declarations;
+  tablet?: Declarations;
+  phone?: Declarations;
+};
+
+export type NodeType =
+  | "page"
+  | "section"
+  | "section-item"
+  | "container"
+  | "columns"
+  | "column"
+  | "stack"
+  | "grid"
+  | "list"
+  | "heading"
+  | "text"
+  | "richtext"
+  | "image"
+  | "video"
+  | "icon"
+  | "button"
+  | "divider"
+  | "spacer"
+  | "accordion"
+  | "accordion-item"
+  | "html"
+  | "smart"
+  | "reference";
+
+export type RichMark = {
+  type: "bold" | "italic" | "underline" | "strike" | "code" | "link" | string;
+  attrs?: Record<string, unknown>;
+};
+
+export type RichTextLeaf = {
+  type: "text";
+  text: string;
+  marks?: RichMark[];
+};
+
+export type RichNode = {
+  type?: string;
+  attrs?: Record<string, unknown>;
+  content?: Array<RichNode | RichTextLeaf>;
+  text?: string;
+  marks?: RichMark[];
+};
+
+export type DeviceVisibility = {
+  all?: boolean;
+  computer?: boolean;
+  tablet?: boolean;
+  phone?: boolean;
+  [key: string]: boolean | undefined;
+};
+
+export type ContentNode = {
+  id: string;
+  type: NodeType;
+  props?: Record<string, unknown>;
+  styles?: StyleSet;
+  classes?: string[];
+  attrs?: {
+    id?: string;
+    ariaLabel?: string;
+    [key: string]: unknown;
+  };
+  children?: ContentNode[];
+  requiresPlugin?: string;
+  locked?: boolean;
+  hidden?: boolean | DeviceVisibility;
+  note?: string;
+};
+
+export type PageContentV5 = {
+  schemaVersion: 5;
+  root: ContentNode;
+  css?: string;
+  meta?: {
+    migratedFrom?: number;
+    [key: string]: unknown;
+  };
+};

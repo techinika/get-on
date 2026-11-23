@@ -50,9 +50,10 @@ describe("template real data", () => {
       const validated = validateContent({ schemaVersion: 4, blocks });
       expect(validated.ok).toBe(true);
       expect(
-        (validated.content?.blocks as Array<Record<string, unknown>>).some(
-          (block) => block.sampleOnly === true,
-        ),
+        validated.ok &&
+          (validated.content.blocks as Array<Record<string, unknown>>).some(
+            (block) => block.sampleOnly === true,
+          ),
       ).toBe(true);
     }
   });

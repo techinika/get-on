@@ -1,9 +1,4 @@
-export * from "./types";
-export * from "./catalog";
-export * from "./registry";
-export * from "./apply";
-export * from "./validation";
-export * from "./variables";
-export * from "./art";
-export * from "./assets";
-export * from "./art-images";
+export type { Block, Theme } from "@get-on/blocks";
+export * from "./artwork";
+export * from "./images";
+export * from "./packages";

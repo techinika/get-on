@@ -945,14 +945,22 @@ function AdvancedTab({ node }: { node: ContentNode }) {
       <Field label={`Hide on ${device}`}>
         <Switch
           label="Hide on this device"
-          checked={Boolean(node.hidden?.[device])}
-          onChange={(checked) =>
+          checked={
+            typeof node.hidden === "boolean"
+              ? node.hidden
+              : Boolean(node.hidden?.[device])
+          }
+          onChange={(checked) => {
+            const currentHidden =
+              typeof node.hidden === "object" && node.hidden !== null
+                ? node.hidden
+                : {};
             updateNode(
               node.id,
-              { hidden: { ...(node.hidden ?? {}), [device]: checked || undefined } },
+              { hidden: { ...currentHidden, [device]: checked || undefined } },
               { group: `hidden:${node.id}` },
-            )
-          }
+            );
+          }}
         />
       </Field>
       <Field label="Lock">

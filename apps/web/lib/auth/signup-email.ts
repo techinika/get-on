@@ -1,5 +1,6 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import env from "@/lib/env";
+import { isSupabaseConfigured } from "@/lib/supabase/fallback";
 
 /**
  * Supabase sends the signup confirmation link using the SMTP settings (Resend)
@@ -21,6 +22,7 @@ function confirmationRedirect(): string | undefined {
 }
 
 export async function sendSignupEmail(email: string): Promise<boolean> {
+  if (!isSupabaseConfigured()) return false;
   const emailRedirectTo = confirmationRedirect();
   const { error } = await confirmationClient().auth.resend({
     type: "signup",

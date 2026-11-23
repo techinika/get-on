@@ -1,232 +1,267 @@
-import type { TemplateCatalogItem, TemplateMeta } from "./types";
+export type TemplateCatalogItem = {
+  slug: string;
+  name: string;
+  tagline: string;
+  description: string;
+  category: string;
+  tags?: string[];
+  planMin: "free" | "basic" | "pro" | "enterprise";
+  pageCount: number;
+  featured: boolean;
+  colors: {
+    primary: string;
+    accent: string;
+    background: string;
+    text: string;
+    soft: string;
+  };
+  preview: {
+    eyebrow: string;
+    heading: string;
+    subheading: string;
+    items: string[];
+  };
+};
 
-export type { TemplateCatalogItem } from "./types";
-
-const CATALOG: TemplateCatalogItem[] = [
-
-  {
-    slug: "salon-beauty",
-    name: "Salon and beauty",
-    tagline: "A soft, elegant website for a salon or beauty studio.",
-    description:
-      "A calm design for hair, skin and nail care. Show treatments, introduce the team and make booking feel unhurried.",
-    category: "health-beauty",
-    tags: ["salon", "beauty", "booking", "soft"],
-    businessTypes: ["salon-beauty"],
-    planMin: "basic",
-    featured: true,
-    pageCount: 4,
-    colors: { primary: "#8E4A5D", accent: "#B5835A", background: "#FFF9F6", text: "#2E2024", soft: "#F8E9E6" },
-    preview: {
-      eyebrow: "Salon and beauty",
-      heading: "Care that makes you feel like yourself",
-      subheading: "A quiet studio for considered hair, skin and nail care.",
-      items: ["Treatments", "The studio", "Book a visit"],
-    },
-  },
-  {
-    slug: "boutique-shop",
-    name: "Boutique shop",
-    tagline: "A product-first website for a small shop.",
-    description:
-      "A warm retail design for a curated shop. Show products, tell the story behind them and make visiting or asking a question easy.",
-    category: "shop",
-    tags: ["shop", "products", "retail", "editorial"],
-    businessTypes: ["shop"],
-    planMin: "basic",
-    featured: true,
-    pageCount: 4,
-    colors: { primary: "#1C1B1A", accent: "#C2410C", background: "#F7F3EE", text: "#151412", soft: "#ECE5DB" },
-    preview: {
-      eyebrow: "Boutique shop",
-      heading: "Things worth keeping",
-      subheading: "A small edit of useful objects, chosen with care.",
-      items: ["The shop", "Our story", "Visit us"],
-    },
-  },
-  {
-    slug: "home-services",
-    name: "Home services",
-    tagline: "A bold, trustworthy website for local trades.",
-    description:
-      "A direct design for repairs, improvements and home services. Put the phone number first, explain the work and make quoting simple.",
-    category: "professional",
-    tags: ["trades", "repairs", "local", "bold"],
-    businessTypes: ["repair-services"],
-    planMin: "basic",
-    featured: true,
-    pageCount: 4,
-    colors: { primary: "#0A58CA", accent: "#FF7A00", background: "#FFFFFF", text: "#0F172A", soft: "#EAF2FF" },
-    preview: {
-      eyebrow: "Home services",
-      heading: "The job done properly, first time",
-      subheading: "Clear quotes, tidy work and a local team.",
-      items: ["Services", "Recent work", "Contact the team"],
-    },
-  },
-  {
-    slug: "community-church",
-    name: "Community and church",
-    tagline: "A warm, welcoming website for a community.",
-    description:
-      "A calm design for a church or community group. Welcome people, explain what happens and make the first visit feel easy.",
-    category: "community",
-    tags: ["community", "church", "welcome", "events"],
-    businessTypes: ["church-community"],
-    planMin: "free",
-    featured: false,
-    pageCount: 4,
-    colors: { primary: "#355E4B", accent: "#D9A441", background: "#FFFBF2", text: "#25302B", soft: "#EEF3E7" },
-    preview: {
-      eyebrow: "Community and church",
-      heading: "There is room for you here",
-      subheading: "A warm community with space for questions, quiet and company.",
-      items: ["What to expect", "Gatherings", "Plan a visit"],
-    },
-  },
-  {
-    slug: "creative-studio",
-    name: "Creative studio",
-    tagline: "An editorial, high-contrast website for a studio.",
-    description:
-      "A bold design for designers, makers and creative teams. Lead with the work, explain the thinking and make starting a project simple.",
-    category: "portfolio",
-    tags: ["studio", "creative", "portfolio", "editorial"],
-    businessTypes: ["portfolio", "consultant"],
-    planMin: "basic",
-    featured: true,
-    pageCount: 4,
-    colors: { primary: "#0A0A0A", accent: "#FF4D2E", background: "#FFFFFF", text: "#0A0A0A", soft: "#F2F2F0" },
-    preview: {
-      eyebrow: "Creative studio",
-      heading: "Make the idea impossible to ignore",
-      subheading: "Brand, digital and campaign work with a clear point of view.",
-      items: ["Selected work", "The studio", "Start a project"],
-    },
-  },
+export const TEMPLATE_CATALOG: TemplateCatalogItem[] = [
   {
     slug: "starter",
-    name: "Starter",
-    tagline: "A friendly, flexible website for any small business.",
+    name: "Local Starter",
+    tagline: "Warm, adaptable pages for everyday businesses and services.",
     description:
-      "A clean starting point with a welcome section, what you offer, a little about you and an easy way for people to get in touch. Works well for almost any business.",
+      "A clear, balanced website layout designed to introduce your business, explain what you offer, and help customers reach you fast.",
     category: "starter",
-    tags: ["simple", "friendly", "flexible", "default"],
-    businessTypes: ["other", "consultant", "shop", "repair-services", "farm-agriculture"],
     planMin: "free",
-    featured: true,
     pageCount: 4,
-    colors: { primary: "#0B6B4F", accent: "#F59E0B", background: "#FFFBF7", text: "#1F1A17", soft: "#F0F7F4" },
+    featured: true,
+    colors: {
+      primary: "#0B6B4F",
+      accent: "#F59E0B",
+      background: "#FFFBF5",
+      text: "#1F1A17",
+      soft: "#F0F7F4",
+    },
     preview: {
-      eyebrow: "Small business, big welcome",
-      heading: "A simple website that feels like you",
-      subheading: "Tell people what you do, show what you offer and make it easy to get in touch.",
-      items: ["What you offer", "About your business", "Contact details"],
+      eyebrow: "Starter",
+      heading: "A clear home for your business online",
+      subheading: "Introduce your services, answer common questions, and invite enquiries.",
+      items: ["Services", "About", "Contact"],
     },
   },
   {
     slug: "software-company",
-    name: "Software company",
-    tagline: "A clear, modern website for a software product.",
+    name: "SaaS & Software",
+    tagline: "Crisp product framing built for modern software teams.",
     description:
-      "Explain what your product does, show how it works, share pricing and answer common questions. Built for software teams that want a calm, confident website.",
+      "Showcase your product architecture, highlight key workflows, compare pricing tiers, and convert sign-ups cleanly.",
     category: "software",
-    tags: ["saas", "product", "pricing", "modern"],
-    businessTypes: ["other", "consultant"],
     planMin: "basic",
-    featured: true,
     pageCount: 5,
-    colors: { primary: "#3730A3", accent: "#14B8A6", background: "#FFFFFF", text: "#1B1A33", soft: "#F4F3FF" },
+    featured: true,
+    colors: {
+      primary: "#0369A1",
+      accent: "#06B6D4",
+      background: "#F8FAFC",
+      text: "#0F172A",
+      soft: "#E0F2FE",
+    },
     preview: {
-      eyebrow: "Software made simple",
-      heading: "Work together, without the busywork",
-      subheading: "One calm place for your team to plan, share and get things done.",
-      items: ["Product features", "Simple pricing", "Questions answered"],
+      eyebrow: "Software",
+      heading: "Ship faster with confidence",
+      subheading: "Structured workflows, transparent plans, and straightforward onboarding.",
+      items: ["Product", "Pricing", "Docs"],
     },
   },
   {
     slug: "law-firm",
-    name: "Law firm",
-    tagline: "A calm, trustworthy website for a law firm.",
+    name: "Chambers & Legal",
+    tagline: "Measured serif typography with calm editorial authority.",
     description:
-      "Put people at ease with clear practice areas, a warm introduction to your team and simple ways to book a first conversation.",
+      "Tailored for legal practices, advisory firms, and consultants who value clarity, trust, and discretion.",
     category: "professional",
-    tags: ["legal", "professional", "trust", "services"],
-    businessTypes: ["consultant", "other"],
     planMin: "basic",
+    pageCount: 4,
     featured: false,
-    pageCount: 5,
-    colors: { primary: "#3B5B8C", accent: "#B8945F", background: "#F7F9FC", text: "#172033", soft: "#EEF2F8" },
+    colors: {
+      primary: "#1E3A8A",
+      accent: "#D97706",
+      background: "#FCFBF8",
+      text: "#18181B",
+      soft: "#EFF6FF",
+    },
     preview: {
-      eyebrow: "Clear advice. Steady support.",
-      heading: "Pragmatic legal help when it matters most",
-      subheading: "Friendly legal guidance explained in plain language.",
-      items: ["Practice areas", "Our approach", "Book a conversation"],
+      eyebrow: "Legal",
+      heading: "Practical counsel when decisions matter",
+      subheading: "Experienced representation across commercial, property, and advisory matters.",
+      items: ["Practice Areas", "Team", "Consult"],
     },
   },
   {
     slug: "restaurant",
-    name: "Restaurant",
-    tagline: "A warm website for a restaurant, cafe or food business.",
+    name: "Bistro & Kitchen",
+    tagline: "Inviting food storytelling with menus and table booking notes.",
     description:
-      "Show your menu, opening hours and contact details in a design that makes people hungry. Perfect for cafes, restaurants and small food businesses.",
+      "Put seasonal dishes, opening hours, and location front and center with warm editorial pacing.",
     category: "restaurant",
-    tags: ["food", "menu", "hours", "warm"],
-    businessTypes: ["restaurant"],
     planMin: "free",
+    pageCount: 4,
     featured: true,
-    pageCount: 6,
-    colors: { primary: "#B8472B", accent: "#D97706", background: "#FFFBF7", text: "#2A1A14", soft: "#FBF3ED" },
+    colors: {
+      primary: "#9D174D",
+      accent: "#F59E0B",
+      background: "#FFFDF9",
+      text: "#27141D",
+      soft: "#FCE7F3",
+    },
     preview: {
-      eyebrow: "Freshly made, served with love",
-      heading: "A table worth sharing",
-      subheading: "Good food, friendly faces and a warm welcome. Come and see us.",
-      items: ["Our menu", "Our story", "Find us"],
+      eyebrow: "Hospitality",
+      heading: "Fresh kitchen plates shared daily",
+      subheading: "Seasonal ingredients, friendly service, and easy reservations.",
+      items: ["Menu", "Hours", "Book"],
     },
   },
   {
     slug: "developer-portfolio",
-    name: "Developer portfolio",
-    tagline: "A focused website for a developer or designer.",
+    name: "Engineer Portfolio",
+    tagline: "Monospace precision for builders, makers, and technical consultants.",
     description:
-      "Show selected work, explain how you approach projects and make it easy for people to start a conversation. Simple, personal and fast.",
+      "Highlight shipped systems, open-source projects, writing, and direct availability without fluff.",
     category: "portfolio",
-    tags: ["portfolio", "developer", "work", "personal"],
-    businessTypes: ["portfolio"],
     planMin: "free",
-    featured: false,
     pageCount: 4,
-    colors: { primary: "#1F2937", accent: "#D97706", background: "#FFFFFF", text: "#111827", soft: "#F9FAFB" },
+    featured: false,
+    colors: {
+      primary: "#1F2937",
+      accent: "#10B981",
+      background: "#FAFAFA",
+      text: "#111827",
+      soft: "#F3F4F6",
+    },
     preview: {
-      eyebrow: "Designer & Developer",
-      heading: "I build websites that feel as good as they look",
-      subheading: "A selection of projects I am proud of and how we can work together.",
-      items: ["Selected work", "How I can help", "Get in touch"],
+      eyebrow: "Portfolio",
+      heading: "Reliable web systems & tools",
+      subheading: "Full-stack architecture, clean APIs, and thoughtful interfaces.",
+      items: ["Projects", "Stack", "Hire"],
+    },
+  },
+  {
+    slug: "salon-beauty",
+    name: "Studio & Wellness",
+    tagline: "Graceful serif rhythm designed for salons, spas, and studios.",
+    description:
+      "Present treatment menus, practitioner profiles, and studio atmosphere in a serene editorial flow.",
+    category: "professional",
+    planMin: "basic",
+    pageCount: 4,
+    featured: false,
+    colors: {
+      primary: "#9D174D",
+      accent: "#F43F5E",
+      background: "#FFF9FB",
+      text: "#27141D",
+      soft: "#FCE7F3",
+    },
+    preview: {
+      eyebrow: "Wellness",
+      heading: "Unhurried care in a calm space",
+      subheading: "Tailored treatments, natural products, and welcoming specialists.",
+      items: ["Treatments", "Gallery", "Visit"],
+    },
+  },
+  {
+    slug: "boutique-shop",
+    name: "Boutique Goods",
+    tagline: "Warm showcase cards tailored for independent shops and makers.",
+    description:
+      "Spotlight curated collections, store story, and stockist info with inviting colour accents.",
+    category: "starter",
+    planMin: "basic",
+    pageCount: 4,
+    featured: false,
+    colors: {
+      primary: "#C2410C",
+      accent: "#F59E0B",
+      background: "#FFFBF7",
+      text: "#291810",
+      soft: "#FFEDD5",
+    },
+    preview: {
+      eyebrow: "Retail",
+      heading: "Thoughtful objects made to last",
+      subheading: "Small-batch goods curated for everyday living.",
+      items: ["Collection", "Story", "Stockists"],
+    },
+  },
+  {
+    slug: "home-services",
+    name: "Trade & Home Services",
+    tagline: "Direct, trustworthy layout for contractors, repairs, and local trades.",
+    description:
+      "Built for fast phone inquiries, clear service areas, guarantees, and upfront quote requests.",
+    category: "starter",
+    planMin: "free",
+    pageCount: 4,
+    featured: false,
+    colors: {
+      primary: "#0B6B4F",
+      accent: "#F59E0B",
+      background: "#FFFBF5",
+      text: "#1F1A17",
+      soft: "#F0F7F4",
+    },
+    preview: {
+      eyebrow: "Home Services",
+      heading: "Dependable work done right on time",
+      subheading: "Licensed local trades serving homes and businesses nearby.",
+      items: ["Services", "Areas", "Quote"],
+    },
+  },
+  {
+    slug: "community-church",
+    name: "Community & Gathering",
+    tagline: "Welcoming layout for congregations, charities, and civic groups.",
+    description:
+      "Share gathering times, community programs, leadership, and ways to get involved.",
+    category: "starter",
+    planMin: "free",
+    pageCount: 4,
+    featured: false,
+    colors: {
+      primary: "#0369A1",
+      accent: "#06B6D4",
+      background: "#F8FAFC",
+      text: "#0F172A",
+      soft: "#E0F2FE",
+    },
+    preview: {
+      eyebrow: "Community",
+      heading: "Everyone has a place at the table",
+      subheading: "Weekly gatherings, local outreach, and neighbourhood support.",
+      items: ["Gatherings", "Programs", "Connect"],
+    },
+  },
+  {
+    slug: "creative-studio",
+    name: "Creative Studio",
+    tagline: "Expressive studio showcase for agencies, photographers, and designers.",
+    description:
+      "Put selected work, process notes, and collaboration inquiries into an editorial grid.",
+    category: "portfolio",
+    planMin: "pro",
+    pageCount: 5,
+    featured: true,
+    colors: {
+      primary: "#1F2937",
+      accent: "#F59E0B",
+      background: "#FAFAFA",
+      text: "#111827",
+      soft: "#F3F4F6",
+    },
+    preview: {
+      eyebrow: "Creative",
+      heading: "Design & direction with character",
+      subheading: "Identity systems, digital craft, and visual storytelling.",
+      items: ["Work", "Studio", "Contact"],
     },
   },
 ];
-
-export const TEMPLATE_CATALOG = CATALOG;
-
-export function catalogItem(slug: string): TemplateCatalogItem | undefined {
-  return CATALOG.find((item) => item.slug === slug);
-}
-
-export function metaFor(slug: string): TemplateMeta {
-  const item = catalogItem(slug);
-  if (!item) throw new Error(`Unknown template: ${slug}`);
-  return {
-    slug: item.slug,
-    name: item.name,
-    tagline: item.tagline,
-    description: item.description,
-    category: item.category,
-    tags: item.tags,
-    businessTypes: item.businessTypes,
-    author: "Get-On",
-    license: "platform",
-    planMin: item.planMin,
-    featured: item.featured,
-    notices: [],
-  };
-}

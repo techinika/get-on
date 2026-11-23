@@ -1,23 +1,26 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminSupabaseConfigured } from "@/lib/supabase/fallback";
 import { readDomainsConfig } from "@/lib/domains/config";
 import { DomainService } from "@/lib/domains/service";
 import { createHostnameProvider } from "@/lib/domains/provider-factory";
 import { readPublishConfig, requireCloudflareConfig } from "@/lib/publishing/config";
 import { createPublishStore } from "@/lib/publishing/store";
 import { parseHost } from "@get-on/site-server";
+import {
+  ALL_JOB_MODES,
+  JOB_LABELS,
+  appendJobErrorLog,
+  finishTrackedJob,
+  recordTrackedRun,
+  startTrackedJob,
+  type JobMode,
+  type ProviderHealthSnapshot,
+} from "./ops-store";
 
 const LIMIT = 50;
 
-export type JobMode = "verify" | "poll" | "health" | "plan" | "cleanup" | "migrate-pointers";
-
-export const JOB_LABELS: Record<JobMode, string> = {
-  verify: "Verify domains",
-  poll: "Poll addresses",
-  health: "Check live addresses",
-  plan: "Enforce plans",
-  cleanup: "Cleanup",
-  "migrate-pointers": "Migrate pointers",
-};
+export { ALL_JOB_MODES, JOB_LABELS };
+export type { JobMode };
 
 export type JobRunResult = {
   ok: boolean;
@@ -28,17 +31,15 @@ export type JobRunResult = {
   error?: string;
 };
 
-type ProviderHealth = {
-  totalRequests?: number;
-  totalFailures?: number;
-  consecutiveFailures?: number;
-  circuitOpenUntil?: string | null;
-  lastFailureAt?: string | null;
-  lastSuccessAt?: string | null;
-};
+type ProviderHealth = ProviderHealthSnapshot;
 
 function nowIso(): string {
   return new Date().toISOString();
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 function buildService() {
@@ -66,22 +67,43 @@ async function recordRun(
   health: ProviderHealth | null,
 ): Promise<void> {
   const finished = Date.now();
+  const startedAt = new Date(started).toISOString();
+  const finishedAt = new Date(finished).toISOString();
+  const formattedError =
+    error instanceof Error
+      ? error.message.slice(0, 500)
+      : error
+        ? String(error).slice(0, 500)
+        : failed > 0
+          ? `${failed} item(s) failed`
+          : null;
+
+  recordTrackedRun({
+    job,
+    status,
+    startedAt,
+    finishedAt,
+    durationMs: finished - started,
+    count,
+    failed,
+    error: formattedError,
+    providerName,
+    health,
+  });
+
+  if (!isAdminSupabaseConfigured()) {
+    return;
+  }
+
   try {
     await admin.from("domain_job_runs").insert({
       job,
       status,
-      started_at: new Date(started).toISOString(),
-      finished_at: new Date(finished).toISOString(),
+      started_at: startedAt,
+      finished_at: finishedAt,
       duration_ms: finished - started,
       count,
-      error:
-        error instanceof Error
-          ? error.message.slice(0, 500)
-          : error
-            ? String(error).slice(0, 500)
-            : failed > 0
-              ? `${failed} item(s) failed`
-              : null,
+      error: formattedError,
       details: { provider: providerName ?? null, failed, health: health ?? null },
     });
     if (health && providerName && providerName !== "fake") {
@@ -94,7 +116,7 @@ async function recordRun(
         circuit_open_until: health.circuitOpenUntil ?? null,
         last_failure_at: health.lastFailureAt ?? null,
         last_success_at: health.lastSuccessAt ?? null,
-        checked_at: new Date().toISOString(),
+        checked_at: finishedAt,
       });
     }
   } catch (writeError) {
@@ -104,6 +126,7 @@ async function recordRun(
 
 export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
   const started = Date.now();
+  const runToken = startTrackedJob(mode);
   const { admin, provider, service } = buildService();
   const providerName = provider.name;
 
@@ -130,6 +153,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: String(row.id),
+              targetLabel: `domain:${row.id}`,
+              message: errorMessage(err),
+            });
             console.error(`[operations] verify ${row.id} failed`, err);
           }
         }
@@ -149,6 +178,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: String(row.id),
+              targetLabel: `hostname:${row.id}`,
+              message: errorMessage(err),
+            });
             console.error(`[operations] poll ${row.id} failed`, err);
           }
         }
@@ -169,6 +204,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: String(row.id),
+              targetLabel: `hostname:${row.id}`,
+              message: errorMessage(err),
+            });
             console.error(`[operations] health ${row.id} failed`, err);
           }
         }
@@ -183,6 +224,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: String(row.id),
+              targetLabel: `team:${row.id}`,
+              message: errorMessage(err),
+            });
             console.error(`[operations] plan ${row.id} failed`, err);
           }
         }
@@ -206,6 +253,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: String(row.provider_id),
+              targetLabel: String(row.hostname ?? row.provider_id),
+              message: errorMessage(err),
+            });
             console.error(`[operations] cleanup ${row.hostname} failed`, err);
           }
         }
@@ -270,6 +323,12 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
             count += 1;
           } catch (err) {
             failed += 1;
+            appendJobErrorLog({
+              job: mode,
+              targetId: hostname,
+              targetLabel: hostname,
+              message: errorMessage(err),
+            });
             console.error(`[operations] pointer ${hostname} failed`, err);
           }
         }
@@ -280,6 +339,14 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
   } catch (err) {
     error = err;
     failed += 1;
+    appendJobErrorLog({
+      job: mode,
+      targetId: null,
+      targetLabel: "Worker execution",
+      message: errorMessage(err),
+    });
+  } finally {
+    finishTrackedJob(runToken);
   }
 
   try {
@@ -297,6 +364,6 @@ export async function runDomainJob(mode: JobMode): Promise<JobRunResult> {
     count,
     failed,
     message,
-    ...(error ? { error: error instanceof Error ? error.message : String(error) } : {}),
+    ...(error ? { error: errorMessage(error) } : {}),
   };
 }

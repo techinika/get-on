@@ -850,7 +850,9 @@ function LayerRow({
           <Icon size={15} strokeWidth={1.7} className="shrink-0 text-text-muted" aria-hidden />
           <span className="truncate">{nodeLabel(node)}</span>
           {node.locked ? <Lock size={12} className="shrink-0 text-text-muted" aria-label="Locked" /> : null}
-          {node.hidden?.all ? <EyeOff size={12} className="shrink-0 text-text-muted" aria-label="Hidden" /> : null}
+          {(typeof node.hidden === "boolean" ? node.hidden : node.hidden?.all) ? (
+            <EyeOff size={12} className="shrink-0 text-text-muted" aria-label="Hidden" />
+          ) : null}
         </button>
         {!isRoot ? (
           <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex group-focus-within:flex">

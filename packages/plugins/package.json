@@ -1,17 +1,10 @@
 {
   "name": "@get-on/plugins",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./index.ts",
-  "types": "./index.ts",
+  "main": "./src/index.ts",
   "exports": {
-    ".": "./index.ts"
-  },
-  "dependencies": {
-    "zod": "^3.24.1"
-  },
-  "devDependencies": {
-    "typescript": "^5.9.3"
+    ".": "./src/index.ts"
   }
 }

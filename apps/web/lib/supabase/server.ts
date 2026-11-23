@@ -2,8 +2,13 @@ import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import env from "@/lib/env";
+import { createMockSupabaseClient, isSupabaseConfigured } from "./fallback";
 
 export async function createClient() {
+  if (!isSupabaseConfigured()) {
+    return createMockSupabaseClient();
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(env.supabaseUrl, env.supabaseAnonKey, {
@@ -30,6 +35,10 @@ export async function createClient() {
  * one that `cookies().set()` would target and then discard.
  */
 export async function createRouteClient(response: NextResponse) {
+  if (!isSupabaseConfigured()) {
+    return createMockSupabaseClient();
+  }
+
   const cookieStore = await cookies();
 
   return createServerClient(env.supabaseUrl, env.supabaseAnonKey, {

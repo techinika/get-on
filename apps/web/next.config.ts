@@ -18,12 +18,20 @@ function storagePattern() {
 }
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   transpilePackages: [
+    "@get-on/activity",
     "@get-on/ai",
+    "@get-on/billing",
     "@get-on/blocks",
+    "@get-on/email",
+    "@get-on/permissions",
+    "@get-on/plugins",
     "@get-on/publisher",
     "@get-on/renderer",
+    "@get-on/site-package",
     "@get-on/site-server",
+    "@get-on/templates",
   ],
   serverExternalPackages: ["sharp"],
   // Tailwind CSS v4 runs through the Turbopack loader, so the utilities in

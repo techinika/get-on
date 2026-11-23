@@ -1,4 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
+import { isSupabaseConfigured } from "@/lib/supabase/fallback";
+import { getLocalDomainOpsRaw } from "@/lib/domains/ops-store";
+import { publishLocalSystemTemplate } from "@/lib/templates/local-sync-store";
 import { StaffError } from "./staff";
 
 export type AccessPurpose =
@@ -94,6 +97,9 @@ export async function recordStaffAction(input: {
   ipHash?: string | null;
   userAgent?: string | null;
 }): Promise<string> {
+  if (!isSupabaseConfigured()) {
+    return "local-audit";
+  }
   return rpc<string>("staff_audit", {
     p_action: input.action,
     p_target_type: input.targetType,
@@ -184,6 +190,9 @@ export async function listEmailSuppressions(limit = 50) {
 }
 
 export async function getDomainOps() {
+  if (!isSupabaseConfigured()) {
+    return getLocalDomainOpsRaw();
+  }
   return rpc<{
     counts: Record<string, number>;
     runs: unknown[];
@@ -205,6 +214,12 @@ export async function publishSystemTemplate(input: {
   reason: string;
   approvalId?: string | null;
 }) {
+  if (!isSupabaseConfigured()) {
+    return publishLocalSystemTemplate({
+      templateId: input.templateId,
+      versionId: input.versionId,
+    });
+  }
   return rpc<{
     ok: boolean;
     duplicate: boolean;

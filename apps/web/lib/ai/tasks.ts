@@ -424,7 +424,8 @@ Do not start with "Image of" or "Picture of".`,
   },
 };
 
-export function textTask(taskId: AiTaskId): TextTaskConfig | null {
+export function textTask(taskId: AiTaskId | "tips.fix"): TextTaskConfig | null {
+  if (taskId === "tips.fix") return null;
   return TEXT_TASKS[taskId] ?? null;
 }
 

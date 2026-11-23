@@ -1,11 +1,14 @@
+import { Suspense } from "react";
 import { AppPage } from "@/components/app/app-page";
 import { AppCard } from "@/components/app/card";
 import { InfoBox } from "@/components/app/info-box";
-import { PageHeader } from "@/components/app/page-header";
 import { Badge } from "@/components/ui/badge";
-import { getDomainOps } from "@/lib/admin";
+import { getDomainOps, requireStaffAction } from "@/lib/admin";
 import { readDomainsConfig } from "@/lib/domains/config";
+import { getOpsSnapshot } from "@/lib/domains/ops-store";
 import { createHostnameProvider } from "@/lib/domains/provider-factory";
+import { BackgroundJobsMonitor } from "./background-jobs-monitor";
+import { OperationsTabs } from "./operations-tabs";
 import { RunDomainJobs } from "./run-jobs";
 
 export const dynamic = "force-dynamic";
@@ -47,10 +50,12 @@ function formatDuration(ms: number): string {
 }
 
 export default async function AdminOperationsPage() {
+  await requireStaffAction("domain.recheck");
   const [ops, config] = await Promise.all([getDomainOps(), Promise.resolve(readDomainsConfig())]);
   const counts = ops.counts ?? {};
   const runs = (ops.runs ?? []) as RunRow[];
   const health = (ops.health as HealthRow | null) ?? null;
+  const initialSnapshot = getOpsSnapshot(ops);
 
   let providerName: string = config.provider;
   let setup: { ok: boolean; problems: string[] } = { ok: false, problems: [] };
@@ -67,13 +72,8 @@ export default async function AdminOperationsPage() {
       ? (health.total_failures / health.total_requests) * 100
       : 0;
 
-  return (
-    <AppPage width="default">
-      <PageHeader
-        title="Operations"
-        description="Domain provider health, pending hostnames and recent checks."
-      />
-
+  const overviewContent = (
+    <>
       <div className="grid grid-cols-1 gap-4 min-[768px]:grid-cols-2 min-[1024px]:grid-cols-4">
         <AppCard className="p-5">
           <p className="text-sm text-text-muted">Hostnames</p>
@@ -184,9 +184,7 @@ export default async function AdminOperationsPage() {
               <li key={run.id} className="py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-semibold text-text">
-                      {run.job}
-                    </span>
+                    <span className="text-sm font-semibold text-text">{run.job}</span>
                     <Badge variant={run.status === "ok" ? "live" : "danger"}>
                       {run.status === "ok" ? "OK" : "Failed"}
                     </Badge>
@@ -214,6 +212,19 @@ export default async function AdminOperationsPage() {
         <code className="font-mono text-xs">pnpm job:domains-cleanup</code> removes provider
         hostnames after the 7-day grace period.
       </InfoBox>
+    </>
+  );
+
+  return (
+    <AppPage width="default">
+      <Suspense fallback={overviewContent}>
+        <OperationsTabs
+          overview={overviewContent}
+          jobsMonitor={<BackgroundJobsMonitor initialSnapshot={initialSnapshot} />}
+          errorCount={initialSnapshot.errorLogs.length}
+          runningCount={initialSnapshot.running.length}
+        />
+      </Suspense>
     </AppPage>
   );
 }
