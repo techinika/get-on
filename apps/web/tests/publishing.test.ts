@@ -411,5 +411,157 @@ describe("publisher v5 & plugin runtime", () => {
     expect(portable.files[jsEntry![0]]).toBeUndefined();
     expect(portableHtml).toContain("mailto:hello@example.com");
   });
+
+  it("isolates third-party plugins into opaque-origin sandbox iframes and strips unsafe code/markup", async () => {
+    const { buildSite, assertStyledHtml } = await import("@get-on/publisher");
+    const { normalizeThirdPartyPlugins, sandboxAttributesForPermissions, sanitizePluginConfig } =
+      await import("@get-on/plugins");
+    const { makeWebsiteFilesPortable } = await import("@/lib/site-package/content");
+
+    const cleanConfig = sanitizePluginConfig(
+      JSON.parse('{"theme":"warm","__proto__":{"polluted":true},"constructor":"bad","limit":10}'),
+    );
+    expect(cleanConfig).toEqual({ theme: "warm", limit: 10 });
+    expect(Object.prototype.hasOwnProperty.call(cleanConfig, "__proto__")).toBe(false);
+    expect(sandboxAttributesForPermissions()).toBe("allow-scripts");
+    expect(sandboxAttributesForPermissions({ allowForms: true, allowPopups: true })).toBe(
+      "allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox",
+    );
+    expect(sandboxAttributesForPermissions({ allowNetwork: true, allowNavigate: true })).not.toContain(
+      "allow-same-origin",
+    );
+    expect(sandboxAttributesForPermissions({ allowNetwork: true, allowNavigate: true })).not.toContain(
+      "allow-top-navigation",
+    );
+
+    const normalized = normalizeThirdPartyPlugins([
+      {
+        id: "Chat Widget!",
+        name: "Live Chat",
+        script: 'GetOnPlugin.onReady(function(ctx){ if(ctx.config.greeting){ ctx.resize(320); } });',
+        html: '<div id="box" onclick="alert(1)">Hello</div><script>alert(2)</script><iframe src="https://evil.test"></iframe>',
+        css: '@import url("https://evil.test/x.css"); </style><script>alert(3)</script> #box{color:#111;}',
+        config: { greeting: "Hi there" },
+        placement: "inline",
+        defaultHeight: 260,
+        permissions: { allowNetwork: false, allowResize: true },
+      },
+      {
+        id: "ticker",
+        name: "Weather Ticker",
+        script: 'GetOnPlugin.onReady(function(){ GetOnPlugin.navigate("https://example.com"); });',
+        placement: "floating",
+        permissions: { allowNetwork: true, allowNavigate: true },
+      },
+      {
+        id: "disabled-plugin",
+        script: "console.log('should not build');",
+        enabled: false,
+      },
+    ]);
+    expect(normalized).toHaveLength(2);
+    expect(normalized[0]!.id).toBe("chatwidget");
+    expect(normalized[1]!.id).toBe("ticker");
+
+    const input = buildSiteInput({
+      project: {
+        ...project,
+        settings: {
+          ...project.settings,
+          thirdPartyPlugins: normalized,
+        },
+      },
+      projectSettings: {
+        theme: { palette: "fresh-green", fontPair: "friendly", corners: "soft" },
+        seo_site_title: "Rose Bakery",
+      },
+      pages: [
+        {
+          ...page,
+          blocks: [
+            { id: "hero-1", type: "hero", props: { heading: "Rose Bakery" } },
+            {
+              id: "plug-1",
+              type: "plugin",
+              props: {
+                pluginId: normalized[0]!.id,
+                title: "Chat Support",
+                height: 300,
+                config: { greeting: "Welcome!" },
+              },
+            },
+          ],
+        },
+      ],
+      media: [],
+      imageBytes: new Map(),
+      planId: "starter",
+      publishId: "66666666-6666-4666-8666-666666666666",
+      rootDomain: "get-on.tech",
+    });
+
+    const built = buildSite(input);
+    const indexHtml = new TextDecoder().decode(built.files["index.html"]!.body);
+    assertStyledHtml(indexHtml);
+
+    // Host page never contains raw plugin JS, only sandboxed iframes without allow-same-origin.
+    expect(indexHtml).not.toContain("GetOnPlugin.onReady");
+    expect(indexHtml).toContain('data-gs-plugin-frame="1"');
+    expect(indexHtml).toContain(`src="/_plugins/${normalized[0]!.id}/index.html#`);
+    expect(indexHtml).toContain('src="/_plugins/ticker/net.html#');
+    expect(indexHtml).toContain('sandbox="allow-scripts"');
+    expect(indexHtml).toContain('referrerpolicy="no-referrer"');
+    expect(indexHtml).not.toContain("allow-same-origin");
+    expect(indexHtml).not.toContain("allow-top-navigation");
+
+    // Disabled plugin is omitted completely.
+    expect(
+      Object.keys(built.files).some((key) => key.includes("disabled-plugin")),
+    ).toBe(false);
+
+    // Sandbox HTML strips inline <script>, <iframe>, onclick handlers, and CSS escapes/@import.
+    const chatSandboxHtml = new TextDecoder().decode(
+      built.files[`_plugins/${normalized[0]!.id}/index.html`]!.body,
+    );
+    expect(chatSandboxHtml).toContain('<div id="box">Hello</div>');
+    expect(chatSandboxHtml).not.toContain("onclick=");
+    expect(chatSandboxHtml).not.toContain("<script>alert");
+    expect(chatSandboxHtml).not.toContain("<iframe");
+    expect(chatSandboxHtml).not.toContain("@import");
+    expect(chatSandboxHtml).not.toContain("</style><script>");
+    expect(chatSandboxHtml).toMatch(
+      new RegExp(`<script src="/_plugins/${normalized[0]!.id}/plugin-[a-f0-9]+\\.js" defer></script>`),
+    );
+
+    // Plugin JS lives in its own immutable _plugins/ asset wrapped with GetOnPlugin SDK.
+    const chatJsKey = Object.keys(built.files).find((k) =>
+      k.startsWith(`_plugins/${normalized[0]!.id}/plugin-`) && k.endsWith(".js"),
+    );
+    expect(chatJsKey).toBeTruthy();
+    expect(built.files[chatJsKey!]!.contentType).toBe("text/javascript; charset=utf-8");
+    const chatJs = new TextDecoder().decode(built.files[chatJsKey!]!.body);
+    expect(chatJs).toContain("window.GetOnPlugin=sdk");
+    expect(chatJs).toContain("ctx.resize(320)");
+
+    // Host runtime script validates opaque origin, ev.source, channel token, and protocol.
+    const hostJsKey = Object.keys(built.files).find((k) => /^assets\/site-[a-f0-9]+\.js$/.test(k));
+    const hostJs = new TextDecoder().decode(built.files[hostJsKey!]!.body);
+    expect(hostJs).toContain('ev.origin!=="null"');
+    expect(hostJs).toContain("ev.source!==rec.frame.contentWindow");
+    expect(hostJs).toContain("d.token!==rec.token");
+    expect(hostJs).toContain('parsed.protocol!=="https:"&&parsed.protocol!=="http:"');
+    expect(hostJs).not.toContain("eval(");
+    expect(hostJs).not.toContain("innerHTML");
+
+    // Portable ZIP export removes _plugins assets and plugin iframes cleanly.
+    const rawBytes: Record<string, Uint8Array> = {};
+    for (const [k, f] of Object.entries(built.files)) rawBytes[k] = f.body;
+    const portable = makeWebsiteFilesPortable(rawBytes, "hello@example.com");
+    expect(Object.keys(portable.files).some((k) => k.startsWith("_plugins/"))).toBe(false);
+    const portableHtml = new TextDecoder().decode(portable.files["index.html"]!);
+    expect(portableHtml).not.toContain("data-gs-plugin-frame");
+    expect(portableHtml).not.toContain("<iframe");
+    expect(portableHtml).not.toContain("<script");
+  });
 });
 

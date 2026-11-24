@@ -341,6 +341,63 @@ describe("health, CSP, and interactive endpoints", () => {
     expect(csp).toContain("script-src 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com");
+  });
+
+  it("serves _plugins sandbox documents and JS assets with isolated CSP and SAMEORIGIN framing", async () => {
+    const env = buildEnv({
+      files: {
+        "sites/site-1/v/pub-1/index.html": objectOf("<!doctype html><title>Rose Bakery</title>"),
+        "sites/site-1/v/pub-1/_plugins/chat-widget/index.html": objectOf(
+          '<!doctype html><script src="/_plugins/chat-widget/plugin-deadbeef.js" defer></script>',
+          "text/html; charset=utf-8",
+        ),
+        "sites/site-1/v/pub-1/_plugins/weather-widget/net.html": objectOf(
+          '<!doctype html><script src="/_plugins/weather-widget/plugin-cafebabe.js" defer></script>',
+          "text/html; charset=utf-8",
+        ),
+        "sites/site-1/v/pub-1/_plugins/chat-widget/plugin-deadbeef.js": objectOf(
+          '"use strict";',
+          "text/javascript; charset=utf-8",
+        ),
+      },
+    });
+    const worker = createSiteWorker({ cache: null });
+
+    const offlineRes = await worker.fetch(
+      requestFor("rosebakery.get-on.tech", "/_plugins/chat-widget/index.html"),
+      env,
+    );
+    expect(offlineRes.status).toBe(200);
+    expect(offlineRes.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(offlineRes.headers.get("referrer-policy")).toBe("no-referrer");
+    expect(offlineRes.headers.get("permissions-policy")).toContain("camera=()");
+    expect(offlineRes.headers.get("x-robots-tag")).toBe("noindex");
+    const offlineCsp = offlineRes.headers.get("content-security-policy") ?? "";
+    expect(offlineCsp).toContain("frame-ancestors 'self'");
+    expect(offlineCsp).toContain("script-src 'self'");
+    expect(offlineCsp).toContain("connect-src 'none'");
+    expect(offlineCsp).toContain("base-uri 'none'");
+    expect(offlineCsp).toContain("form-action 'none'");
+
+    const netRes = await worker.fetch(
+      requestFor("rosebakery.get-on.tech", "/_plugins/weather-widget/net.html"),
+      env,
+    );
+    expect(netRes.status).toBe(200);
+    expect(netRes.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    const netCsp = netRes.headers.get("content-security-policy") ?? "";
+    expect(netCsp).toContain("frame-ancestors 'self'");
+    expect(netCsp).toContain("connect-src https:");
+    expect(netCsp).toContain("script-src 'self'");
+
+    const jsRes = await worker.fetch(
+      requestFor("rosebakery.get-on.tech", "/_plugins/chat-widget/plugin-deadbeef.js"),
+      env,
+    );
+    expect(jsRes.status).toBe(200);
+    expect(jsRes.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+    expect(jsRes.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
   });
 
   it("issues signed form tokens and forwards signed submissions", async () => {

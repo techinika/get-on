@@ -357,6 +357,7 @@ export function makeWebsiteFilesPortable(
       path.startsWith("_forms/") ||
       path.startsWith("_gs/") ||
       path.startsWith("_l/") ||
+      path.startsWith("_plugins/") ||
       /^assets\/site-[a-f0-9]+\.js$/i.test(path)
     ) {
       removed.push(path);
@@ -367,8 +368,11 @@ export function makeWebsiteFilesPortable(
       continue;
     }
     let html = decodeText(body);
-    // Remove Google Analytics and platform runtime scripts.
+    // Remove Google Analytics, platform runtime scripts, and sandboxed third-party plugin frames.
     html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
+    html = html.replace(/<section\b[^>]*data-gs-plugin-section="1"[^>]*>[\s\S]*?<\/section>/gi, "");
+    html = html.replace(/<div\b[^>]*data-gs-plugin-section="1"[^>]*>[\s\S]*?<\/div>/gi, "");
+    html = html.replace(/<iframe\b[^>]*data-gs-plugin-frame="1"[^>]*>[\s\S]*?<\/iframe>/gi, "");
     // Turn contact forms into an email button, or hide them when no email exists.
     html = html.replace(/<form\b[^>]*>([\s\S]*?)<\/form>/gi, (_match, inner) => {
       if (!/contact|message|email|phone|name/i.test(inner)) return "";

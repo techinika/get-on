@@ -92,6 +92,27 @@ export type PublishPage = {
   blocks: Block[] | unknown[] | PageContentV5 | { blocks?: Block[] | unknown[] };
 };
 
+export type PluginSandboxPermissionsInput = {
+  allowNetwork?: boolean;
+  allowForms?: boolean;
+  allowPopups?: boolean;
+  allowNavigate?: boolean;
+  allowResize?: boolean;
+};
+
+export type ThirdPartyPluginInput = {
+  id: string;
+  name?: string;
+  script: string;
+  html?: string;
+  css?: string;
+  config?: Record<string, unknown>;
+  placement?: "inline" | "floating" | "headless";
+  defaultHeight?: number;
+  permissions?: PluginSandboxPermissionsInput;
+  enabled?: boolean;
+};
+
 export type BuildSiteInput = {
   siteId: string;
   subdomain?: string;
@@ -100,6 +121,7 @@ export type BuildSiteInput = {
   rootDomain?: string;
   primaryHost?: string | null;
   activePlugins?: string[];
+  thirdPartyPlugins?: ThirdPartyPluginInput[];
   forms?: { enabled: boolean };
   settings: SiteSettings;
   pages: PublishPage[];
@@ -153,6 +175,280 @@ export function normalizeFormId(rawId: string, fallbackSeed = "form"): string {
   }
   const base = cleaned || "contact";
   return `${base}_${digest}`.slice(0, 32);
+}
+
+type NormalizedSandboxPlugin = {
+  id: string;
+  name: string;
+  script: string;
+  html: string;
+  css: string;
+  config: Record<string, unknown>;
+  placement: "inline" | "floating" | "headless";
+  defaultHeight: number;
+  permissions: {
+    allowNetwork: boolean;
+    allowForms: boolean;
+    allowPopups: boolean;
+    allowNavigate: boolean;
+    allowResize: boolean;
+  };
+  docPath: string;
+  scriptPath: string;
+  sandboxAttr: string;
+};
+
+const FORBIDDEN_CONFIG_KEYS = new Set(["__proto__", "constructor", "prototype"]);
+
+function normalizePluginId(rawId: string, fallbackSeed = "plugin"): string {
+  const lowered = rawId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  if (lowered.length >= 2 && lowered.length <= 40) return lowered;
+  const digest = fnv1aHex(rawId || fallbackSeed);
+  const base = lowered || "plugin";
+  return `${base}_${digest}`.slice(0, 40);
+}
+
+function sanitizeJsonValue(value: unknown, depth: number): unknown {
+  if (depth > 4) return null;
+  if (value === null || typeof value === "boolean") return value;
+  if (typeof value === "string") return value.slice(0, 8192);
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (Array.isArray(value)) {
+    return value.slice(0, 50).map((item) => sanitizeJsonValue(item, depth + 1));
+  }
+  if (typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    let count = 0;
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (count >= 50) break;
+      if (FORBIDDEN_CONFIG_KEYS.has(k) || typeof v === "undefined" || typeof v === "function") {
+        continue;
+      }
+      out[k.slice(0, 80)] = sanitizeJsonValue(v, depth + 1);
+      count += 1;
+    }
+    return out;
+  }
+  return null;
+}
+
+function sanitizePluginConfig(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return sanitizeJsonValue(raw, 0) as Record<string, unknown>;
+}
+
+function sanitizePluginCss(rawCss: string): string {
+  if (!rawCss) return "";
+  return rawCss
+    .replace(/[<>]/g, "")
+    .replace(/@import\b[^;]*(;|$)/gi, "")
+    .replace(/expression\s*\(/gi, "")
+    .replace(/javascript\s*:/gi, "")
+    .replace(/vbscript\s*:/gi, "")
+    .slice(0, 128 * 1024);
+}
+
+function sandboxAttributesForPlugin(perms: NormalizedSandboxPlugin["permissions"]): string {
+  const tokens = ["allow-scripts"];
+  if (perms.allowForms) tokens.push("allow-forms");
+  if (perms.allowPopups) tokens.push("allow-popups", "allow-popups-to-escape-sandbox");
+  return tokens.join(" ");
+}
+
+function buildPluginSandboxRuntimeJs(plugin: { id: string; script: string }): string {
+  return `(function(){
+"use strict";
+var PLUGIN_ID=${JSON.stringify(plugin.id)};
+var rootEl=document.getElementById("gs-plugin-root");
+var instanceId=(window.location.hash||"").replace(/^#/,"").slice(0,80);
+var channelToken="";
+var readyFired=false;
+var currentCtx=null;
+var callbacks=[];
+function deliver(ctx){
+for(var i=0;i<callbacks.length;i+=1){
+try{callbacks[i](ctx);}catch(_err){}
+}
+}
+function postToHost(payload){
+try{
+if(window.parent&&window.parent!==window){
+window.parent.postMessage(payload,"*");
+}
+}catch(_err){}
+}
+var sdk={
+version:1,
+pluginId:PLUGIN_ID,
+instanceId:instanceId,
+mount:rootEl,
+config:Object.create(null),
+onReady:function(fn){
+if(typeof fn!=="function")return;
+callbacks.push(fn);
+if(currentCtx){try{fn(currentCtx);}catch(_err){}}
+},
+init:function(fn){sdk.onReady(fn);},
+resize:function(height){
+if(!channelToken||typeof height!=="number"||!isFinite(height))return;
+postToHost({type:"gs:plugin:resize",token:channelToken,pluginId:PLUGIN_ID,instanceId:instanceId,height:height});
+},
+navigate:function(url){
+if(!channelToken||typeof url!=="string")return;
+postToHost({type:"gs:plugin:navigate",token:channelToken,pluginId:PLUGIN_ID,instanceId:instanceId,url:url});
+},
+emit:function(name,detail){
+if(!channelToken||typeof name!=="string")return;
+postToHost({type:"gs:plugin:event",token:channelToken,pluginId:PLUGIN_ID,instanceId:instanceId,name:name,detail:detail===undefined?null:detail});
+}
+};
+window.GetOnPlugin=sdk;
+window.addEventListener("message",function(ev){
+if(ev.source!==window.parent)return;
+var d=ev.data;
+if(!d||typeof d!=="object"||d.type!=="gs:plugin:init")return;
+if(d.pluginId!==PLUGIN_ID)return;
+if(instanceId&&d.instanceId&&d.instanceId!==instanceId)return;
+if(typeof d.instanceId==="string"&&d.instanceId&&!instanceId){
+instanceId=d.instanceId;
+sdk.instanceId=instanceId;
+}
+if(typeof d.token!=="string"||!d.token)return;
+var first=!channelToken;
+channelToken=d.token;
+sdk.config=d.config&&typeof d.config==="object"?d.config:Object.create(null);
+currentCtx={pluginId:PLUGIN_ID,instanceId:instanceId,pagePath:typeof d.pagePath==="string"?d.pagePath:"/",config:sdk.config,mount:rootEl,resize:sdk.resize,navigate:sdk.navigate,emit:sdk.emit};
+if(first&&!readyFired){
+readyFired=true;
+deliver(currentCtx);
+}
+});
+function announce(){
+postToHost({type:"gs:plugin:ready",pluginId:PLUGIN_ID,instanceId:instanceId});
+}
+if(document.readyState==="loading"){
+document.addEventListener("DOMContentLoaded",announce,{once:true});
+}else{
+announce();
+}
+try{
+(function(GetOnPlugin,root){
+"use strict";
+${plugin.script}
+})(sdk,rootEl);
+}catch(_pluginErr){}
+})();`;
+}
+
+function buildPluginSandboxHtml(
+  plugin: NormalizedSandboxPlugin,
+  scriptPath: string,
+): string {
+  const safeCss = sanitizePluginCss(plugin.css);
+  const safeMarkup = plugin.html ? sanitizeHtml(plugin.html).html : "";
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${escapeHtml(plugin.name)}</title>
+<style>*,*::before,*::after{box-sizing:border-box}html,body{margin:0;padding:0;background:transparent;font-family:system-ui,-apple-system,sans-serif}#gs-plugin-root{width:100%}${safeCss}</style>
+<script src="/${escapeHtml(scriptPath)}" defer></script>
+</head>
+<body>
+<div id="gs-plugin-root" data-gs-plugin="${escapeHtml(plugin.id)}">${safeMarkup}</div>
+</body>
+</html>`;
+}
+
+function normalizeThirdPartyPlugins(
+  raw: ThirdPartyPluginInput[] | undefined,
+  encoder: TextEncoder,
+): {
+  plugins: NormalizedSandboxPlugin[];
+  pluginById: Map<string, NormalizedSandboxPlugin>;
+  files: Record<string, BuiltFile>;
+} {
+  const plugins: NormalizedSandboxPlugin[] = [];
+  const pluginById = new Map<string, NormalizedSandboxPlugin>();
+  const files: Record<string, BuiltFile> = {};
+  if (!Array.isArray(raw)) return { plugins, pluginById, files };
+
+  for (let i = 0; i < raw.length && plugins.length < 20; i += 1) {
+    const item = raw[i];
+    if (!item || typeof item !== "object" || item.enabled === false) continue;
+    const id = normalizePluginId(typeof item.id === "string" ? item.id : `plugin_${i + 1}`, `plugin_${i + 1}`);
+    if (pluginById.has(id)) continue;
+
+    const script = typeof item.script === "string" ? item.script.trim() : "";
+    const html = typeof item.html === "string" ? item.html : "";
+    const css = typeof item.css === "string" ? item.css : "";
+    if (!script && !html.trim()) continue;
+    if (script.length > 256 * 1024 || html.length > 128 * 1024 || css.length > 128 * 1024) {
+      continue;
+    }
+
+    const placement =
+      item.placement === "floating" || item.placement === "headless" ? item.placement : "inline";
+    const heightNum = Number(item.defaultHeight);
+    const defaultHeight =
+      placement === "headless"
+        ? 0
+        : Number.isFinite(heightNum)
+          ? Math.max(48, Math.min(2400, Math.round(heightNum)))
+          : 220;
+
+    const permissions = {
+      allowNetwork: item.permissions?.allowNetwork === true,
+      allowForms: item.permissions?.allowForms === true,
+      allowPopups: item.permissions?.allowPopups === true,
+      allowNavigate: item.permissions?.allowNavigate === true,
+      allowResize: item.permissions?.allowResize !== false,
+    };
+
+    const jsText = buildPluginSandboxRuntimeJs({ id, script });
+    const jsHash = fnv1aHex(jsText);
+    const scriptPath = `_plugins/${id}/plugin-${jsHash}.js`;
+    const docPath = `_plugins/${id}/${permissions.allowNetwork ? "net.html" : "index.html"}`;
+
+    const normalized: NormalizedSandboxPlugin = {
+      id,
+      name:
+        typeof item.name === "string" && item.name.trim()
+          ? item.name.trim().slice(0, 80)
+          : id,
+      script,
+      html,
+      css,
+      config: sanitizePluginConfig(item.config),
+      placement,
+      defaultHeight,
+      permissions,
+      docPath,
+      scriptPath,
+      sandboxAttr: sandboxAttributesForPlugin(permissions),
+    };
+
+    const jsBytes = encoder.encode(jsText);
+    files[scriptPath] = {
+      body: jsBytes,
+      contentType: "text/javascript; charset=utf-8",
+      size: jsBytes.byteLength,
+    };
+
+    const htmlText = buildPluginSandboxHtml(normalized, scriptPath);
+    const htmlBytes = encoder.encode(htmlText);
+    files[docPath] = {
+      body: htmlBytes,
+      contentType: "text/html; charset=utf-8",
+      size: htmlBytes.byteLength,
+    };
+
+    plugins.push(normalized);
+    pluginById.set(id, normalized);
+  }
+
+  return { plugins, pluginById, files };
 }
 
 function resolveLinkHref(
@@ -219,7 +515,99 @@ type RenderHtmlContext = {
   contactEnabled: boolean;
   pagePath: string;
   collectedForms: ContactFormConfig[];
+  thirdPartyPluginById: Map<string, NormalizedSandboxPlugin>;
+  mountedThirdPartyPlugins: Set<string>;
+  pluginInstanceSeq: number;
 };
+
+function renderPluginIframeHtml(
+  plugin: NormalizedSandboxPlugin,
+  ctx: RenderHtmlContext,
+  overrideProps?: Record<string, unknown>,
+): string {
+  ctx.pluginInstanceSeq += 1;
+  ctx.mountedThirdPartyPlugins.add(plugin.id);
+
+  const instanceId = `plg_${plugin.id}_${fnv1aHex(`${ctx.pagePath}:${plugin.id}:${ctx.pluginInstanceSeq}`)}`;
+  const blockConfig = overrideProps?.config
+    ? sanitizePluginConfig(overrideProps.config)
+    : {};
+  const mergedConfig = { ...plugin.config, ...blockConfig };
+  const placement =
+    overrideProps?.placement === "floating" ||
+    overrideProps?.placement === "headless" ||
+    overrideProps?.placement === "inline"
+      ? overrideProps.placement
+      : plugin.placement;
+  const rawHeight = Number(overrideProps?.height ?? plugin.defaultHeight);
+  const height =
+    placement === "headless"
+      ? 0
+      : Number.isFinite(rawHeight)
+        ? Math.max(48, Math.min(2400, Math.round(rawHeight)))
+        : plugin.defaultHeight;
+  const title =
+    typeof overrideProps?.title === "string" && overrideProps.title.trim()
+      ? overrideProps.title.trim().slice(0, 80)
+      : plugin.name;
+
+  const style =
+    placement === "headless"
+      ? "width:0;height:0;border:0;visibility:hidden;position:absolute"
+      : placement === "floating"
+        ? `width:360px;max-width:100%;height:${height}px;border:0;display:block;background:transparent`
+        : `width:100%;height:${height}px;border:0;display:block;background:transparent`;
+
+  const tabindexAttr = placement === "headless" ? ' tabindex="-1" aria-hidden="true"' : "";
+  const loadingAttr = placement === "headless" ? "eager" : "lazy";
+
+  return `<iframe src="/${escapeHtml(plugin.docPath)}#${escapeHtml(instanceId)}" title="${escapeHtml(
+    title,
+  )}" sandbox="${escapeHtml(
+    plugin.sandboxAttr,
+  )}" referrerpolicy="no-referrer" loading="${loadingAttr}"${tabindexAttr} data-gs-plugin-frame="1" data-gs-plugin-id="${escapeHtml(
+    plugin.id,
+  )}" data-gs-plugin-instance="${escapeHtml(instanceId)}" data-gs-plugin-config="${escapeHtml(
+    JSON.stringify(mergedConfig),
+  )}" data-gs-plugin-resize="${plugin.permissions.allowResize ? "1" : "0"}" data-gs-plugin-navigate="${
+    plugin.permissions.allowNavigate ? "1" : "0"
+  }" style="${style}"></iframe>`;
+}
+
+function renderPluginBlockHtml(
+  rawId: string,
+  props: Record<string, unknown>,
+  ctx: RenderHtmlContext,
+  extraClasses = "",
+  anchorId?: string,
+): string {
+  const rawPluginId = typeof props.pluginId === "string" ? props.pluginId : "";
+  if (!rawPluginId) return "";
+  const plugin = ctx.thirdPartyPluginById.get(normalizePluginId(rawPluginId));
+  if (!plugin) return "";
+
+  const attrs = [
+    anchorId ? `id="${escapeHtml(anchorId)}"` : "",
+    rawId ? `data-gs-node="${escapeHtml(rawId)}"` : "",
+    `data-gs-block="plugin"`,
+    `data-gs-plugin-section="1"`,
+    `data-gs-plugin-id="${escapeHtml(plugin.id)}"`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  const iframeHtml = renderPluginIframeHtml(plugin, ctx, props);
+  const placement =
+    props.placement === "floating" || props.placement === "headless" ? props.placement : "inline";
+  if (placement === "headless") {
+    return `<div class="gs-plugin-headless" ${attrs} style="position:absolute;width:0;height:0;overflow:hidden;border:0;pointer-events:none" aria-hidden="true">${iframeHtml}</div>`;
+  }
+  if (placement === "floating") {
+    return `<div class="gs-plugin-floating" ${attrs} style="position:fixed;right:16px;bottom:16px;z-index:50;max-width:calc(100vw - 32px)">${iframeHtml}</div>`;
+  }
+  const sectionClass = ["gs-section gs-plugin-section", extraClasses].filter(Boolean).join(" ");
+  return `<section class="${escapeHtml(sectionClass)}" ${attrs}><div class="gs-container">${iframeHtml}</div></section>`;
+}
 
 function renderContactFormHtml(
   rawId: string,
@@ -321,6 +709,9 @@ function renderSmartBlockHtml(
 
   if (type === "contact-form") {
     return renderContactFormHtml(rawId, props, ctx, attrs);
+  }
+  if (type === "plugin" || (type === "custom-code" && typeof props.pluginId === "string")) {
+    return renderPluginBlockHtml(rawId, props, ctx, extraClasses, anchorId);
   }
 
   const eyebrow = typeof props.eyebrow === "string" ? props.eyebrow : "";
@@ -677,6 +1068,104 @@ function bootAll(){
 var keys=Object.keys(registry);
 for(var i=0;i<keys.length;i+=1){initPlugin(keys[i],registry[keys[i]]);}
 }
+api.register("sandbox",{
+init:function(ctx){
+var frames=document.querySelectorAll("iframe[data-gs-plugin-frame]");
+if(!frames||!frames.length)return;
+var instances=Object.create(null);
+function makeToken(){
+if(window.crypto&&typeof window.crypto.getRandomValues==="function"){
+var arr=new Uint32Array(4);
+window.crypto.getRandomValues(arr);
+return arr[0].toString(16)+arr[1].toString(16)+arr[2].toString(16)+arr[3].toString(16);
+}
+return Math.random().toString(36).slice(2)+Date.now().toString(36);
+}
+function parseConfig(raw){
+if(!raw)return Object.create(null);
+try{
+var parsed=JSON.parse(raw);
+return parsed&&typeof parsed==="object"?parsed:Object.create(null);
+}catch(_e){return Object.create(null);}
+}
+function sendInit(rec){
+try{
+if(rec.frame&&rec.frame.contentWindow){
+rec.frame.contentWindow.postMessage({
+type:"gs:plugin:init",
+token:rec.token,
+pluginId:rec.pluginId,
+instanceId:rec.instanceId,
+pagePath:ctx.pagePath,
+config:rec.config
+},"*");
+}
+}catch(_e){}
+}
+for(var i=0;i<frames.length;i+=1){
+(function(frame){
+var pluginId=frame.getAttribute("data-gs-plugin-id")||"";
+var instanceId=frame.getAttribute("data-gs-plugin-instance")||"";
+if(!pluginId||!instanceId)return;
+var rec={
+frame:frame,
+pluginId:pluginId,
+instanceId:instanceId,
+token:makeToken(),
+allowResize:frame.getAttribute("data-gs-plugin-resize")==="1",
+allowNavigate:frame.getAttribute("data-gs-plugin-navigate")==="1",
+config:parseConfig(frame.getAttribute("data-gs-plugin-config"))
+};
+instances[instanceId]=rec;
+frame.addEventListener("load",function(){sendInit(rec);});
+sendInit(rec);
+})(frames[i]);
+}
+window.addEventListener("message",function(ev){
+if(ev.origin!=="null")return;
+var d=ev.data;
+if(!d||typeof d!=="object")return;
+var instanceId=typeof d.instanceId==="string"?d.instanceId:"";
+var rec=instanceId?instances[instanceId]:null;
+if(!rec||!rec.frame||ev.source!==rec.frame.contentWindow)return;
+if(d.type==="gs:plugin:ready"){
+if(d.pluginId!==rec.pluginId)return;
+sendInit(rec);
+return;
+}
+if(typeof d.token!=="string"||d.token!==rec.token)return;
+if(d.type==="gs:plugin:resize"){
+if(!rec.allowResize||typeof d.height!=="number"||!isFinite(d.height))return;
+var clamped=Math.max(48,Math.min(2400,Math.round(d.height)));
+rec.frame.style.height=clamped+"px";
+return;
+}
+if(d.type==="gs:plugin:navigate"){
+if(!rec.allowNavigate||typeof d.url!=="string")return;
+try{
+var parsed=new URL(d.url,window.location.origin);
+if(parsed.protocol!=="https:"&&parsed.protocol!=="http:")return;
+window.location.assign(parsed.toString());
+}catch(_e){}
+return;
+}
+if(d.type==="gs:plugin:event"){
+try{
+var target=rec.frame.parentElement||document;
+target.dispatchEvent(new CustomEvent("geton:plugin",{
+bubbles:true,
+detail:{
+pluginId:rec.pluginId,
+instanceId:rec.instanceId,
+name:typeof d.name==="string"?d.name.slice(0,64):"",
+detail:d.detail===undefined?null:d.detail
+}
+}));
+}catch(_e){}
+}
+});
+}
+});
 if(document.readyState==="loading"){
 document.addEventListener("DOMContentLoaded",bootAll,{once:true});
 }else{
@@ -692,6 +1181,7 @@ export function renderHtml(input: {
   css?: string;
   scriptSrc?: string | null;
   activePlugins?: string[];
+  thirdPartyPlugins?: NormalizedSandboxPlugin[];
   nav: Array<{ label: string; href: string; pageId?: string }>;
   images: Map<string, { src: string; alt?: string }>;
   logoUrl: string | null;
@@ -721,6 +1211,10 @@ export function renderHtml(input: {
     ...(input.activePlugins ?? []),
     ...(input.contactEnabled && !(input.activePlugins ?? []).includes("contact") ? ["contact"] : []),
   ];
+  const thirdPartyPluginById = new Map<string, NormalizedSandboxPlugin>();
+  for (const plugin of input.thirdPartyPlugins ?? []) {
+    thirdPartyPluginById.set(plugin.id, plugin);
+  }
   const ctx: RenderHtmlContext = {
     settings: input.settings,
     images: input.images,
@@ -728,6 +1222,9 @@ export function renderHtml(input: {
     contactEnabled: Boolean(input.contactEnabled || activePlugins.includes("contact")),
     pagePath: input.pagePath,
     collectedForms: input.collectedForms ?? [],
+    thirdPartyPluginById,
+    mountedThirdPartyPlugins: new Set<string>(),
+    pluginInstanceSeq: 0,
   };
 
   let blocksHtml = "";
@@ -742,6 +1239,19 @@ export function renderHtml(input: {
     blocksHtml = flatBlocks
       .map((blk) => renderSmartBlockHtml(blk.id, blk.type, blk.props, ctx))
       .join("\n");
+  }
+
+  const autoInlinePluginsHtml: string[] = [];
+  const overlayPluginsHtml: string[] = [];
+  for (const plugin of input.thirdPartyPlugins ?? []) {
+    if (ctx.mountedThirdPartyPlugins.has(plugin.id)) continue;
+    const html = renderPluginBlockHtml(`auto_${plugin.id}`, { pluginId: plugin.id, placement: plugin.placement }, ctx);
+    if (!html) continue;
+    if (plugin.placement === "floating" || plugin.placement === "headless") {
+      overlayPluginsHtml.push(html);
+    } else {
+      autoInlinePluginsHtml.push(html);
+    }
   }
 
   const footerMetaParts: string[] = [];
@@ -784,7 +1294,7 @@ ${input.page.noindex ? '<meta name="robots" content="noindex">' : ""}
       ? `<button type="button" class="gs-nav-toggle" aria-expanded="false" aria-label="Toggle navigation">Menu</button><nav class="gs-nav" aria-label="Main navigation" data-open="false">${navHtml}</nav>`
       : ""
   }</div></header>
-<main>${blocksHtml}</main>
+<main>${blocksHtml}${autoInlinePluginsHtml.join("")}</main>${overlayPluginsHtml.join("")}
 <footer class="gs-footer"><div class="gs-container"><div class="gs-grid"><div><p style="font-weight:700;margin:0 0 6px">${escapeHtml(
     input.settings.businessName,
   )}</p>${footerMetaParts.join("")}</div>${
@@ -862,6 +1372,8 @@ export function buildSite(input: BuildSiteInput): {
   ];
   const contactEnabled = activePlugins.includes("contact");
   const forms: ContactFormConfig[] = [];
+  const normalizedPlugins = normalizeThirdPartyPlugins(input.thirdPartyPlugins, encoder);
+  Object.assign(files, normalizedPlugins.files);
 
   for (const page of input.pages) {
     if (page.hidden) continue;
@@ -874,6 +1386,7 @@ export function buildSite(input: BuildSiteInput): {
       css,
       scriptSrc: `/${scriptPath}`,
       activePlugins,
+      thirdPartyPlugins: normalizedPlugins.plugins,
       nav,
       images: imageMap,
       logoUrl,

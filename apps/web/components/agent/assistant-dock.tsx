@@ -13,7 +13,10 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { AssistantMessage } from "@/components/agent/assistant-message";
+import {
+  VirtualizedMessageList,
+  type VirtualChatMessage,
+} from "@/components/agent/virtualized-message-list";
 
 const HelpContent = dynamic(
   () => import("@/components/shell/help-panel").then((m) => m.HelpContent),
@@ -54,13 +57,7 @@ import {
 } from "@/lib/agent/constants";
 import { cn } from "@/lib/utils";
 
-type ChatMessage = {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  credits?: number;
-  createdAt?: string;
-};
+type ChatMessage = VirtualChatMessage;
 
 type Conversation = {
   id: string;
@@ -91,9 +88,7 @@ export type AssistantDockProps = {
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-const MAX_MESSAGES = 300;
-const DEFAULT_VISIBLE_MESSAGES = 40;
-const VISIBLE_MESSAGES_STEP = 40;
+const MAX_MESSAGES = 1000;
 const MAX_CONVERSATIONS = 50;
 const MAX_STREAM_TEXT = 100_000;
 const MAX_SSE_BUFFER = 4 * 1024 * 1024;
@@ -101,34 +96,6 @@ const MAX_SSE_BUFFER = 4 * 1024 * 1024;
 function keepLast<T>(items: T[], limit: number): T[] {
   return items.length > limit ? items.slice(items.length - limit) : items;
 }
-
-const ChatMessageItem = React.memo(function ChatMessageItem({
-  message,
-}: {
-  message: ChatMessage;
-}) {
-  return (
-    <div
-      className={cn(
-        "max-w-[88%] rounded-[14px] px-3.5 py-2.5",
-        message.role === "user"
-          ? "self-end bg-primary text-on-primary"
-          : "self-start bg-surface-muted text-text",
-      )}
-    >
-      {message.role === "assistant" ? (
-        <AssistantMessage text={message.content} />
-      ) : (
-        <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>
-      )}
-      {message.role === "assistant" && (message.credits ?? 0) > 0 ? (
-        <p className="mt-1 text-xs opacity-70">
-          {message.credits} credit{message.credits === 1 ? "" : "s"} used
-        </p>
-      ) : null}
-    </div>
-  );
-});
 
 function readStorage(key: string): string | null {
   try {
@@ -240,7 +207,6 @@ export function AssistantDock({
   const canUse = role === "owner" || role === "admin" || role === "editor";
   const panelRef = React.useRef<HTMLDivElement>(null);
   const closeRef = React.useRef<HTMLButtonElement>(null);
-  const listRef = React.useRef<HTMLDivElement>(null);
   const loadedRef = React.useRef(false);
   const optimisticIdRef = React.useRef<string | null>(null);
   const abortRef = React.useRef<AbortController | null>(null);
@@ -248,7 +214,6 @@ export function AssistantDock({
   const conversationIdRef = React.useRef<string | null>(null);
   const streamBufferRef = React.useRef("");
   const streamRafRef = React.useRef<number | null>(null);
-  const scrollRafRef = React.useRef<number | null>(null);
   const widthRef = React.useRef(width);
   React.useEffect(() => {
     widthRef.current = width;
@@ -257,7 +222,7 @@ export function AssistantDock({
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
-  const [visibleCount, setVisibleCount] = React.useState(DEFAULT_VISIBLE_MESSAGES);
+  const [listResetKey, setListResetKey] = React.useState(0);
   const [draft, setDraft] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -298,9 +263,6 @@ export function AssistantDock({
       if (streamRafRef.current !== null && typeof window !== "undefined") {
         window.cancelAnimationFrame(streamRafRef.current);
       }
-      if (scrollRafRef.current !== null && typeof window !== "undefined") {
-        window.cancelAnimationFrame(scrollRafRef.current);
-      }
     };
   }, []);
 
@@ -336,7 +298,7 @@ export function AssistantDock({
         const rows = Array.isArray(data.messages) ? data.messages : [];
         setRemoteBusy(false);
         setConversationId(id);
-        setVisibleCount(DEFAULT_VISIBLE_MESSAGES);
+        setListResetKey((key) => key + 1);
         setMessages(
           keepLast(
             rows
@@ -472,17 +434,6 @@ export function AssistantDock({
   }, [open, conversationId, enabled, canUse]);
 
   React.useEffect(() => {
-    const node = listRef.current;
-    if (!node || typeof window === "undefined") return;
-    if (scrollRafRef.current !== null) return;
-    scrollRafRef.current = window.requestAnimationFrame(() => {
-      scrollRafRef.current = null;
-      const current = listRef.current;
-      if (current) current.scrollTop = current.scrollHeight;
-    });
-  }, [messages, streamingText, sending, remoteBusy]);
-
-  React.useEffect(() => {
     if (!open) return;
     const previouslyFocused = (returnFocusRef?.current ??
       document.activeElement) as HTMLElement | null;
@@ -537,7 +488,7 @@ export function AssistantDock({
     abortRef.current = null;
     setConversationId(null);
     setMessages([]);
-    setVisibleCount(DEFAULT_VISIBLE_MESSAGES);
+    setListResetKey((key) => key + 1);
     setDraft("");
     clearStreamBuffer();
     setStatusLabel("");
@@ -826,9 +777,6 @@ export function AssistantDock({
 
   if (!open) return null;
 
-  const hiddenMessageCount = Math.max(0, messages.length - visibleCount);
-  const visibleMessages = hiddenMessageCount > 0 ? messages.slice(-visibleCount) : messages;
-
   const showChat = tab === "assistant";
   const disabledCopy = !enabled
     ? "The assistant is taking a break. You can still get help from our team."
@@ -1006,13 +954,18 @@ export function AssistantDock({
           </div>
         ) : (
           <>
-            <div ref={listRef} className="flex-1 overflow-y-auto p-4">
-              {loading ? (
+            <VirtualizedMessageList
+              key={listResetKey}
+              messages={messages}
+              stickTrigger={`${streamingText.length}:${sending ? 1 : 0}:${remoteBusy ? 1 : 0}:${pendingConfirmation?.id ?? ""}:${editingBrief ? 1 : 0}`}
+              loading={loading}
+              loadingState={
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-text-muted">
                   <Loader2 size={18} strokeWidth={1.75} className="animate-spin" aria-hidden />
                   Loading chat
                 </div>
-              ) : messages.length === 0 && !streamingText ? (
+              }
+              emptyState={
                 <div className="flex h-full flex-col justify-center">
                   <span className="flex h-11 w-11 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Sparkles size={21} strokeWidth={1.75} aria-hidden />
@@ -1038,20 +991,12 @@ export function AssistantDock({
                     ))}
                   </div>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {hiddenMessageCount > 0 ? (
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount((count) => count + VISIBLE_MESSAGES_STEP)}
-                      className="self-center rounded-input border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-muted hover:text-text"
-                    >
-                      Show earlier messages ({hiddenMessageCount} remaining)
-                    </button>
-                  ) : null}
-                  {visibleMessages.map((message) => (
-                    <ChatMessageItem key={message.id} message={message} />
-                  ))}
+              }
+              hasTrailingContent={Boolean(
+                streamingText || pendingConfirmation || sending || remoteBusy || editingBrief,
+              )}
+              footer={
+                <>
                   {editingBrief && pendingConfirmation ? (
                     <div className="max-w-[88%] self-start rounded-[14px] bg-surface p-3 mb-3">
                       <p className="text-xs font-semibold text-text-muted mb-2">Edit the website details</p>
@@ -1163,14 +1108,16 @@ export function AssistantDock({
                       {statusLabel || "Assistant is answering"}
                     </div>
                   ) : null}
-                </div>
-              )}
-              {error ? (
-                <div role="alert" className="mt-3 rounded-info bg-danger-soft p-3 text-sm text-danger-text">
-                  {error}
-                </div>
-              ) : null}
-            </div>
+                </>
+              }
+              error={
+                error ? (
+                  <div role="alert" className="mt-3 rounded-info bg-danger-soft p-3 text-sm text-danger-text">
+                    {error}
+                  </div>
+                ) : null
+              }
+            />
 
             <div className="shrink-0 border-t border-border p-3">
               {needsCredits ? (

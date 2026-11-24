@@ -250,7 +250,9 @@ export type HandleSiteRequestOptions = {
 const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
 const MAX_FORM_BODY_BYTES = 16 * 1024;
 const SITE_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
+const PLUGIN_SANDBOX_HTML_RE = /^_plugins\/[a-z0-9_-]+\/(index|net)\.html$/i;
+const PLUGIN_SANDBOX_JS_RE = /^_plugins\/[a-z0-9_-]+\/plugin-[a-f0-9]+\.js$/i;
 
 function sanitizePath(rawPath: string): string {
   const clean = rawPath.split("?")[0]?.split("#")[0] ?? "/";
@@ -267,7 +269,26 @@ function escapeHtml(text: string): string {
     .replaceAll("'", "&#39;");
 }
 
-function securityHeaders(isHtml: boolean): Record<string, string> {
+function pluginSandboxCsp(allowNetwork: boolean): string {
+  return `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src ${
+    allowNetwork ? "https:" : "'none'"
+  }; form-action 'none'; frame-ancestors 'self'; object-src 'none'; base-uri 'none'`;
+}
+
+function securityHeaders(isHtml: boolean, relPath = ""): Record<string, string> {
+  const sandboxMatch = isHtml ? PLUGIN_SANDBOX_HTML_RE.exec(relPath) : null;
+  if (sandboxMatch) {
+    const allowNetwork = sandboxMatch[1]?.toLowerCase() === "net";
+    return {
+      "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+      "X-Frame-Options": "SAMEORIGIN",
+      "X-Content-Type-Options": "nosniff",
+      "Referrer-Policy": "no-referrer",
+      "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
+      "X-Robots-Tag": "noindex",
+      "Content-Security-Policy": pluginSandboxCsp(allowNetwork),
+    };
+  }
   return {
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
     "X-Frame-Options": "DENY",
@@ -298,7 +319,8 @@ function cacheControlFor(filePath: string): string {
   if (
     filePath.startsWith("_shared/") ||
     filePath.startsWith("assets/") ||
-    filePath.startsWith("media/")
+    filePath.startsWith("media/") ||
+    PLUGIN_SANDBOX_JS_RE.test(filePath)
   ) {
     return "public, max-age=31536000, immutable";
   }
@@ -381,7 +403,7 @@ function respondWithFile(
   const baseHeaders: Record<string, string> = {
     "Content-Type": contentType,
     "Cache-Control": cacheControl,
-    ...securityHeaders(isHtml),
+    ...securityHeaders(isHtml, relPath),
     ...(file.etag ? { ETag: file.etag } : {}),
     ...(status === 404 ? { "X-Robots-Tag": "noindex" } : {}),
   };

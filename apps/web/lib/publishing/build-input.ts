@@ -5,6 +5,7 @@ import type {
   SiteSettings,
   SocialLink,
 } from "@get-on/publisher";
+import { normalizeThirdPartyPlugins } from "@get-on/plugins";
 import { isPageContentV5, type Theme } from "@get-on/blocks";
 
 const PALETTES = new Set([
@@ -28,6 +29,7 @@ export type ProjectJson = {
   businessType?: string;
   logoData?: string | null;
   socialLinks?: { network?: string; url?: string }[];
+  thirdPartyPlugins?: unknown;
 };
 
 export type SourceProject = {
@@ -90,6 +92,8 @@ export type BuildInputArgs = {
   primaryHost?: string | null;
   /** The plugin ids that are switched on for the website. */
   activePlugins?: string[];
+  /** Third-party JS plugins executed in isolated sandboxed iframes. */
+  thirdPartyPlugins?: unknown;
   builtAt?: Date;
 };
 
@@ -375,6 +379,9 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
   };
 
   const contactEnabled = (args.activePlugins ?? []).includes("contact");
+  const thirdPartyPlugins = normalizeThirdPartyPlugins(
+    args.thirdPartyPlugins ?? projectJson.thirdPartyPlugins,
+  );
 
   return {
     siteId: args.project.id,
@@ -383,6 +390,7 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     rootDomain: args.rootDomain,
     primaryHost: args.primaryHost ?? null,
     activePlugins: args.activePlugins ?? [],
+    ...(thirdPartyPlugins.length > 0 ? { thirdPartyPlugins } : {}),
     settings: siteSettings,
     pages: args.pages.map((page) => toPublishPage(page, allowIndexing)),
     forms: { enabled: contactEnabled },

@@ -15,6 +15,13 @@ import type { AgentMessage } from "@/lib/agent/conversations";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AssistantMessage } from "@/components/agent/assistant-message";
+import {
+  VirtualizedMessageList,
+  computeMessageLayout,
+  estimateMessageHeight,
+  findVisibleMessageRange,
+  type VirtualChatMessage,
+} from "@/components/agent/virtualized-message-list";
 
 function message(
   id: string,
@@ -166,5 +173,68 @@ describe("assistant message markdown rendering", () => {
     const elapsedMs = performance.now() - start;
     expect(html).toContain("[unclosed");
     expect(elapsedMs).toBeLessThan(250);
+  });
+});
+
+describe("virtualized message list", () => {
+  function makeHistory(count: number): VirtualChatMessage[] {
+    return Array.from({ length: count }, (_, idx) => ({
+      id: `msg-${idx}`,
+      role: idx % 2 === 0 ? "user" : "assistant",
+      content: `Message #${idx}: **hello** world`,
+    }));
+  }
+
+  it("computes cumulative layout offsets and slices only visible range in O(log n)", () => {
+    const history = makeHistory(2000);
+    const measured = new Map<string, number>([
+      ["msg-0", 80],
+      ["msg-1", 120],
+    ]);
+    const layout = computeMessageLayout(history, measured, 360);
+
+    expect(layout.offsets[0]).toBe(0);
+    expect(layout.offsets[1]).toBe(80);
+    expect(layout.offsets[2]).toBe(200);
+    expect(layout.totalHeight).toBeGreaterThan(2000 * 50);
+
+    const topRange = findVisibleMessageRange(layout.offsets, layout.sizes, 0, 500, 4);
+    expect(topRange.startIndex).toBe(0);
+    expect(topRange.endIndex).toBeLessThan(20);
+
+    const midOffset = layout.offsets[1000]!;
+    const midRange = findVisibleMessageRange(layout.offsets, layout.sizes, midOffset, 500, 4);
+    expect(midRange.startIndex).toBeLessThanOrEqual(1000);
+    expect(midRange.endIndex).toBeGreaterThanOrEqual(1000);
+    expect(midRange.endIndex - midRange.startIndex).toBeLessThan(25);
+  });
+
+  it("scales height estimates for multiline content and credits", () => {
+    const shortHeight = estimateMessageHeight({ content: "hi", credits: 0 }, 360);
+    const longHeight = estimateMessageHeight(
+      { content: "line\n".repeat(10), credits: 1 },
+      360,
+    );
+    expect(longHeight).toBeGreaterThan(shortHeight);
+  });
+
+  it("renders only a small visible slice for 1,500 messages", () => {
+    const history = makeHistory(1500);
+    const html = renderToStaticMarkup(
+      React.createElement(VirtualizedMessageList, {
+        messages: history,
+        stickTrigger: "0:0:0::0",
+        loading: false,
+        loadingState: null,
+        emptyState: null,
+        hasTrailingContent: false,
+      }),
+    );
+
+    const renderedCount = (html.match(/data-virtual-id="/g) ?? []).length;
+    expect(renderedCount).toBeGreaterThan(0);
+    expect(renderedCount).toBeLessThan(30);
+    expect(html).toContain("msg-1499");
+    expect(html).not.toContain('data-virtual-id="msg-0"');
   });
 });

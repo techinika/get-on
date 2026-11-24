@@ -491,6 +491,7 @@ export const KNOWN_SMART_KINDS = new Set([
   "quote",
   "banner",
   "newsletter",
+  "plugin",
 ]);
 
 const PROTECTED_CLASSES = new Set(["gs-watermark", "gs-protect", "gs-root"]);
