@@ -7,7 +7,7 @@ import { TemplateGallery } from "@/components/templates/template-gallery";
 import { buttonVariants } from "@/components/ui/button";
 import { ToastProvider } from "@/components/ui/toast";
 import { templatesForPlan } from "@/lib/templates/catalog";
-import { AnalyticsLoader, GaConsentBanner } from "@/components/analytics";
+import { AnalyticsLoader } from "@/components/analytics";
 
 export const metadata: Metadata = {
   title: "Website templates",
@@ -54,7 +54,6 @@ export default function PublicTemplatesPage() {
         </section>
       </main>
       <AnalyticsLoader />
-      <GaConsentBanner />
       <LandingFooter />
     </>
   );

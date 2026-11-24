@@ -10,7 +10,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { initialsFrom } from "@/lib/viewer";
 import type { Viewer } from "@/lib/viewer";
-import { AnalyticsLoader, GaConsentBanner } from "@/components/analytics";
+import { AnalyticsLoader } from "@/components/analytics";
 
 export default async function Home() {
   const viewer = await getViewer();
@@ -28,7 +28,6 @@ export default async function Home() {
       </main>
       <LandingFooter />
       <AnalyticsLoader />
-      <GaConsentBanner />
     </>
   );
 }
