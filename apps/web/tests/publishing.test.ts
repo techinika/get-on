@@ -343,3 +343,73 @@ describe("site status", () => {
     );
   });
 });
+
+describe("publisher v5 & plugin runtime", () => {
+  it("builds v5 pages, normalizes form ids, emits external CSP-safe plugin JS, and strips scripts cleanly on portable export", async () => {
+    const { buildSite, assertStyledHtml } = await import("@get-on/publisher");
+    const { pageFromBlocks } = await import("@get-on/blocks");
+    const { makeWebsiteFilesPortable } = await import("@/lib/site-package/content");
+
+    const v5Page = pageFromBlocks([
+      { id: "hero-01", type: "hero", props: { heading: "Rose Bakery", subheading: "Fresh bread" } },
+      {
+        id: "cnt",
+        type: "contact-form",
+        props: { heading: "Write to us", showName: true, showPhone: true, phoneRequired: false },
+      },
+    ]);
+    v5Page.root.children![0]!.styles = { base: { color: "{text}" } };
+
+    const input = buildSiteInput({
+      project,
+      projectSettings: {
+        theme: { palette: "ocean", fontPair: "classic", corners: "round" },
+        seo_site_title: "Rose Bakery",
+        seo_description: "Bread and pastries",
+      },
+      pages: [{ ...page, blocks: v5Page }],
+      media: [],
+      imageBytes: new Map(),
+      planId: "starter",
+      publishId: "55555555-5555-4555-8555-555555555555",
+      rootDomain: "get-on.tech",
+      activePlugins: ["contact"],
+    });
+
+    expect(input.activePlugins).toEqual(["contact"]);
+    const built = buildSite(input);
+    const html = new TextDecoder().decode(built.files["index.html"]!.body);
+    assertStyledHtml(html);
+    expect(html).toContain("Rose Bakery");
+    expect(html).toContain('data-gs-plugins="contact"');
+    expect(html).toMatch(/<script src="\/assets\/site-[a-f0-9]+\.js" defer><\/script>/);
+    expect(html).not.toMatch(/<script\b[^>]*>[\s\S]*\S[\s\S]*<\/script>/);
+    expect(built.forms).toHaveLength(1);
+    expect(built.forms[0]).toMatchObject({
+      pagePath: "/",
+      showName: true,
+      showPhone: true,
+      phoneRequired: false,
+    });
+    expect(built.forms[0]!.id).toMatch(/^[A-Za-z0-9_-]{6,32}$/);
+    expect(html).toContain(`action="/_forms/${built.forms[0]!.id}"`);
+
+    const jsEntry = Object.entries(built.files).find(([k]) => /^assets\/site-[a-f0-9]+\.js$/.test(k));
+    expect(jsEntry).toBeTruthy();
+    expect(jsEntry![1].contentType).toBe("text/javascript; charset=utf-8");
+    const jsText = new TextDecoder().decode(jsEntry![1].body);
+    expect(jsText).toContain("GetOnPlugins");
+    expect(jsText).toContain("/_forms/");
+    expect(jsText).not.toContain("eval(");
+    expect(jsText).not.toContain("innerHTML");
+
+    const rawBytes: Record<string, Uint8Array> = {};
+    for (const [k, f] of Object.entries(built.files)) rawBytes[k] = f.body;
+    const portable = makeWebsiteFilesPortable(rawBytes, "hello@example.com");
+    const portableHtml = new TextDecoder().decode(portable.files["index.html"]!);
+    expect(portableHtml).not.toMatch(/<script\b/i);
+    expect(portable.files[jsEntry![0]]).toBeUndefined();
+    expect(portableHtml).toContain("mailto:hello@example.com");
+  });
+});
+

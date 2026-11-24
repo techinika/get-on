@@ -1,13 +1,18 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { ShellTopBar } from "@/components/shell/shell-top-bar";
 import { ShellSidebar } from "@/components/shell/shell-sidebar";
 import { ShellBottomTabs } from "@/components/shell/shell-bottom-tabs";
 import { NavigationProgress } from "@/components/shell/navigation-progress";
 import { QuickFind } from "@/components/shell/quick-find";
-import { AssistantDock } from "@/components/agent/assistant-dock";
+
+const AssistantDock = dynamic(
+  () => import("@/components/agent/assistant-dock").then((m) => m.AssistantDock),
+  { ssr: false },
+);
 import type {
   ShellAssistant,
   ShellProject,
@@ -234,23 +239,25 @@ export function AppShell({
         returnFocusRef={quickFindButtonRef}
       />
 
-      <AssistantDock
-        open={assistantOpen}
-        tab={assistantTab}
-        width={assistantWidth}
-        enabled={assistantEnabled}
-        role={currentTeam.role}
-        planId={currentTeam.planId}
-        teamName={currentTeam.name}
-        userId={user.id}
-        projectId={projectId}
-        projectName={project?.name ?? ""}
-        credits={usage.aiCredits ?? 0}
-        onClose={closeAssistant}
-        onTabChange={setAssistantTab}
-        onWidthChange={changeAssistantWidth}
-        returnFocusRef={assistantButtonRef}
-      />
+      {assistantOpen ? (
+        <AssistantDock
+          open={assistantOpen}
+          tab={assistantTab}
+          width={assistantWidth}
+          enabled={assistantEnabled}
+          role={currentTeam.role}
+          planId={currentTeam.planId}
+          teamName={currentTeam.name}
+          userId={user.id}
+          projectId={projectId}
+          projectName={project?.name ?? ""}
+          credits={usage.aiCredits ?? 0}
+          onClose={closeAssistant}
+          onTabChange={setAssistantTab}
+          onWidthChange={changeAssistantWidth}
+          returnFocusRef={assistantButtonRef}
+        />
+      ) : null}
     </div>
   );
 }

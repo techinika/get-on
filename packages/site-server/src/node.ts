@@ -4,9 +4,10 @@ import path from "node:path";
 import {
   contentTypeFor,
   handleSiteRequest,
+  type SiteFile,
+  type SiteLink,
   type SitePointer,
   type SiteStore,
-  type StoredObject,
 } from "./index";
 
 export function sitePath(dir: string, siteId: string, publishId: string): string {
@@ -45,7 +46,28 @@ async function readJson<T>(filePath: string): Promise<T | null> {
   }
 }
 
+function safeRelative(filePath: string): string | null {
+  if (!filePath || filePath.startsWith("/") || filePath.includes("..") || filePath.includes("\\")) {
+    return null;
+  }
+  return filePath;
+}
+
 export function createNodeStore(dir: string): SiteStore {
+  const readStoredFile = async (absPath: string, relPath: string): Promise<SiteFile | null> => {
+    try {
+      const buf = await readFile(absPath);
+      const bytes = new Uint8Array(buf);
+      return {
+        body: bytes,
+        contentType: contentTypeFor(relPath),
+        size: bytes.byteLength,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   return {
     async getPointer(hostname: string): Promise<SitePointer | null> {
       const hostMapping = await readJson<{
@@ -66,19 +88,29 @@ export function createNodeStore(dir: string): SiteStore {
       }
       return readJson<SitePointer>(pointerPath(dir, hostname));
     },
-    async getObject(key: string): Promise<StoredObject | null> {
+
+    async getFile(siteId: string, publishId: string, filePath: string): Promise<SiteFile | null> {
+      const safe = safeRelative(filePath);
+      if (!safe) return null;
+      return readStoredFile(path.join(sitePath(dir, siteId, publishId), safe), safe);
+    },
+
+    async getSharedFile(filePath: string): Promise<SiteFile | null> {
+      const safe = safeRelative(filePath);
+      if (!safe) return null;
+      return readStoredFile(sharedPath(dir, safe), safe);
+    },
+
+    async getLink(code: string): Promise<SiteLink | null> {
+      if (!/^[a-z2-9]{7,10}$/.test(code)) return null;
+      return readJson<SiteLink>(linkPath(dir, code));
+    },
+
+    async getObject(key: string): Promise<SiteFile | null> {
       const normalized = key.startsWith("sites/_shared/")
         ? sharedPath(dir, key.slice("sites/_shared/".length))
         : path.join(dir, key);
-      try {
-        const buf = await readFile(normalized);
-        return {
-          body: new Uint8Array(buf),
-          contentType: contentTypeFor(normalized),
-        };
-      } catch {
-        return null;
-      }
+      return readStoredFile(normalized, normalized);
     },
   };
 }
@@ -132,6 +164,9 @@ export function serve(options: {
   rootDir?: string;
   port?: number;
   rootDomain?: string;
+  appOrigin?: string;
+  formTokenSecret?: string;
+  workerSharedSecret?: string;
 }) {
   const dir = options.dir ?? options.rootDir ?? ".";
   const store = createNodeStore(dir);
@@ -139,12 +174,25 @@ export function serve(options: {
   const server = http.createServer(async (req, res) => {
     const host = req.headers.host ?? `localhost:${port}`;
     const url = new URL(req.url ?? "/", `http://${host}`);
+    const method = req.method ?? "GET";
+    let bodyBuf: Buffer | undefined;
+    if (method !== "GET" && method !== "HEAD") {
+      const chunks: Buffer[] = [];
+      for await (const chunk of req) {
+        chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+      }
+      bodyBuf = Buffer.concat(chunks);
+    }
     const request = new Request(url.toString(), {
-      method: req.method ?? "GET",
+      method,
       headers: req.headers as Record<string, string>,
+      ...(bodyBuf !== undefined ? { body: new Uint8Array(bodyBuf) } : {}),
     });
     const response = await handleSiteRequest(request, store, {
       rootDomain: options.rootDomain,
+      appOrigin: options.appOrigin,
+      formTokenSecret: options.formTokenSecret,
+      workerSharedSecret: options.workerSharedSecret,
     });
     res.statusCode = response.status;
     response.headers.forEach((value, key) => res.setHeader(key, value));

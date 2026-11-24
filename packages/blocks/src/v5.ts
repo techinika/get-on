@@ -425,43 +425,119 @@ export function generateStarterContent(input: {
   includeContactForm?: boolean;
 }): { schemaVersion: 3; blocks: Block[] } {
   const kindLabel = input.businessType ? ` ${input.businessType}` : "";
+  const blocks: Block[] = [
+    createBlock("hero", {
+      layout: "split",
+      eyebrow: input.businessName,
+      heading: `Welcome to ${input.businessName}`,
+      subheading:
+        input.description ||
+        `A warm, dependable${kindLabel} website ready for your customers.`,
+      buttonLabel: "Get in touch",
+      buttonLink: { type: "anchor", anchor: "contact" },
+    }),
+    createBlock("features", {
+      layout: "rows",
+      heading: "What we do",
+      items: [
+        { title: "Quality service", text: "Built around what local customers actually need." },
+        { title: "Fast response", text: "Clear answers and easy booking." },
+      ],
+    }),
+    createBlock("cta", {
+      layout: "split",
+      heading: `Work with ${input.businessName}`,
+      buttonLabel: "Contact us",
+      buttonLink: { type: "anchor", anchor: "contact" },
+    }),
+  ];
+  if (input.includeContactForm) {
+    blocks.push(
+      createBlock("contact-form", {
+        heading: "Send us a message",
+        showName: true,
+        showPhone: Boolean(input.phone),
+        phoneRequired: false,
+      }),
+    );
+  }
   return {
     schemaVersion: 3,
-    blocks: [
-      createBlock("hero", {
-        layout: "split",
-        eyebrow: input.businessName,
-        heading: `Welcome to ${input.businessName}`,
-        subheading:
-          input.description ||
-          `A warm, dependable${kindLabel} website ready for your customers.`,
-        buttonLabel: "Get in touch",
-      }),
-      createBlock("features", {
-        layout: "rows",
-        heading: "What we do",
-        items: [
-          { title: "Quality service", text: "Built around what local customers actually need." },
-          { title: "Fast response", text: "Clear answers and easy booking." },
-        ],
-      }),
-      createBlock("cta", {
-        layout: "split",
-        heading: `Work with ${input.businessName}`,
-        buttonLabel: "Contact us",
-      }),
-    ],
+    blocks,
   };
 }
 
-export function countSampleBlocks(blocks: unknown[]): number {
-  if (!Array.isArray(blocks)) return 0;
-  return blocks.filter(
-    (block) =>
-      block &&
-      typeof block === "object" &&
-      (block as { sampleOnly?: unknown }).sampleOnly === true,
-  ).length;
+export function isPageContentV5(raw: unknown): raw is PageContentV5 {
+  return Boolean(
+    raw &&
+      typeof raw === "object" &&
+      (raw as { schemaVersion?: unknown }).schemaVersion === 5 &&
+      (raw as { root?: unknown }).root &&
+      typeof (raw as { root?: unknown }).root === "object",
+  );
+}
+
+export type CollectedBlock = {
+  id: string;
+  type: string;
+  props: Record<string, unknown>;
+  requiresPlugin?: string;
+  sampleOnly?: boolean;
+};
+
+export function collectContentBlocks(raw: unknown): CollectedBlock[] {
+  if (Array.isArray(raw)) {
+    const out: CollectedBlock[] = [];
+    for (const item of raw) {
+      if (!item || typeof item !== "object") continue;
+      const rec = item as Record<string, unknown>;
+      const type = typeof rec.type === "string" ? rec.type : "";
+      if (!type) continue;
+      out.push({
+        id: typeof rec.id === "string" ? rec.id : "",
+        type,
+        props:
+          rec.props && typeof rec.props === "object"
+            ? (rec.props as Record<string, unknown>)
+            : {},
+        sampleOnly: rec.sampleOnly === true,
+      });
+    }
+    return out;
+  }
+  if (isPageContentV5(raw)) {
+    const out: CollectedBlock[] = [];
+    const walk = (node: ContentNode): void => {
+      const props = node.props ?? {};
+      if (node.type === "smart") {
+        const kind = typeof props.kind === "string" ? props.kind : "text";
+        out.push({
+          id: node.id,
+          type: kind,
+          props,
+          requiresPlugin: node.requiresPlugin,
+        });
+      } else if (node.type !== "page") {
+        out.push({
+          id: node.id,
+          type: node.type,
+          props,
+          requiresPlugin: node.requiresPlugin,
+        });
+      }
+      for (const child of node.children ?? []) walk(child);
+    };
+    walk(raw.root);
+    return out;
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as { blocks?: unknown[] }).blocks)) {
+    return collectContentBlocks((raw as { blocks: unknown[] }).blocks);
+  }
+  return [];
+}
+
+export function countSampleBlocks(blocks: unknown): number {
+  return collectContentBlocks(blocks).filter((item) => item.sampleOnly === true).length;
 }
 
 const BLOCK_LABELS: Record<string, string> = {

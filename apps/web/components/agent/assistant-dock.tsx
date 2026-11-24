@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import {
   ArrowUp,
@@ -12,9 +13,33 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
-import { HelpContent } from "@/components/shell/help-panel";
 import { AssistantMessage } from "@/components/agent/assistant-message";
-import { CreateSiteFlow } from "@/components/agent/create-site-flow";
+
+const HelpContent = dynamic(
+  () => import("@/components/shell/help-panel").then((m) => m.HelpContent),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center gap-2 py-6 text-sm text-text-muted">
+        <Loader2 size={16} strokeWidth={1.75} className="animate-spin" aria-hidden />
+        Loading help…
+      </div>
+    ),
+  },
+);
+
+const CreateSiteFlow = dynamic(
+  () => import("@/components/agent/create-site-flow").then((m) => m.CreateSiteFlow),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex flex-1 items-center justify-center gap-2 py-10 text-sm text-text-muted">
+        <Loader2 size={18} strokeWidth={1.75} className="animate-spin" aria-hidden />
+        Loading website builder…
+      </div>
+    ),
+  },
+);
 import type { ShellRole } from "@/components/shell/types";
 import type { PlanId } from "@/lib/plans";
 import { useMediaQuery } from "@/lib/use-media-query";
@@ -67,12 +92,66 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 const MAX_MESSAGES = 300;
+const DEFAULT_VISIBLE_MESSAGES = 40;
+const VISIBLE_MESSAGES_STEP = 40;
 const MAX_CONVERSATIONS = 50;
 const MAX_STREAM_TEXT = 100_000;
 const MAX_SSE_BUFFER = 4 * 1024 * 1024;
 
 function keepLast<T>(items: T[], limit: number): T[] {
   return items.length > limit ? items.slice(items.length - limit) : items;
+}
+
+const ChatMessageItem = React.memo(function ChatMessageItem({
+  message,
+}: {
+  message: ChatMessage;
+}) {
+  return (
+    <div
+      className={cn(
+        "max-w-[88%] rounded-[14px] px-3.5 py-2.5",
+        message.role === "user"
+          ? "self-end bg-primary text-on-primary"
+          : "self-start bg-surface-muted text-text",
+      )}
+    >
+      {message.role === "assistant" ? (
+        <AssistantMessage text={message.content} />
+      ) : (
+        <p className="whitespace-pre-wrap break-words text-[15px]">{message.content}</p>
+      )}
+      {message.role === "assistant" && (message.credits ?? 0) > 0 ? (
+        <p className="mt-1 text-xs opacity-70">
+          {message.credits} credit{message.credits === 1 ? "" : "s"} used
+        </p>
+      ) : null}
+    </div>
+  );
+});
+
+function readStorage(key: string): string | null {
+  try {
+    return typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key: string, value: string): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage quota or sandbox errors
+  }
+}
+
+function removeStorage(key: string): void {
+  try {
+    if (typeof window !== "undefined") window.localStorage.removeItem(key);
+  } catch {
+    // Ignore storage quota or sandbox errors
+  }
 }
 
 async function readSse(
@@ -167,6 +246,9 @@ export function AssistantDock({
   const abortRef = React.useRef<AbortController | null>(null);
   const sendingRef = React.useRef(false);
   const conversationIdRef = React.useRef<string | null>(null);
+  const streamBufferRef = React.useRef("");
+  const streamRafRef = React.useRef<number | null>(null);
+  const scrollRafRef = React.useRef<number | null>(null);
   const widthRef = React.useRef(width);
   React.useEffect(() => {
     widthRef.current = width;
@@ -175,6 +257,7 @@ export function AssistantDock({
   const [conversations, setConversations] = React.useState<Conversation[]>([]);
   const [conversationId, setConversationId] = React.useState<string | null>(null);
   const [messages, setMessages] = React.useState<ChatMessage[]>([]);
+  const [visibleCount, setVisibleCount] = React.useState(DEFAULT_VISIBLE_MESSAGES);
   const [draft, setDraft] = React.useState("");
   const [sending, setSending] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -210,18 +293,33 @@ export function AssistantDock({
   }, [conversationId]);
 
   React.useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (streamRafRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(streamRafRef.current);
+      }
+      if (scrollRafRef.current !== null && typeof window !== "undefined") {
+        window.cancelAnimationFrame(scrollRafRef.current);
+      }
+    };
+  }, []);
+
+  React.useEffect(() => {
     if (typeof window === "undefined") return;
     const timeout = window.setTimeout(() => {
-      setDraft(window.localStorage.getItem(draftKey) ?? "");
+      setDraft(readStorage(draftKey) ?? "");
     }, 0);
     return () => window.clearTimeout(timeout);
   }, [draftKey]);
 
   React.useEffect(() => {
     if (typeof window === "undefined") return;
-    const value = draft.slice(0, 4000);
-    if (value) window.localStorage.setItem(draftKey, value);
-    else window.localStorage.removeItem(draftKey);
+    const timeout = window.setTimeout(() => {
+      const value = draft.slice(0, 4000);
+      if (value) writeStorage(draftKey, value);
+      else removeStorage(draftKey);
+    }, 250);
+    return () => window.clearTimeout(timeout);
   }, [draft, draftKey]);
 
   const loadConversation = React.useCallback(
@@ -238,6 +336,7 @@ export function AssistantDock({
         const rows = Array.isArray(data.messages) ? data.messages : [];
         setRemoteBusy(false);
         setConversationId(id);
+        setVisibleCount(DEFAULT_VISIBLE_MESSAGES);
         setMessages(
           keepLast(
             rows
@@ -247,7 +346,7 @@ export function AssistantDock({
           ),
         );
         if (typeof data.balance === "number") setBalance(data.balance);
-        window.localStorage.setItem(activeKey, id);
+        writeStorage(activeKey, id);
       } catch (loadError) {
         setError(loadError instanceof Error ? loadError.message : "We could not load that chat.");
       } finally {
@@ -287,8 +386,7 @@ export function AssistantDock({
             );
           });
         setConversations(list.slice(0, MAX_CONVERSATIONS));
-        const saved =
-          typeof window !== "undefined" ? window.localStorage.getItem(activeKey) : null;
+        const saved = readStorage(activeKey);
         const next = list.find((item) => item.id === saved) ?? list[0];
         if (next) {
           await loadConversation(next.id);
@@ -375,8 +473,13 @@ export function AssistantDock({
 
   React.useEffect(() => {
     const node = listRef.current;
-    if (!node) return;
-    node.scrollTop = node.scrollHeight;
+    if (!node || typeof window === "undefined") return;
+    if (scrollRafRef.current !== null) return;
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null;
+      const current = listRef.current;
+      if (current) current.scrollTop = current.scrollHeight;
+    });
   }, [messages, streamingText, sending, remoteBusy]);
 
   React.useEffect(() => {
@@ -419,19 +522,29 @@ export function AssistantDock({
     };
   }, [open, isMobile, onClose, returnFocusRef]);
 
+  function clearStreamBuffer() {
+    streamBufferRef.current = "";
+    if (streamRafRef.current !== null && typeof window !== "undefined") {
+      window.cancelAnimationFrame(streamRafRef.current);
+      streamRafRef.current = null;
+    }
+    setStreamingText("");
+  }
+
   function newChat() {
     if (sending) return;
     abortRef.current?.abort();
     abortRef.current = null;
     setConversationId(null);
     setMessages([]);
+    setVisibleCount(DEFAULT_VISIBLE_MESSAGES);
     setDraft("");
-    setStreamingText("");
+    clearStreamBuffer();
     setStatusLabel("");
     setRemoteBusy(false);
     setError(null);
     setHistoryOpen(false);
-    if (typeof window !== "undefined") window.localStorage.removeItem(activeKey);
+    removeStorage(activeKey);
     closeRef.current?.focus();
   }
 
@@ -454,21 +567,19 @@ export function AssistantDock({
       cid = data.conversation.id;
       setConversationId(cid);
       setConversations((current) => [data.conversation!, ...current]);
-      if (typeof window !== "undefined") {
-        window.localStorage.setItem(activeKey, cid);
-      }
+      writeStorage(activeKey, cid);
     }
     setCreateSiteOpen(true);
   }
 
-  async function send() {
-    const text = draft.trim();
+  async function send(overrideText?: string) {
+    const text = (overrideText ?? draft).trim();
     if (!text || sending || needsCredits || !enabled || !canUse || pendingConfirmation) return;
 
     sendingRef.current = true;
     setSending(true);
     setError(null);
-    setStreamingText("");
+    clearStreamBuffer();
     setStatusLabel("Sending");
     const controller = new AbortController();
     abortRef.current = controller;
@@ -477,7 +588,7 @@ export function AssistantDock({
     setMessages((current) =>
       keepLast([...current, { id: optimisticId, role: "user", content: text }], MAX_MESSAGES),
     );
-    setDraft("");
+    if (overrideText === undefined) setDraft("");
 
     try {
       let id = conversationId;
@@ -501,9 +612,7 @@ export function AssistantDock({
         id = conversation.id;
         setConversationId(id);
         setConversations((current) => [conversation, ...current]);
-        if (typeof window !== "undefined") {
-          window.localStorage.setItem(activeKey, id);
-        }
+        writeStorage(activeKey, id);
       }
 
       const response = await fetch(`/api/agent/conversations/${id}/messages`, {
@@ -549,11 +658,22 @@ export function AssistantDock({
           return;
         }
         if (event === "delta" && typeof data.text === "string") {
-          setStreamingText((current) => (current + data.text).slice(0, MAX_STREAM_TEXT));
+          if (streamBufferRef.current.length < MAX_STREAM_TEXT) {
+            streamBufferRef.current = (streamBufferRef.current + data.text).slice(
+              0,
+              MAX_STREAM_TEXT,
+            );
+          }
+          if (streamRafRef.current === null && typeof window !== "undefined") {
+            streamRafRef.current = window.requestAnimationFrame(() => {
+              streamRafRef.current = null;
+              setStreamingText(streamBufferRef.current);
+            });
+          }
           return;
         }
         if (event === "confirmation_required") {
-          setStreamingText("");
+          clearStreamBuffer();
           setStatusLabel("");
           setSending(false);
           sendingRef.current = false;
@@ -571,6 +691,7 @@ export function AssistantDock({
           return;
         }
         if (event === "error") {
+          clearStreamBuffer();
           setError(
             typeof data.message === "string"
               ? data.message
@@ -581,9 +702,9 @@ export function AssistantDock({
         }
         if (event === "done") {
           const saved = messageFrom(data.message);
+          clearStreamBuffer();
           if (saved) {
             setMessages((current) => keepLast([...current, saved], MAX_MESSAGES));
-            setStreamingText("");
             setConversations((current) =>
               current
                 .map((conversation) =>
@@ -671,14 +792,25 @@ export function AssistantDock({
     const startX = event.clientX;
     const startWidth = widthRef.current;
     let latest = startWidth;
+    let resizeRaf: number | null = null;
 
     function onMove(moveEvent: PointerEvent) {
       latest = clampAssistantWidth(startWidth + (startX - moveEvent.clientX));
-      onWidthChange(latest);
+      panelRef.current?.style.setProperty("--assistant-w", `${latest}px`);
+      if (resizeRaf === null) {
+        resizeRaf = window.requestAnimationFrame(() => {
+          resizeRaf = null;
+          onWidthChange(latest);
+        });
+      }
     }
     function onUp() {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      if (resizeRaf !== null) {
+        window.cancelAnimationFrame(resizeRaf);
+        resizeRaf = null;
+      }
       onWidthChange(latest);
     }
     window.addEventListener("pointermove", onMove);
@@ -693,6 +825,9 @@ export function AssistantDock({
   }
 
   if (!open) return null;
+
+  const hiddenMessageCount = Math.max(0, messages.length - visibleCount);
+  const visibleMessages = hiddenMessageCount > 0 ? messages.slice(-visibleCount) : messages;
 
   const showChat = tab === "assistant";
   const disabledCopy = !enabled
@@ -905,29 +1040,17 @@ export function AssistantDock({
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {messages.map((message) => (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "max-w-[88%] rounded-[14px] px-3.5 py-2.5",
-                        message.role === "user"
-                          ? "self-end bg-primary text-on-primary"
-                          : "self-start bg-surface-muted text-text",
-                      )}
+                  {hiddenMessageCount > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((count) => count + VISIBLE_MESSAGES_STEP)}
+                      className="self-center rounded-input border border-border bg-surface px-3 py-1.5 text-xs font-semibold text-text-muted transition-colors hover:bg-surface-muted hover:text-text"
                     >
-                      {message.role === "assistant" ? (
-                        <AssistantMessage text={message.content} />
-                      ) : (
-                        <p className="whitespace-pre-wrap break-words text-[15px]">
-                          {message.content}
-                        </p>
-                      )}
-                      {message.role === "assistant" && (message.credits ?? 0) > 0 ? (
-                        <p className="mt-1 text-xs opacity-70">
-                          {message.credits} credit{message.credits === 1 ? "" : "s"} used
-                        </p>
-                      ) : null}
-                    </div>
+                      Show earlier messages ({hiddenMessageCount} remaining)
+                    </button>
+                  ) : null}
+                  {visibleMessages.map((message) => (
+                    <ChatMessageItem key={message.id} message={message} />
                   ))}
                   {editingBrief && pendingConfirmation ? (
                     <div className="max-w-[88%] self-start rounded-[14px] bg-surface p-3 mb-3">
@@ -963,13 +1086,11 @@ export function AssistantDock({
                       <div className="mt-3 flex gap-2">
                         <button
                           type="button"
-                          onClick={async () => {
-                            setDraft(
-                              `Update the website brief: name "${briefForm.name}", address "${briefForm.address}", business type "${briefForm.businessType}", about "${briefForm.about}".`,
-                            );
+                          onClick={() => {
+                            const summaryText = `Update the website brief: name "${briefForm.name}", address "${briefForm.address}", business type "${briefForm.businessType}", about "${briefForm.about}".`;
                             setEditingBrief(false);
-                            await new Promise((resolve) => setTimeout(resolve, 0));
-                            void send();
+                            setPendingConfirmation(null);
+                            void send(summaryText);
                           }}
                           disabled={sending}
                           className="flex-1 h-9 rounded-input border border-border bg-surface px-3 text-sm text-text transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"

@@ -1,5 +1,12 @@
 export const DEFAULT_ROOT_DOMAIN = "get-on.tech";
 
+export type SiteState =
+  | "live"
+  | "offline"
+  | "review"
+  | "suspended"
+  | "unpublished";
+
 export type SitePause = {
   title: string;
   text: string;
@@ -15,7 +22,7 @@ export type SiteRedirect = {
 export type SitePointer = {
   siteId: string;
   publishId: string;
-  state: "live" | "offline" | "review" | "suspended" | "unpublished";
+  state: SiteState;
   builtAt: string;
   plan?: string;
   primaryHost?: string | null;
@@ -29,15 +36,34 @@ export type SitePointer = {
   links?: Record<string, { url: string; active?: boolean }>;
 };
 
-export type StoredObject = {
+export type SiteFile = {
   body: ArrayBuffer | Uint8Array;
   contentType?: string | null;
   etag?: string | null;
+  size?: number;
+};
+
+export type StoredObject = SiteFile;
+
+export type SiteLink = {
+  v: 1;
+  siteId: string;
+  projectId: string;
+  targetPath: string;
+  params?: Record<string, string>;
+  active: boolean;
 };
 
 export type SiteStore = {
   getPointer(hostname: string): Promise<SitePointer | null>;
-  getObject(key: string): Promise<StoredObject | null>;
+  getFile?(
+    siteId: string,
+    publishId: string,
+    filePath: string,
+  ): Promise<SiteFile | null>;
+  getSharedFile?(filePath: string): Promise<SiteFile | null>;
+  getLink?(code: string): Promise<SiteLink | null>;
+  getObject?(key: string): Promise<SiteFile | null>;
 };
 
 export type ParseHostResult =
@@ -54,7 +80,8 @@ export function parseHost(
   if (!cleaned || /[^a-z0-9.-]/.test(cleaned)) {
     return { ok: false, reason: "invalid_host" };
   }
-  const normalizedRoot = rootDomain.trim().toLowerCase().split(":")[0] ?? DEFAULT_ROOT_DOMAIN;
+  const normalizedRoot =
+    rootDomain.trim().toLowerCase().split(":")[0] ?? DEFAULT_ROOT_DOMAIN;
   if (cleaned === normalizedRoot || cleaned === `www.${normalizedRoot}`) {
     return { ok: false, reason: "root_domain" };
   }
@@ -73,8 +100,8 @@ const MIME_BY_EXT: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
   ".htm": "text/html; charset=utf-8",
   ".css": "text/css; charset=utf-8",
-  ".js": "application/javascript; charset=utf-8",
-  ".mjs": "application/javascript; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".mjs": "text/javascript; charset=utf-8",
   ".json": "application/json; charset=utf-8",
   ".svg": "image/svg+xml",
   ".png": "image/png",
@@ -220,10 +247,156 @@ export type HandleSiteRequestOptions = {
   statsSaltSecret?: string;
 };
 
+const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
+const MAX_FORM_BODY_BYTES = 16 * 1024;
+const SITE_CSP =
+  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
+
 function sanitizePath(rawPath: string): string {
   const clean = rawPath.split("?")[0]?.split("#")[0] ?? "/";
   if (clean.includes("..")) return "/";
   return clean.startsWith("/") ? clean : `/${clean}`;
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function securityHeaders(isHtml: boolean): Record<string, string> {
+  return {
+    "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+    "X-Frame-Options": "DENY",
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+    ...(isHtml ? { "Content-Security-Policy": SITE_CSP } : {}),
+  };
+}
+
+function byteLengthOf(body: ArrayBuffer | Uint8Array): number {
+  return body instanceof Uint8Array ? body.byteLength : body.byteLength;
+}
+
+function normalizeEtag(value: string): string {
+  return value.trim().replace(/^W\//i, "").replace(/^"|"$/g, "");
+}
+
+function etagMatches(header: string | null, fileEtag: string | null | undefined): boolean {
+  if (!header || !fileEtag) return false;
+  const target = normalizeEtag(fileEtag);
+  return header
+    .split(",")
+    .map((part) => normalizeEtag(part))
+    .some((part) => part === "*" || part === target);
+}
+
+function cacheControlFor(filePath: string): string {
+  if (
+    filePath.startsWith("_shared/") ||
+    filePath.startsWith("assets/") ||
+    filePath.startsWith("media/")
+  ) {
+    return "public, max-age=31536000, immutable";
+  }
+  return "public, max-age=60, stale-while-revalidate=300";
+}
+
+async function readSharedFromStore(
+  store: SiteStore,
+  relPath: string,
+): Promise<SiteFile | null> {
+  if (store.getSharedFile) {
+    return store.getSharedFile(relPath);
+  }
+  if (store.getObject) {
+    return store.getObject(`sites/_shared/${relPath}`);
+  }
+  return null;
+}
+
+async function readSiteFileFromStore(
+  store: SiteStore,
+  siteId: string,
+  publishId: string,
+  relPath: string,
+): Promise<SiteFile | null> {
+  if (store.getFile) {
+    return store.getFile(siteId, publishId, relPath);
+  }
+  if (store.getObject) {
+    return store.getObject(`sites/${siteId}/v/${publishId}/${relPath}`);
+  }
+  return null;
+}
+
+function sendSignedStats(
+  options: HandleSiteRequestOptions,
+  hostname: string,
+  payload: Record<string, unknown>,
+): void {
+  const origin = options.appOrigin?.replace(/\/$/, "");
+  const secret = options.workerSharedSecret;
+  if (!origin || !secret) return;
+  const body = JSON.stringify(payload);
+  const run = async () => {
+    try {
+      const ts = String(Date.now());
+      const ip = options.clientIp ?? "";
+      const bodyHash = await sha256Hex(body);
+      const sig = await signWorkerRequest(secret, { ts, host: hostname, ip, bodyHash });
+      await fetch(`${origin}/api/stats/ingest`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": hostname,
+          "x-gs-ip": ip,
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body,
+      });
+    } catch {
+      // Best-effort analytics must never break redirects or page delivery.
+    }
+  };
+  const promise = run();
+  options.waitUntil?.(promise);
+}
+
+function respondWithFile(
+  request: Request,
+  file: SiteFile,
+  relPath: string,
+  status = 200,
+  overrideCacheControl?: string,
+): Response {
+  const contentType = file.contentType ?? contentTypeFor(relPath);
+  const isHtml = contentType.toLowerCase().includes("text/html");
+  const cacheControl = overrideCacheControl ?? cacheControlFor(relPath);
+  const size = file.size ?? byteLengthOf(file.body);
+  const baseHeaders: Record<string, string> = {
+    "Content-Type": contentType,
+    "Cache-Control": cacheControl,
+    ...securityHeaders(isHtml),
+    ...(file.etag ? { ETag: file.etag } : {}),
+    ...(status === 404 ? { "X-Robots-Tag": "noindex" } : {}),
+  };
+
+  if (status === 200 && etagMatches(request.headers.get("if-none-match"), file.etag)) {
+    return new Response(null, { status: 304, headers: baseHeaders });
+  }
+
+  return new Response(request.method === "HEAD" ? null : (file.body as BodyInit), {
+    status,
+    headers: {
+      ...baseHeaders,
+      "Content-Length": String(size),
+    },
+  });
 }
 
 export async function handleSiteRequest(
@@ -236,52 +409,371 @@ export async function handleSiteRequest(
   if (!parsedHost.ok) {
     return new Response("Site not found", {
       status: 404,
-      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex",
+        ...securityHeaders(false),
+      },
     });
-  }
-
-  const pointer = await store.getPointer(parsedHost.hostname);
-  if (!pointer || pointer.state !== "live") {
-    return new Response("Site unavailable", {
-      status: 404,
-      headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
-    });
-  }
-
-  if (pointer.supportPaused || pointer.planLapsed) {
-    const title = pointer.pause?.title || "Site temporarily unavailable";
-    const text = pointer.pause?.text || "Please check back soon.";
-    return new Response(
-      `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;padding:48px;text-align:center"><h1>${title}</h1><p>${text}</p></body></html>`,
-      { status: 503, headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } },
-    );
   }
 
   const reqPath = sanitizePath(options.rawPath ?? new URL(request.url).pathname);
 
-  if (!parsedHost.custom && pointer.primaryHost && pointer.redirectFreeAddress !== false) {
-    return Response.redirect(`https://${pointer.primaryHost}${reqPath}`, 301);
+  if (reqPath === "/_gs/health") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          Allow: "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    return new Response(request.method === "HEAD" ? null : "ok", {
+      status: 200,
+      headers: {
+        "Content-Type": "text/plain; charset=utf-8",
+        "Content-Length": "2",
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
   }
 
-  const redirect = pointer.redirects?.find((r) => r.from === reqPath);
-  if (redirect) {
-    return Response.redirect(
-      redirect.to.startsWith("/") ? new URL(redirect.to, request.url).toString() : redirect.to,
-      redirect.code || 301,
+  const pointer = await store.getPointer(parsedHost.hostname);
+  if (!pointer) {
+    return new Response(
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Site not found</title></head><body style="font-family:system-ui,sans-serif;padding:48px;text-align:center"><h1>Website not found</h1><p>No live website is connected to this address yet.</p></body></html>`,
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(true),
+        },
+      },
     );
   }
 
-  if (reqPath.startsWith("/_shared/")) {
-    const sharedKey = `sites/${reqPath.slice(1)}`;
-    const obj = await store.getObject(sharedKey);
-    if (!obj) return new Response("Not found", { status: 404 });
-    return new Response(obj.body as BodyInit, {
-      status: 200,
+  if (pointer.state === "suspended") {
+    return new Response(
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Website unavailable</title></head><body style="font-family:system-ui,sans-serif;padding:48px;text-align:center"><h1>Website suspended</h1><p>This website is temporarily suspended.</p></body></html>`,
+      {
+        status: 403,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(true),
+        },
+      },
+    );
+  }
+
+  if (pointer.state === "unpublished" || pointer.state === "offline") {
+    return new Response(
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Website not live yet</title></head><body style="font-family:system-ui,sans-serif;padding:48px;text-align:center"><h1>Website not live yet</h1><p>This website is not live yet. Please check back soon.</p></body></html>`,
+      {
+        status: 404,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(true),
+        },
+      },
+    );
+  }
+
+  if (pointer.state !== "live") {
+    return new Response("Site unavailable", {
+      status: 404,
       headers: {
-        "Content-Type": obj.contentType ?? contentTypeFor(reqPath),
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex",
+        ...securityHeaders(false),
       },
     });
+  }
+
+  if (pointer.supportPaused || pointer.planLapsed) {
+    const title = escapeHtml(pointer.pause?.title || "Site temporarily unavailable");
+    const text = escapeHtml(pointer.pause?.text || "Please check back soon.");
+    return new Response(
+      `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>${title}</title></head><body style="font-family:system-ui,sans-serif;padding:48px;text-align:center"><h1>${title}</h1><p>${text}</p></body></html>`,
+      {
+        status: 503,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(true),
+        },
+      },
+    );
+  }
+
+  const tokenMatch = /^\/_forms\/([A-Za-z0-9_-]{6,32})\/token$/.exec(reqPath);
+  if (tokenMatch) {
+    if (request.method !== "GET") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          Allow: "GET",
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    if (!options.formTokenSecret) {
+      return new Response(JSON.stringify({ ok: false, error: "form_unavailable" }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    const token = await signFormToken(options.formTokenSecret, {
+      s: pointer.siteId,
+      f: tokenMatch[1]!,
+      t: Date.now(),
+    });
+    return new Response(JSON.stringify({ ok: true, token }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  const formMatch = /^\/_forms\/([^/]+)$/.exec(reqPath);
+  if (formMatch) {
+    const formId = formMatch[1]!;
+    if (request.method !== "POST") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          Allow: "POST",
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    if (!FORM_ID_RE.test(formId)) {
+      return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
+        status: 404,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    const origin = options.appOrigin?.replace(/\/$/, "");
+    const secret = options.workerSharedSecret;
+    if (!origin || !secret) {
+      return new Response(JSON.stringify({ ok: false, error: "form_unavailable" }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_FORM_BODY_BYTES) {
+      return new Response(JSON.stringify({ ok: false, error: "payload_too_large" }), {
+        status: 413,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+
+    const ts = String(Date.now());
+    const ip = options.clientIp ?? "";
+    const bodyHash = await sha256Hex(rawBody);
+    const sig = await signWorkerRequest(secret, {
+      ts,
+      host: parsedHost.hostname,
+      ip,
+      bodyHash,
+    });
+    const upstream = await fetch(`${origin}/api/public/forms/${encodeURIComponent(formId)}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        "x-gs-host": parsedHost.hostname,
+        "x-gs-ip": ip,
+        "x-gs-ua": (request.headers.get("user-agent") ?? "").slice(0, 200),
+        "x-gs-ts": ts,
+        "x-gs-sig": sig,
+      },
+      body: rawBody,
+    });
+    const upstreamText = await upstream.text();
+    return new Response(upstreamText, {
+      status: upstream.status,
+      headers: {
+        "Content-Type": upstream.headers.get("content-type") ?? "application/json; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  if (reqPath === "/_gs/stats") {
+    if (request.method !== "POST") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          Allow: "POST",
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    const raw = await request.text().catch(() => "");
+    let pagePath = "/";
+    try {
+      const parsed = JSON.parse(raw) as { path?: unknown };
+      if (typeof parsed.path === "string" && parsed.path.startsWith("/")) {
+        pagePath = parsed.path.slice(0, 200);
+      }
+    } catch {
+      // Ignore malformed beacon JSON
+    }
+    const visitorSeed = `${options.clientIp ?? ""}|${request.headers.get("user-agent") ?? ""}|${options.statsSaltSecret ?? pointer.siteId}`;
+    const visitorHash = await sha256Hex(visitorSeed);
+    sendSignedStats(options, parsedHost.hostname, {
+      kind: "view",
+      siteId: pointer.siteId,
+      projectId: pointer.siteId,
+      path: pagePath,
+      visitorHash,
+    });
+    return new Response(null, {
+      status: 204,
+      headers: {
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return new Response("Method not allowed", {
+      status: 405,
+      headers: {
+        Allow: "GET, HEAD",
+        "Content-Type": "text/plain; charset=utf-8",
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  if (reqPath.startsWith("/_l/")) {
+    const code = reqPath.slice("/_l/".length);
+    const link = store.getLink ? await store.getLink(code) : null;
+    if (!link || !link.active || (link.siteId && link.siteId !== pointer.siteId)) {
+      return new Response("This link is no longer active.", {
+        status: 410,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    const dest = new URL(link.targetPath, `https://${parsedHost.hostname}`);
+    for (const [k, v] of Object.entries(link.params ?? {})) {
+      if (typeof v === "string") dest.searchParams.set(k, v);
+    }
+    const visitorSeed = `${options.clientIp ?? ""}|${request.headers.get("user-agent") ?? ""}|${options.statsSaltSecret ?? pointer.siteId}`;
+    const visitorHash = await sha256Hex(visitorSeed);
+    sendSignedStats(options, parsedHost.hostname, {
+      kind: "click",
+      siteId: pointer.siteId,
+      projectId: link.projectId || pointer.siteId,
+      path: link.targetPath,
+      linkCode: code,
+      params: link.params ?? {},
+      visitorHash,
+    });
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: dest.toString(),
+        "Cache-Control": "no-store",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  if (
+    !parsedHost.custom &&
+    pointer.primaryHost &&
+    pointer.redirectFreeAddress !== false &&
+    pointer.redirectToPrimary !== false
+  ) {
+    return new Response(null, {
+      status: 301,
+      headers: {
+        Location: `https://${pointer.primaryHost}${reqPath}`,
+        "Cache-Control": "public, max-age=60",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  const redirect = pointer.redirects?.find((r) => r.from === reqPath);
+  if (redirect && (/^\//.test(redirect.to) || /^https?:\/\//i.test(redirect.to))) {
+    const dest = redirect.to.startsWith("/")
+      ? new URL(redirect.to, request.url).toString()
+      : redirect.to;
+    return new Response(null, {
+      status: redirect.code || 301,
+      headers: {
+        Location: dest,
+        "Cache-Control": "public, max-age=60",
+        ...securityHeaders(false),
+      },
+    });
+  }
+
+  if (reqPath.startsWith("/_shared/")) {
+    const rel = reqPath.slice("/_shared/".length);
+    const file = await readSharedFromStore(store, rel);
+    if (!file) {
+      return new Response("Not found", {
+        status: 404,
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    return respondWithFile(request, file, `_shared/${rel}`);
   }
 
   const candidatePaths =
@@ -292,31 +784,34 @@ export async function handleSiteRequest(
         : [reqPath.slice(1), `${reqPath.slice(1)}/index.html`, `${reqPath.slice(1)}.html`];
 
   for (const rel of candidatePaths) {
-    const key = `sites/${pointer.siteId}/v/${pointer.publishId}/${rel}`;
-    const obj = await store.getObject(key);
-    if (obj) {
-      return new Response(request.method === "HEAD" ? null : (obj.body as BodyInit), {
-        status: 200,
-        headers: {
-          "Content-Type": obj.contentType ?? contentTypeFor(rel),
-          "Cache-Control": "public, max-age=60",
-        },
-      });
+    const file = await readSiteFileFromStore(
+      store,
+      pointer.siteId,
+      pointer.publishId,
+      rel,
+    );
+    if (file) {
+      return respondWithFile(request, file, rel);
     }
   }
 
-  const notFoundObj = await store.getObject(
-    `sites/${pointer.siteId}/v/${pointer.publishId}/404.html`,
+  const notFoundFile = await readSiteFileFromStore(
+    store,
+    pointer.siteId,
+    pointer.publishId,
+    "404.html",
   );
-  if (notFoundObj) {
-    return new Response(notFoundObj.body as BodyInit, {
-      status: 404,
-      headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" },
-    });
+  if (notFoundFile) {
+    return respondWithFile(request, notFoundFile, "404.html", 404, "no-store");
   }
 
   return new Response("Not found", {
     status: 404,
-    headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" },
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Robots-Tag": "noindex",
+      ...securityHeaders(false),
+    },
   });
 }

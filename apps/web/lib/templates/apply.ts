@@ -1,3 +1,4 @@
+import { collectContentBlocks } from "@get-on/blocks";
 import { requireSystemTemplate, materializeTemplate } from "@get-on/templates";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -98,10 +99,7 @@ function profileOf(project: ProjectRow) {
 }
 
 function blockTypes(blocks: unknown): string[] {
-  if (!Array.isArray(blocks)) return [];
-  return blocks
-    .map((block) => (block && typeof block === "object" ? String((block as { type?: unknown }).type ?? "") : ""))
-    .filter(Boolean);
+  return collectContentBlocks(blocks).map((block) => block.type).filter(Boolean);
 }
 
 async function enableContactIfNeeded(supabase: SupabaseLike, projectId: string, blocks: unknown) {

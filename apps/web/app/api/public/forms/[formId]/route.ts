@@ -123,9 +123,10 @@ export async function POST(
 
   const admin = createAdminClient();
   const config = readPublishConfig();
-  const parsedHost =
-    parseHost(host, config.rootDomain) ??
-    parseHost(host, config.localRootDomain);
+  const primaryParsed = parseHost(host, config.rootDomain);
+  const parsedHost = primaryParsed.ok
+    ? primaryParsed
+    : parseHost(host, config.localRootDomain);
   if (!parsedHost.ok) {
     await logSubmission(createAdminClient(), {
       projectId: "",

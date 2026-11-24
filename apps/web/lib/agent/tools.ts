@@ -12,6 +12,18 @@ import { logActivity } from "@/lib/activity";
 import { recordSecurityEvent } from "@/lib/security/events";
 import { can } from "@/lib/permissions";
 import { planLimits } from "@/lib/plans";
+import {
+  collectContentBlocks,
+  isPageContentV5,
+  replaceNode,
+  richTextFromPlain,
+  richTextToPlain,
+  validateContent,
+  validateContentV5,
+  type RichNode,
+} from "@get-on/blocks";
+import { PLUGIN_MANIFESTS } from "@get-on/plugins";
+import { TEMPLATE_CATALOG } from "@get-on/templates/catalog";
 
 const EXPIRY_MS = 60 * 60 * 1000;
 
@@ -200,19 +212,6 @@ export const updateCreateSiteBrief: ToolExecutor<
     const step = flowState.step;
 
     let next: string | null = null;
-    if (!complete) {
-      const field = missing[0];
-      next =
-        field === "business name"
-          ? "What should your website be called?"
-          : field === "web address"
-            ? "Which web address would you like (something.get-on.tech)?"
-            : field === "business type"
-              ? "What kind of business is it?"
-              : field === "a few words about your business"
-                ? "Tell me a little about your business."
-                : "Which style fits your business?";
-    }
     if (!complete) {
       const field = missing[0];
       next =
@@ -451,19 +450,44 @@ export const getSiteSettings: ToolExecutor<z.infer<typeof getSiteSettingsSchema>
       .maybeSingle();
     const pid = conv?.project_id ?? null;
     if (!pid) return { ok: true, data: null };
-    const { data: row } = await admin
-      .from("projects")
-      .select("status, subdomain, primary_host, settings")
-      .eq("id", pid)
-      .maybeSingle();
+    const [{ data: row }, { data: projectSettings }] = await Promise.all([
+      admin
+        .from("projects")
+        .select("status, subdomain, primary_host, settings")
+        .eq("id", pid)
+        .maybeSingle(),
+      admin
+        .from("project_settings")
+        .select("seo_site_title, seo_description, tagline")
+        .eq("project_id", pid)
+        .maybeSingle(),
+    ]);
     if (!row) return { ok: true, data: null };
     const settings = row.settings && typeof row.settings === "object" ? (row.settings as Record<string, unknown>) : {};
+    const seoTitle =
+      typeof projectSettings?.seo_site_title === "string"
+        ? projectSettings.seo_site_title
+        : typeof settings.seo_title === "string"
+          ? settings.seo_title
+          : null;
+    const seoDescription =
+      typeof projectSettings?.seo_description === "string"
+        ? projectSettings.seo_description
+        : typeof settings.seo_description === "string"
+          ? settings.seo_description
+          : null;
+    const tagline =
+      typeof projectSettings?.tagline === "string"
+        ? projectSettings.tagline
+        : typeof settings.tagline === "string"
+          ? settings.tagline
+          : null;
     return {
       ok: true,
       data: {
-        seoTitle: typeof settings.seo_title === "string" ? settings.seo_title : null,
-        seoDescription: typeof settings.seo_description === "string" ? settings.seo_description : null,
-        tagline: typeof settings.tagline === "string" ? settings.tagline : null,
+        seoTitle,
+        seoDescription,
+        tagline,
         published: row.status === "published",
         domain: (row.primary_host ?? null) as string | null,
       },
@@ -512,9 +536,11 @@ export const listTemplates: ToolExecutor<z.infer<typeof listTemplatesSchema>, { 
     return {
       ok: true,
       data: {
-        templates: [
-          { slug: "starter", name: "Starter", businessType: "general" },
-        ],
+        templates: TEMPLATE_CATALOG.map((item) => ({
+          slug: item.slug,
+          name: item.name,
+          businessType: item.category,
+        })),
       },
     };
   },
@@ -692,31 +718,103 @@ export const improveText: ToolExecutor<ImproveTextInput, { pageId: string; revis
       };
     }
 
-    const blocks = Array.isArray(page.blocks) ? [...page.blocks] : [];
-    const target = blocks[fields.blockIndex];
-    if (!target || typeof target !== "object") {
-      return { ok: false, code: "NOT_FOUND", message: "That block does not exist." };
-    }
+    let nextContent: unknown = null;
+    if (isPageContentV5(page.blocks)) {
+      const collected = collectContentBlocks(page.blocks);
+      const targetMeta = collected[fields.blockIndex];
+      if (!targetMeta?.id) {
+        return { ok: false, code: "NOT_FOUND", message: "That block does not exist." };
+      }
+      const p = targetMeta.props;
+      const existing =
+        typeof p.text === "string"
+          ? p.text
+          : typeof p.subheading === "string"
+            ? p.subheading
+            : p.doc
+              ? richTextToPlain(p.doc as RichNode)
+              : "";
+      const result = await runTask("text.improve", {
+        teamId: actor.teamId,
+        userId: actor.userId,
+        projectId: page.project_id,
+        userInput: fields.text,
+        existingText: existing,
+      });
+      if (!result.ok) {
+        return { ok: false, code: result.code, message: result.message };
+      }
+      const nextRoot = replaceNode(page.blocks.root, targetMeta.id, (node) => {
+        const nodeProps = { ...(node.props ?? {}) };
+        if (node.type === "richtext") {
+          nodeProps.doc = richTextFromPlain(result.text);
+        } else if (typeof nodeProps.subheading === "string" && typeof nodeProps.text !== "string") {
+          nodeProps.subheading = result.text;
+        } else {
+          nodeProps.text = result.text;
+        }
+        return { ...node, props: nodeProps };
+      });
+      nextContent = { ...page.blocks, root: nextRoot };
+    } else {
+      const blocks = Array.isArray(page.blocks)
+        ? [...page.blocks]
+        : page.blocks &&
+            typeof page.blocks === "object" &&
+            Array.isArray((page.blocks as { blocks?: unknown[] }).blocks)
+          ? [...(page.blocks as { blocks: unknown[] }).blocks]
+          : [];
+      const target = blocks[fields.blockIndex];
+      if (!target || typeof target !== "object") {
+        return { ok: false, code: "NOT_FOUND", message: "That block does not exist." };
+      }
+      const rec = target as Record<string, unknown>;
+      const props = rec.props && typeof rec.props === "object" ? (rec.props as Record<string, unknown>) : null;
+      const existingText =
+        typeof rec.text === "string"
+          ? rec.text
+          : props && typeof props.text === "string"
+            ? props.text
+            : props && typeof props.subheading === "string"
+              ? props.subheading
+              : "";
 
-    const result = await runTask("text.improve", {
-      teamId: actor.teamId,
-      userId: actor.userId,
-      projectId: page.project_id,
-      userInput: fields.text,
-      existingText: typeof (target as { text?: unknown }).text === "string" ? (target as { text: string }).text : "",
-    });
-    if (!result.ok) {
-      return { ok: false, code: result.code, message: result.message };
-    }
+      const result = await runTask("text.improve", {
+        teamId: actor.teamId,
+        userId: actor.userId,
+        projectId: page.project_id,
+        userInput: fields.text,
+        existingText,
+      });
+      if (!result.ok) {
+        return { ok: false, code: result.code, message: result.message };
+      }
 
-    const nextBlocks = blocks.map((b, i) =>
-      i === fields.blockIndex ? { ...(b as Record<string, unknown>), text: result.text } : b,
-    );
+      const nextBlocks = blocks.map((b, i) => {
+        if (i !== fields.blockIndex) return b;
+        const row = { ...(b as Record<string, unknown>) };
+        if (row.props && typeof row.props === "object") {
+          const nextProps = { ...(row.props as Record<string, unknown>) };
+          if (typeof nextProps.subheading === "string" && typeof nextProps.text !== "string") {
+            nextProps.subheading = result.text;
+          } else {
+            nextProps.text = result.text;
+          }
+          row.props = nextProps;
+        } else {
+          row.text = result.text;
+        }
+        return row;
+      });
+      nextContent = Array.isArray(page.blocks)
+        ? nextBlocks
+        : { ...(page.blocks as Record<string, unknown>), blocks: nextBlocks };
+    }
 
     const admin = createAdminClient();
     const { data: newRevision, error } = await admin.rpc("save_page_content", {
       p_page_id: fields.pageId,
-      p_content: nextBlocks,
+      p_content: nextContent,
       p_expected_revision: fields.expectedRevision,
     });
     if (error || newRevision === null || newRevision === undefined) {
@@ -756,7 +854,7 @@ export const improveText: ToolExecutor<ImproveTextInput, { pageId: string; revis
 
 export const updatePageBlocksSchema = z.object({
   pageId: z.string().uuid(),
-  blocks: z.array(z.any()),
+  blocks: z.union([z.array(z.any()), z.record(z.string(), z.any())]),
   expectedRevision: z.number().int().nonnegative(),
 });
 
@@ -782,6 +880,26 @@ export const updatePageBlocks: ToolExecutor<UpdatePageBlocksInput, { pageId: str
       return { ok: false, code: "FORBIDDEN", message: "Only editors, admins and the owner can edit pages." };
     }
     const fields = input as UpdatePageBlocksInput;
+
+    if (isPageContentV5(fields.blocks)) {
+      const checked = validateContentV5(fields.blocks);
+      if (!checked.ok) {
+        return {
+          ok: false,
+          code: "INVALID_CONTENT",
+          message: checked.errors[0]?.message ?? "Invalid page content.",
+        };
+      }
+    } else {
+      const checked = validateContent(fields.blocks);
+      if (!checked.ok) {
+        return {
+          ok: false,
+          code: "INVALID_CONTENT",
+          message: checked.errors[0] ?? "Invalid page blocks.",
+        };
+      }
+    }
 
     const supabase = await createClient();
     const { data: page } = await supabase
@@ -1184,6 +1302,16 @@ export const enablePlugin: ToolExecutor<EnablePluginInput, { projectId: string; 
       return { ok: false, code: "FORBIDDEN", message: "Plugin management is not available on your role." };
     }
     const fields = input as EnablePluginInput;
+    const manifest = PLUGIN_MANIFESTS.find(
+      (item) => item.id === fields.pluginId && item.status === "available",
+    );
+    if (!manifest) {
+      return {
+        ok: false,
+        code: "UNKNOWN_PLUGIN",
+        message: `Plugin "${fields.pluginId}" is not available.`,
+      };
+    }
 
     const supabase = await createClient();
     const { error } = await supabase.rpc("enable_plugin", { p_project_id: fields.projectId, p_plugin_id: fields.pluginId });

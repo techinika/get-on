@@ -13,7 +13,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getShellData } from "@/lib/dashboard";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
-import { countSampleBlocks } from "@get-on/blocks";
+import { collectContentBlocks, countSampleBlocks } from "@get-on/blocks";
 
 type Params = { params: Promise<{ projectId: string }> };
 
@@ -111,24 +111,16 @@ export default async function PublishHistoryPage({ params }: Params) {
       settings.logoData,
   );
 
-  function blocksOf(value: unknown): unknown[] {
-    if (Array.isArray(value)) return value;
-    if (value && typeof value === "object" && Array.isArray((value as { blocks?: unknown[] }).blocks)) {
-      return (value as { blocks: unknown[] }).blocks;
-    }
-    return [];
-  }
-
-  const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
+  const homepageReady = homepage
+    ? collectContentBlocks(homepage.blocks).length > 0
+    : false;
   const sampleContentCount = pageRows.reduce(
     (total, page) => total + countSampleBlocks(page.blocks),
     0,
   );
   const contactEnabled = contactInstall?.state === "active";
   const hasContactForm = pageRows.some((page) =>
-    blocksOf(page.blocks).some(
-      (block) => (block as { type?: string } | null)?.type === "contact-form",
-    ),
+    collectContentBlocks(page.blocks).some((block) => block.type === "contact-form"),
   );
   const hasLiveVersion = livePublish !== null;
   const siteState = siteStateOf({

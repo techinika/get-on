@@ -12,6 +12,9 @@ import {
 import { buildAgentPrompt, normaliseAgentContext } from "@/lib/agent/prompt";
 import { chunkText, encodeSse } from "@/lib/agent/sse";
 import type { AgentMessage } from "@/lib/agent/conversations";
+import * as React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { AssistantMessage } from "@/components/agent/assistant-message";
 
 function message(
   id: string,
@@ -120,5 +123,48 @@ describe("agent stream", () => {
     expect(chunks).toHaveLength(3);
     expect(chunks.join("")).toBe(text);
     expect(chunkText("")).toEqual([]);
+  });
+});
+
+describe("assistant message markdown rendering", () => {
+  it("terminates cleanly on unmatched parentheses, brackets, asterisks, and backticks", () => {
+    const input = "Website (draft) with [unclosed bracket, *lonely star and `unclosed code";
+    const html = renderToStaticMarkup(React.createElement(AssistantMessage, { text: input }));
+    expect(html).toContain("Website (draft)");
+    expect(html).toContain("[unclosed bracket");
+  });
+
+  it("renders valid links and strips javascript: link protocols", () => {
+    const input =
+      "Visit [Docs](https://get-on.tech/docs) and ignore [bad](javascript:alert(1)).";
+    const html = renderToStaticMarkup(React.createElement(AssistantMessage, { text: input }));
+    expect(html).toContain('href="https://get-on.tech/docs"');
+    expect(html).not.toContain('href="javascript:');
+  });
+
+  it("renders headings, lists, bold, italic, and inline code cleanly", () => {
+    const input = [
+      "## Next steps",
+      "",
+      "- **Publish** your *home* page with `npm run build`",
+      "- Review [settings](/dashboard)",
+    ].join("\n");
+    const html = renderToStaticMarkup(React.createElement(AssistantMessage, { text: input }));
+    expect(html).toContain("<h2");
+    expect(html).toContain("<strong>Publish</strong>");
+    expect(html).toContain("<em>home</em>");
+    expect(html).toContain("<code");
+    expect(html).toContain('href="/dashboard"');
+  });
+
+  it("handles pathological unclosed markdown in linear time without freezing", () => {
+    const pathological = "**[unclosed ".repeat(1500) + "`code *star ".repeat(1500);
+    const start = performance.now();
+    const html = renderToStaticMarkup(
+      React.createElement(AssistantMessage, { text: pathological }),
+    );
+    const elapsedMs = performance.now() - start;
+    expect(html).toContain("[unclosed");
+    expect(elapsedMs).toBeLessThan(250);
   });
 });

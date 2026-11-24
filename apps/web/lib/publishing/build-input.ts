@@ -5,7 +5,7 @@ import type {
   SiteSettings,
   SocialLink,
 } from "@get-on/publisher";
-import type { Theme } from "@get-on/blocks";
+import { isPageContentV5, type Theme } from "@get-on/blocks";
 
 const PALETTES = new Set([
   "fresh-green",
@@ -278,6 +278,16 @@ function toPublishPage(
   page: SourcePage,
   allowIndexing: boolean,
 ): PublishPage {
+  const rawBlocks = page.blocks;
+  const blocks: PublishPage["blocks"] = isPageContentV5(rawBlocks)
+    ? rawBlocks
+    : Array.isArray(rawBlocks)
+      ? rawBlocks
+      : rawBlocks &&
+          typeof rawBlocks === "object" &&
+          Array.isArray((rawBlocks as { blocks?: unknown[] }).blocks)
+        ? ((rawBlocks as { blocks: unknown[] }).blocks)
+        : [];
   return {
     id: page.id,
     slug: slugOf(page),
@@ -288,7 +298,7 @@ function toPublishPage(
     noindex: Boolean(page.hide_from_search) || !allowIndexing,
     hidden: Boolean(page.is_hidden),
     showInMenu: page.show_in_menu !== false,
-    blocks: Array.isArray(page.blocks) ? page.blocks : [],
+    blocks,
   };
 }
 
@@ -372,6 +382,7 @@ export function buildSiteInput(args: BuildInputArgs): BuildSiteInput {
     subdomain: args.project.subdomain,
     rootDomain: args.rootDomain,
     primaryHost: args.primaryHost ?? null,
+    activePlugins: args.activePlugins ?? [],
     settings: siteSettings,
     pages: args.pages.map((page) => toPublishPage(page, allowIndexing)),
     forms: { enabled: contactEnabled },

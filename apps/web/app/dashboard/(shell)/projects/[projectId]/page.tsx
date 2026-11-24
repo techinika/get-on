@@ -16,7 +16,7 @@ import { planLimits } from "@/lib/team";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
 import { friendlyError } from "@/lib/errors";
-import { countSampleBlocks } from "@get-on/blocks";
+import { collectContentBlocks, countSampleBlocks } from "@get-on/blocks";
 
 type Params = {
   params: Promise<{ projectId: string }>;
@@ -116,21 +116,15 @@ export default async function OverviewPage({ params, searchParams }: Params) {
     suspendedAt: project.suspended_at,
   });
 
-  function blocksOf(value: unknown): unknown[] {
-    if (Array.isArray(value)) return value;
-    if (value && typeof value === "object" && Array.isArray((value as { blocks?: unknown[] }).blocks)) {
-      return (value as { blocks: unknown[] }).blocks;
-    }
-    return [];
-  }
-
-  const homepageReady = homepage ? blocksOf(homepage.blocks).length > 0 : false;
+  const homepageReady = homepage
+    ? collectContentBlocks(homepage.blocks).length > 0
+    : false;
   const contactEnabled = contactInstall?.state === "active";
   const contactFormCount = pageRows.reduce(
     (total, page) =>
       total +
-      blocksOf(page.blocks).filter(
-        (block) => (block as { type?: string } | null)?.type === "contact-form",
+      collectContentBlocks(page.blocks).filter(
+        (block) => block.type === "contact-form",
       ).length,
     0,
   );

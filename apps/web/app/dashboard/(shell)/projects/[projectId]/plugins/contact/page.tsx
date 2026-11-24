@@ -9,28 +9,22 @@ import {
   type RecipientRow,
 } from "@/components/project/contact-settings";
 
-type Props = { params: Promise<{ projectId: string }> };
+import { collectContentBlocks } from "@get-on/blocks";
 
-type Block = { id?: unknown; type?: unknown; props?: { variation?: unknown } };
+type Props = { params: Promise<{ projectId: string }> };
 
 function formsOnPages(
   pages: Array<{ id: string; title: string; path: string; blocks: unknown }>,
 ): FormPage[] {
   const found: FormPage[] = [];
   for (const page of pages) {
-    const blocks = Array.isArray(page.blocks)
-      ? page.blocks
-      : Array.isArray((page.blocks as { blocks?: unknown[] } | null)?.blocks)
-        ? ((page.blocks as { blocks: unknown[] }).blocks)
-        : [];
-    for (const block of blocks as Block[]) {
-      if (block?.type !== "contact-form") continue;
-      const blockId = typeof block.id === "string" ? block.id : "form";
+    for (const block of collectContentBlocks(page.blocks)) {
+      if (block.type !== "contact-form") continue;
       found.push({
         pageId: page.id,
         pageTitle: page.title,
         path: page.path,
-        blockId,
+        blockId: block.id || "form",
       });
     }
   }

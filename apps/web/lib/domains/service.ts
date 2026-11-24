@@ -303,14 +303,37 @@ export class DomainService {
   }
 
   async startDomain(input: StartDomainInput): Promise<Domain> {
-    await this.logStep(input.projectId, null, "domain_start", "Connection started", {
+    const preCreationSteps: Array<{
+      event: string;
+      summary: string;
+      meta?: Record<string, unknown>;
+    }> = [];
+    const bufferStep = (
+      event: string,
+      summary: string,
+      meta?: Record<string, unknown>,
+    ) => {
+      preCreationSteps.push({ event, summary, meta });
+      console.log(
+        "[domains] step",
+        JSON.stringify({
+          projectId: input.projectId,
+          event,
+          summary,
+          meta,
+          at: new Date().toISOString(),
+        }),
+      );
+    };
+
+    bufferStep("domain_start", "Connection started", {
       input: input.domain,
       projectId: input.projectId,
     });
 
     const normalized = normalizeDomainInput(input.domain);
     if (!normalized.ok) {
-      await this.logStep(input.projectId, null, "domain_start_failed", "Invalid domain input", {
+      bufferStep("domain_start_failed", "Invalid domain input", {
         input: input.domain,
         reason: normalized.reason,
       });
@@ -319,7 +342,7 @@ export class DomainService {
       );
     }
 
-    await this.logStep(input.projectId, null, "domain_normalized", "Domain normalized", {
+    bufferStep("domain_normalized", "Domain normalized", {
       registrable: normalized.domain.registrable,
       hostname: normalized.domain.hostname,
       subdomain: normalized.domain.subdomain,
@@ -327,14 +350,14 @@ export class DomainService {
 
     const screening = screenDomain(normalized.domain.sld);
     if (screening.action === "block") {
-      await this.logStep(input.projectId, null, "domain_blocked", "Domain blocked by screening", {
+      bufferStep("domain_blocked", "Domain blocked by screening", {
         sld: normalized.domain.sld,
         reason: screening.reason,
       });
       throw new DomainError("DOMAIN_BLOCKED");
     }
 
-    await this.logStep(input.projectId, null, "domain_screened", "Domain passed screening", {
+    bufferStep("domain_screened", "Domain passed screening", {
       sld: normalized.domain.sld,
       action: screening.action,
       reason: screening.reason ?? null,
@@ -345,6 +368,10 @@ export class DomainService {
       p_registrable: normalized.domain.registrable,
       p_display: input.displayName?.trim() || normalized.domain.registrable,
     });
+
+    for (const step of preCreationSteps) {
+      await this.event(domainId, step.event, step.summary, null, step.meta);
+    }
 
     await this.logStep(domainId, null, "domain_created", "Domain record created in database", {
       registrable: normalized.domain.registrable,

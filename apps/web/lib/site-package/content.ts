@@ -1,6 +1,6 @@
 import { zipSync } from "fflate";
 import sharp from "sharp";
-import { validateContent } from "@get-on/blocks";
+import { collectContentBlocks, isPageContentV5, validateContent } from "@get-on/blocks";
 import {
   SITE_PACKAGE_CONTENT_SCHEMA_VERSION,
   SITE_PACKAGE_FORMAT,
@@ -106,7 +106,14 @@ export function buildContentDocument(source: PackageSource): SiteDocument {
   const config = readPublishConfig();
   const settings = source.settings ?? {};
   const pages: SitePage[] = source.pages.map((page) => {
-    const parsed = validateContent(page.blocks);
+    const rawForValidation = isPageContentV5(page.blocks)
+      ? collectContentBlocks(page.blocks).map((b, idx) => ({
+          id: b.id || `blk_${idx + 1}`,
+          type: b.type,
+          props: b.props,
+        }))
+      : page.blocks;
+    const parsed = validateContent(rawForValidation);
     if (!parsed.ok) {
       throw new SitePackageError("EXPORT_NOT_VALID", "A page has content we cannot export.");
     }
@@ -346,7 +353,12 @@ export function makeWebsiteFilesPortable(
   const removed: string[] = [];
   const out: Record<string, Uint8Array> = {};
   for (const [path, body] of Object.entries(files)) {
-    if (path.startsWith("_forms/") || path.startsWith("_gs/") || path.startsWith("_l/")) {
+    if (
+      path.startsWith("_forms/") ||
+      path.startsWith("_gs/") ||
+      path.startsWith("_l/") ||
+      /^assets\/site-[a-f0-9]+\.js$/i.test(path)
+    ) {
       removed.push(path);
       continue;
     }
@@ -355,10 +367,8 @@ export function makeWebsiteFilesPortable(
       continue;
     }
     let html = decodeText(body);
-    // Remove Google Analytics and any other external script.
-    html = html.replace(/<script\b[^>]*>(?:[\s\S]*?)<\/script>/gi, (match) => {
-      return /googletagmanager|google-analytics|gtag\(/i.test(match) ? "" : match;
-    });
+    // Remove Google Analytics and platform runtime scripts.
+    html = html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, "");
     // Turn contact forms into an email button, or hide them when no email exists.
     html = html.replace(/<form\b[^>]*>([\s\S]*?)<\/form>/gi, (_match, inner) => {
       if (!/contact|message|email|phone|name/i.test(inner)) return "";

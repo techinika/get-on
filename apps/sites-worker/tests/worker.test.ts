@@ -314,3 +314,88 @@ describe("tracked links", () => {
     expect(cache.puts).toHaveLength(0);
   });
 });
+
+describe("health, CSP, and interactive endpoints", () => {
+  it("answers /_gs/health with 200 ok without touching the cache", async () => {
+    const cache = new FakeCache();
+    const env = buildEnv({ state: "unpublished" });
+    const worker = createSiteWorker({ cache });
+    const pending = context();
+    const response = await worker.fetch(
+      requestFor("rosebakery.get-on.tech", "/_gs/health"),
+      env,
+      pending.ctx,
+    );
+    await Promise.all(pending.pending);
+
+    expect(response.status).toBe(200);
+    expect(await response.text()).toBe("ok");
+    expect(response.headers.get("cache-control")).toBe("no-store");
+    expect(cache.puts).toHaveLength(0);
+  });
+
+  it("includes strict self-hosted script CSP on HTML pages", async () => {
+    const worker = createSiteWorker({ cache: null });
+    const response = await worker.fetch(requestFor(), liveEnv());
+    const csp = response.headers.get("content-security-policy") ?? "";
+    expect(csp).toContain("script-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+  });
+
+  it("issues signed form tokens and forwards signed submissions", async () => {
+    const cache = new FakeCache();
+    const env: WorkerEnv = {
+      ...liveEnv(),
+      FORM_TOKEN_SECRET: "form-secret-test-value",
+      WORKER_SHARED_SECRET: "worker-secret-test-value",
+      APP_ORIGIN: "https://app.get-on.tech",
+    };
+    const worker = createSiteWorker({ cache });
+
+    const tokenRes = await worker.fetch(
+      requestFor("rosebakery.get-on.tech", "/_forms/contact1/token"),
+      env,
+    );
+    expect(tokenRes.status).toBe(200);
+    const tokenBody = (await tokenRes.json()) as { ok: boolean; token: string };
+    expect(tokenBody.ok).toBe(true);
+    expect(tokenBody.token).toContain(".");
+    expect(cache.puts).toHaveLength(0);
+
+    const originalFetch = globalThis.fetch;
+    let capturedUrl = "";
+    let capturedSig = "";
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      capturedUrl = String(input);
+      const headers = new Headers(init?.headers);
+      capturedSig = headers.get("x-gs-sig") ?? "";
+      return new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    try {
+      const submitRes = await worker.fetch(
+        requestFor("rosebakery.get-on.tech", "/_forms/contact1", {
+          method: "POST",
+          headers: { "content-type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams({
+            name: "Ada",
+            email: "ada@example.com",
+            message: "Hello there!",
+            _t: tokenBody.token,
+          }).toString(),
+        }),
+        env,
+      );
+      expect(submitRes.status).toBe(200);
+      expect(capturedUrl).toBe("https://app.get-on.tech/api/public/forms/contact1");
+      expect(capturedSig).toMatch(/^[a-f0-9]{64}$/);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+

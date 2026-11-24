@@ -81,7 +81,8 @@ async function serve(
   if (
     cache &&
     (request.method === "GET" || request.method === "HEAD") &&
-    !requestPath.startsWith("/_l/")
+    !requestPath.startsWith("/_l/") &&
+    !requestPath.startsWith("/_gs/")
   ) {
     const host = parseHost(request.headers.get("host"), rootDomain);
     if (host.ok) {
@@ -126,7 +127,7 @@ async function serve(
     request.method === "GET" &&
     response.status === 200 &&
     !cacheControl.includes("no-store") &&
-    !/^\/(?:_forms|_l)\//.test(rawPathOf(request.url) ?? "");
+    !/^\/(?:_forms|_gs|_l)\//.test(rawPathOf(request.url) ?? "");
 
   if (cacheable && key) {
     const copy = response.clone();
