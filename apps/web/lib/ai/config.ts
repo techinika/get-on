@@ -7,6 +7,8 @@ export type AiConfig = {
   accountId: string;
   apiToken: string;
   gatewayId: string;
+  workerUrl?: string;
+  workerSecret?: string;
   creditNeurons: number;
   dailyCapCredits: number;
   usdPerNeuron: number;
@@ -23,6 +25,15 @@ function number(value: string | undefined, fallback: number): number {
 }
 
 export function aiConfig(): AiConfig {
+  const workerUrl = (
+    process.env.AI_WORKER_URL ||
+    process.env.API_ORIGIN ||
+    ""
+  )
+    .trim()
+    .replace(/\/+$/, "");
+  const workerSecret = (process.env.WORKER_SHARED_SECRET ?? "").trim();
+
   return {
     provider: process.env.AI_PROVIDER === "workers-ai" ? "workers-ai" : "fake",
     enabled: process.env.AI_ENABLED !== "false",
@@ -30,6 +41,8 @@ export function aiConfig(): AiConfig {
     accountId: process.env.CF_AI_ACCOUNT_ID ?? "",
     apiToken: process.env.CF_AI_API_TOKEN ?? "",
     gatewayId: process.env.AI_GATEWAY_ID ?? "",
+    workerUrl,
+    workerSecret,
     creditNeurons: integer(process.env.AI_CREDIT_NEURONS, 100),
     dailyCapCredits: integer(process.env.AI_DAILY_CAP_CREDITS, 5000),
     usdPerNeuron: number(process.env.AI_USD_PER_NEURON, 0.000011),

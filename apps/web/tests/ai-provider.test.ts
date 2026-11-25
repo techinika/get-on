@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isAiError } from "@get-on/ai";
+import { sha256Hex, verifyWorkerRequest } from "@get-on/site-server";
 import { WorkersAiProvider } from "@/lib/ai/provider";
 
 const config = {
@@ -142,4 +143,71 @@ describe("Workers AI provider", () => {
       steps: 4,
     });
   });
+
+  it("routes signed requests to Cloudflare API worker when workerUrl and workerSecret are set", async () => {
+    const workerSecret = "shared-worker-secret-test";
+    const fetchMock = vi.fn(async () =>
+      jsonResponse({
+        choices: [{ message: { content: "Worker reply" } }],
+        usage: { prompt_tokens: 9, completion_tokens: 4 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const provider = new WorkersAiProvider({
+      accountId: "",
+      apiToken: "",
+      gatewayId: "get-on-gw",
+      workerUrl: "https://api.get-on.tech/",
+      workerSecret,
+    });
+
+    const textResult = await provider.generateText({
+      modelId: "@cf/meta/llama-3.2-3b-instruct",
+      messages: [{ role: "user", content: "Hello" }],
+      metadata: { team: "t1", task: "agent.chat" },
+    });
+
+    expect(textResult.value).toBe("Worker reply");
+    expect(textResult.usage).toEqual({ inputTokens: 9, outputTokens: 4 });
+
+    const [chatUrl, chatInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(chatUrl).toBe("https://api.get-on.tech/ai/v1/chat/completions");
+    const chatHeaders = chatInit.headers as Record<string, string>;
+    expect(chatHeaders["x-gs-host"]).toBe("api.get-on.tech");
+    expect(chatHeaders["x-gs-ts"]).toBeTruthy();
+    expect(chatHeaders["x-gs-sig"]).toBeTruthy();
+    const chatBody = String(chatInit.body);
+    const verifiedChat = await verifyWorkerRequest(workerSecret, {
+      ts: chatHeaders["x-gs-ts"]!,
+      host: chatHeaders["x-gs-host"]!,
+      ip: chatHeaders["x-gs-ip"] ?? "",
+      bodyHash: await sha256Hex(chatBody),
+      sig: chatHeaders["x-gs-sig"]!,
+    });
+    expect(verifiedChat).toBe(true);
+    expect(JSON.parse(chatBody)).toMatchObject({
+      model: "@cf/meta/llama-3.2-3b-instruct",
+      gatewayId: "get-on-gw",
+      metadata: { team: "t1", task: "agent.chat" },
+    });
+
+    const runFetchMock = vi.fn(async () =>
+      jsonResponse({ result: { response: "safe" } }),
+    );
+    vi.stubGlobal("fetch", runFetchMock);
+    const guardResult = await provider.moderate({
+      modelId: "@cf/meta/llama-guard-3-8b",
+      text: "Check me",
+    });
+    expect(guardResult.safe).toBe(true);
+    const [runUrl, runInit] = runFetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(runUrl).toBe("https://api.get-on.tech/ai/run");
+    expect(JSON.parse(String(runInit.body))).toEqual({
+      model: "@cf/meta/llama-guard-3-8b",
+      inputs: { messages: [{ role: "user", content: "Check me" }] },
+      gatewayId: "get-on-gw",
+    });
+  });
 });
+

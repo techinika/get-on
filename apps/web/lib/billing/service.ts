@@ -787,7 +787,7 @@ export async function startInvoicePayment(input: {
       merchantReference,
       amountCents: number(raw.total_cents),
       currency: string(raw.currency),
-      description: `Get-On ${string(raw.kind)} payment`,
+      description: (nullableString(raw.description) || `Get-On ${string(raw.kind)} payment`).slice(0, 100),
       callbackUrl:
         process.env.PESAPAL_CALLBACK_URL ||
         `${appOrigin()}/api/billing/pesapal/callback`,

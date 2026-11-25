@@ -10,5 +10,7 @@ export function createAiProvider(config: AiConfig = aiConfig()): AiProvider {
     accountId: config.accountId,
     apiToken: config.apiToken,
     gatewayId: config.gatewayId,
+    workerUrl: config.workerUrl,
+    workerSecret: config.workerSecret,
   });
 }

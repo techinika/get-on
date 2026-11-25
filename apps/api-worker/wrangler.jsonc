@@ -18,6 +18,9 @@
   },
   // Secrets set with `wrangler secret put`:
   //   CRON_SECRET, JOBS_SECRET, WORKER_SHARED_SECRET
+  "ai": {
+    "binding": "AI"
+  },
   "triggers": {
     "crons": ["*/5 * * * *", "0 * * * *", "0 1 * * *"]
   },

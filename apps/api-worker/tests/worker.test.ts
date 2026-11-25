@@ -233,4 +233,156 @@ describe("api-worker", () => {
     expect(failRetry).toHaveBeenCalledTimes(1);
     expect(failAck).not.toHaveBeenCalled();
   });
+
+  it("requires valid worker signatures on /ai/v1/chat/completions and /ai/run", async () => {
+    const worker = createApiWorker();
+    const runMock = vi.fn(async () => ({
+      response: "Hello from edge AI",
+      tool_calls: [{ id: "tc_1", function: { name: "site_info", arguments: "{}" } }],
+      usage: { prompt_tokens: 15, completion_tokens: 6 },
+    }));
+
+    const missingBinding = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/v1/chat/completions", {
+        method: "POST",
+        body: JSON.stringify({ model: "@cf/meta/llama-3.2-3b-instruct", messages: [] }),
+      }),
+      { WORKER_SHARED_SECRET: "secret" },
+    );
+    expect(missingBinding.status).toBe(503);
+
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: "ai-worker-secret",
+      AI_GATEWAY_ID: "env-gateway",
+      AI: { run: runMock },
+    };
+
+    const unsignedRes = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/v1/chat/completions", {
+        method: "POST",
+        body: JSON.stringify({ model: "@cf/meta/llama-3.2-3b-instruct", messages: [] }),
+      }),
+      env,
+    );
+    expect(unsignedRes.status).toBe(401);
+
+    const payload = JSON.stringify({
+      model: "@cf/meta/llama-3.2-3b-instruct",
+      messages: [{ role: "user", content: "Hi" }],
+      metadata: { team: "team-1" },
+    });
+    const ts = String(Date.now());
+    const host = "api.get-on.tech";
+    const bodyHash = await sha256Hex(payload);
+
+    const badSigRes = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": "invalid",
+        },
+        body: payload,
+      }),
+      env,
+    );
+    expect(badSigRes.status).toBe(403);
+    expect(runMock).not.toHaveBeenCalled();
+
+    const sig = await signWorkerRequest("ai-worker-secret", { ts, host, ip: "", bodyHash });
+    const okRes = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body: payload,
+      }),
+      env,
+    );
+    expect(okRes.status).toBe(200);
+    expect(await okRes.json()).toEqual({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: "Hello from edge AI",
+            tool_calls: [{ id: "tc_1", function: { name: "site_info", arguments: "{}" } }],
+          },
+        },
+      ],
+      usage: { prompt_tokens: 15, completion_tokens: 6 },
+    });
+    expect(runMock).toHaveBeenCalledWith(
+      "@cf/meta/llama-3.2-3b-instruct",
+      { messages: [{ role: "user", content: "Hi" }] },
+      {
+        gateway: {
+          id: "env-gateway",
+          skipCache: true,
+          collectLog: false,
+          metadata: { team: "team-1" },
+        },
+      },
+    );
+  });
+
+  it("omits gateway options when no gateway id exists and base64-encodes binary image streams on /ai/run", async () => {
+    const worker = createApiWorker();
+    const bytes = new Uint8Array([137, 80, 78, 71]);
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(bytes);
+        controller.close();
+      },
+    });
+    const runMock = vi.fn(async () => stream);
+    const secret = "ai-worker-secret-2";
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: secret,
+      AI: { run: runMock },
+    };
+
+    const payload = JSON.stringify({
+      model: "@cf/black-forest-labs/flux-1-schnell",
+      inputs: { prompt: "Bakery storefront", steps: 4 },
+    });
+    const ts = String(Date.now());
+    const host = "api.get-on.tech";
+    const bodyHash = await sha256Hex(payload);
+    const sig = await signWorkerRequest(secret, { ts, host, ip: "", bodyHash });
+
+    const res = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/run", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body: payload,
+      }),
+      env,
+    );
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({
+      result: { image: "iVBORw==" },
+    });
+    expect(runMock).toHaveBeenCalledWith(
+      "@cf/black-forest-labs/flux-1-schnell",
+      { prompt: "Bakery storefront", steps: 4 },
+      undefined,
+    );
+  });
 });
+

@@ -1,7 +1,8 @@
 export const PLAN_IDS = ["free", "basic", "pro", "enterprise"] as const;
 export type PlanId = (typeof PLAN_IDS)[number];
 
-export type TermMonths = 1 | 3 | 6 | 12 | 24;
+export const VALID_TERM_MONTHS = [1, 3, 6, 12, 24, 36, 48, 60] as const;
+export type TermMonths = (typeof VALID_TERM_MONTHS)[number];
 
 export type PlanLimits = {
   maxWebsites: number | null;
@@ -218,7 +219,9 @@ export type TeamAccess = {
 
 export function parseTermMonths(value: unknown): TermMonths {
   const n = Number(value);
-  if (n === 1 || n === 3 || n === 6 || n === 12 || n === 24) return n;
+  if ((VALID_TERM_MONTHS as readonly number[]).includes(n)) {
+    return n as TermMonths;
+  }
   return 1;
 }
 

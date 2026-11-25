@@ -1,3 +1,4 @@
+import { sha256Hex, signWorkerRequest } from "@get-on/site-server";
 import {
   AgentToolCall,
   AiError,
@@ -22,6 +23,8 @@ export type WorkersAiConfig = {
   apiToken: string;
   gatewayId: string;
   baseUrl?: string;
+  workerUrl?: string;
+  workerSecret?: string;
 };
 
 function timeoutSignal(timeoutMs: number): {
@@ -74,6 +77,10 @@ export class WorkersAiProvider implements AiProvider {
     this.config = config;
   }
 
+  private usesWorkerBackend(): boolean {
+    return Boolean(this.config.workerUrl?.trim() && this.config.workerSecret?.trim());
+  }
+
   private baseUrl(): string {
     return (
       this.config.baseUrl ??
@@ -100,12 +107,110 @@ export class WorkersAiProvider implements AiProvider {
     return headers;
   }
 
+  private async workerRequest(
+    path: string,
+    body: Record<string, unknown>,
+    timeoutMs: number,
+    metadata?: Record<string, string>,
+  ): Promise<unknown> {
+    const workerUrl = this.config.workerUrl!.replace(/\/+$/, "");
+    const workerSecret = this.config.workerSecret!;
+    const targetPath = path.startsWith("/ai/run/") ? "/ai/run" : path;
+    const payloadObj: Record<string, unknown> =
+      path.startsWith("/ai/run/")
+        ? {
+            model: path.slice("/ai/run/".length),
+            inputs: body,
+          }
+        : { ...body };
+
+    if (this.config.gatewayId) {
+      payloadObj.gatewayId = this.config.gatewayId;
+    }
+    if (metadata && Object.keys(metadata).length > 0) {
+      payloadObj.metadata = metadata;
+    }
+
+    const timer = timeoutSignal(timeoutMs);
+    try {
+      const serialized = JSON.stringify(payloadObj);
+      const ts = String(Date.now());
+      const host = new URL(workerUrl).hostname;
+      const bodyHash = await sha256Hex(serialized);
+      const sig = await signWorkerRequest(workerSecret, {
+        ts,
+        host,
+        ip: "",
+        bodyHash,
+      });
+
+      const response = await fetch(`${workerUrl}${targetPath}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body: serialized,
+        signal: timer.signal,
+      });
+
+      const text = await response.text();
+      let parsed: unknown = null;
+      try {
+        parsed = text ? JSON.parse(text) : null;
+      } catch {
+        parsed = null;
+      }
+
+      if (!response.ok) {
+        const envelope =
+          parsed && typeof parsed === "object"
+            ? (parsed as Record<string, unknown>)
+            : {};
+        const firstError = Array.isArray(envelope.errors)
+          ? (envelope.errors[0] as Record<string, unknown> | undefined)
+          : undefined;
+        throw toAiError({
+          status: response.status,
+          code: firstError?.code,
+          message:
+            firstError?.message ??
+            envelope.message ??
+            (typeof parsed === "string" ? parsed : text) ??
+            `Cloudflare Worker AI returned ${response.status}`,
+        });
+      }
+
+      return parsed;
+    } catch (error) {
+      if (error instanceof AiError) throw error;
+      if (error instanceof Error && error.name === "AbortError") {
+        throw new AiError("AI_TIMEOUT");
+      }
+      throw toAiError(error);
+    } finally {
+      timer.clear();
+    }
+  }
+
   private async request(
     path: string,
     body: unknown,
     timeoutMs: number,
     metadata?: Record<string, string>,
   ): Promise<unknown> {
+    if (this.usesWorkerBackend()) {
+      return this.workerRequest(
+        path,
+        (body && typeof body === "object" ? body : {}) as Record<string, unknown>,
+        timeoutMs,
+        metadata,
+      );
+    }
+
     if (!this.config.accountId || !this.config.apiToken || !this.config.gatewayId) {
       throw new AiError("AI_PROVIDER_ERROR", {
         details: { reason: "missing_cloudflare_config" },

@@ -75,6 +75,7 @@ type AgentLoopOptions = {
   };
   maxSteps?: number;
   timeoutMs?: number;
+  turnId?: string;
 };
 
 type AgentLoopSuccess = {
@@ -134,6 +135,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
   const admin = createAdminClient();
   const startedAt = Date.now();
+  const turnId = options.turnId?.trim() || crypto.randomUUID();
   const config = aiConfig();
 
   const feature = await getAssistantFeature();
@@ -224,7 +226,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       const turnCap = feature.turnCapCredits;
       const reserveAmount = reserveCredits(estimate, turnCap > 0 ? turnCap : 3);
 
-      const idempotencyKey = `${conversationId}-${steps}`;
+      const idempotencyKey = `${conversationId}:${turnId}:${steps}`;
       const { data: created, error: createError } = await admin
         .from("ai_requests")
         .insert({
@@ -241,12 +243,13 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           model_ids: [model.id],
           prompt_version: "agent.chat@1",
           skill_versions: [],
-          input_hash: `${conversationId}-${steps}`,
+          input_hash: idempotencyKey,
           idempotency_key: idempotencyKey,
         })
         .select("id")
         .single();
       if (createError || !created) {
+        console.error("[agent] could not insert ai_request", createError);
         return {
           ok: false,
           code: "AI_PROVIDER_ERROR",
@@ -258,13 +261,26 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       requestId = String(created.id);
 
       if (settings.moderationEnabled && guard?.modelId) {
-        const moderation = await moderateText(
-          provider,
-          guard.modelId,
-          inputText,
-          20000,
-          metadata,
-        );
+        let moderation: { safe: boolean; categories: string[] };
+        try {
+          moderation = await moderateText(
+            provider,
+            guard.modelId,
+            inputText,
+            20000,
+            metadata,
+          );
+        } catch (modError) {
+          await admin
+            .from("ai_requests")
+            .update({
+              status: "failed",
+              error_code: isAiError(modError) ? modError.code : "AI_PROVIDER_ERROR",
+              finished_at: new Date().toISOString(),
+            })
+            .eq("id", requestId);
+          throw modError;
+        }
         await admin
           .from("ai_requests")
           .update({ moderation })

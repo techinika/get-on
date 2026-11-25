@@ -74,7 +74,7 @@ export async function saveBillingSettings(formData: FormData) {
 export async function saveBillingTerm(formData: FormData) {
   await requireStaffAction("billing.price.manage");
   const months = int(formData, "months");
-  if (![1, 6, 12, 24, 36, 48, 60].includes(months)) fail("Choose a valid term.");
+  if (![1, 3, 6, 12, 24, 36, 48, 60].includes(months)) fail("Choose a valid term.");
   try {
     await saveBillingTermRpc({
       months,

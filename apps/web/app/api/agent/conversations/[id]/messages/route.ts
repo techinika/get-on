@@ -192,6 +192,7 @@ export async function POST(
         teamId: actor.teamId,
         userId: actor.userId,
         projectId: conversation.projectId,
+        turnId: userMessage.id,
         tools: Object.values(assistantTools),
         context: {
           route: context.route,

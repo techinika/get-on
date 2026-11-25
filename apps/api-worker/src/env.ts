@@ -48,6 +48,25 @@ export interface KvNamespaceLike {
   put?(key: string, value: string): Promise<void>;
 }
 
+export interface AiGatewayOptions {
+  id: string;
+  skipCache?: boolean;
+  collectLog?: boolean;
+  metadata?: Record<string, string>;
+}
+
+export interface AiRunOptions {
+  gateway?: AiGatewayOptions;
+}
+
+export interface AiBindingLike {
+  run(
+    model: string,
+    inputs: Record<string, unknown>,
+    options?: AiRunOptions,
+  ): Promise<unknown>;
+}
+
 export interface ExecutionContextLike {
   waitUntil(promise: Promise<unknown>): void;
 }
@@ -56,9 +75,11 @@ export interface ApiWorkerEnv {
   ROOT_DOMAIN?: string;
   APP_ORIGIN?: string;
   API_ORIGIN?: string;
+  AI_GATEWAY_ID?: string;
   CRON_SECRET?: string;
   JOBS_SECRET?: string;
   WORKER_SHARED_SECRET?: string;
+  AI?: AiBindingLike;
   JOBS_QUEUE?: QueueLike<JobMessageBody>;
   SITES_KV?: KvNamespaceLike;
 }
