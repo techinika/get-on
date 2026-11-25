@@ -33,22 +33,22 @@ jobs:
 
       - name: Typecheck & test sites worker
         run: |
-          pnpm --filter @get-on/sites-worker typecheck
-          pnpm --filter @get-on/sites-worker test
+          pnpm --filter @get-on/sites-worker run typecheck
+          pnpm --filter @get-on/sites-worker run test
 
       - name: Typecheck & test API worker
         run: |
-          pnpm --filter @get-on/api-worker typecheck
-          pnpm --filter @get-on/api-worker test
+          pnpm --filter @get-on/api-worker run typecheck
+          pnpm --filter @get-on/api-worker run test
 
       - name: Deploy sites worker to Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm --filter @get-on/sites-worker deploy
+        run: pnpm --filter @get-on/sites-worker run deploy
 
       - name: Deploy API worker to Cloudflare
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: pnpm --filter @get-on/api-worker deploy
+        run: pnpm --filter @get-on/api-worker run deploy
