@@ -486,7 +486,7 @@ export function ShellSidebar({
 
           <div className="flex-1" />
 
-          {isAdmin ? (
+          {isAdmin && pathname.startsWith("/admin") ? (
             <div className="mb-2">
               <Link
                 href="/admin"

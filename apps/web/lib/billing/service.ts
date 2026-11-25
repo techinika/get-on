@@ -14,6 +14,7 @@ import {
 } from "@get-on/billing";
 import { can, type Action, type Role } from "@/lib/permissions";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureTeamMonthlyCredits } from "@/lib/ai/jobs";
 import {
   appOrigin,
   PaymentProviderError,
@@ -851,6 +852,16 @@ export async function confirmProviderTransaction(
   if (error) throw new BillingError("PAYMENT_CONFIRM_FAILED", error.message);
   const result = (data ?? {}) as Row;
   if (result.status === "confirmed" && result.invoice_id) {
+    const { data: invoiceRow } = await admin
+      .from("invoices")
+      .select("team_id")
+      .eq("id", String(result.invoice_id))
+      .maybeSingle();
+    if (invoiceRow?.team_id) {
+      await ensureTeamMonthlyCredits(admin, String(invoiceRow.team_id)).catch(
+        () => undefined,
+      );
+    }
     await notifyPaymentConfirmed(String(result.invoice_id)).catch(() => undefined);
   }
   return result;

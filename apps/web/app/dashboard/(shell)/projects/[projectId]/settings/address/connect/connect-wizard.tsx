@@ -212,6 +212,42 @@ export function ConnectWizard({
     };
   }, [step, domain, projectId, hosts.length]);
 
+  useEffect(() => {
+    if (step !== 4 || liveHost || hosts.length === 0) return;
+    let cancelled = false;
+    const started = Date.now();
+    const pendingIds = hosts
+      .filter((host) => host.status !== "live")
+      .map((host) => host.id);
+    if (pendingIds.length === 0) return;
+
+    async function tick() {
+      if (cancelled || Date.now() - started > 10 * 60 * 1000) return;
+      let promoted = false;
+      for (const hostId of pendingIds) {
+        if (cancelled) return;
+        const result = await refreshAddressAction(projectId, hostId);
+        if (cancelled) return;
+        if (result.ok) {
+          setHosts((current) =>
+            current.map((item) => (item.id === hostId ? result.data : item)),
+          );
+          if (result.data.status === "live") promoted = true;
+        }
+      }
+      setLastChecked(new Date());
+      if (promoted) {
+        router.refresh();
+      }
+    }
+
+    const timer = window.setInterval(() => void tick(), 20_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [step, liveHost, hosts, projectId, router]);
+
   async function start() {
     setBusy("start");
     setError(null);

@@ -22,7 +22,6 @@ import { Section } from "@/components/app/section";
 import { AppCard } from "@/components/app/card";
 import { AppEmptyState } from "@/components/app/empty-state";
 import { Badge } from "@/components/ui/badge";
-import { Sparkline, TrendBadge } from "@/components/analytics/sparkline";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Dialog } from "@/components/ui/dialog";
 import { Input, Label } from "@/components/ui/input";
@@ -31,7 +30,6 @@ import { useToast } from "@/components/ui/toast";
 import { friendlyError } from "@/lib/errors";
 import { gradientFor } from "@/lib/gradient";
 import { relativeTime } from "@/lib/relative-time";
-import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { cn } from "@/lib/utils";
 import { QrDialog } from "@/components/app/qr-dialog";
 
@@ -285,9 +283,11 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
   const [qrOpen, setQrOpen] = React.useState(false);
 
   const href = `/dashboard/projects/${website.id}`;
-  const shareUrl = website.primaryHost
-    ? primaryAddress(readPublishConfig(), website.subdomain, website.primaryHost)
-    : `https://${website.subdomain}.get-on.tech`;
+  const shareUrl =
+    website.siteUrl ??
+    (website.primaryHost
+      ? `https://${website.primaryHost}`
+      : `https://${website.subdomain}.get-on.tech`);
 
   async function copyLink() {
     setMenuOpen(false);
@@ -371,11 +371,6 @@ function WebsiteCard({ website }: { website: WebsiteSummary }) {
                 Edited {relativeTime(website.updatedAt)}
               </span>
             )}
-            {/* Growth sparkline and trend badge */}
-            <div className="mt-3 flex items-baseline gap-2">
-              <Sparkline projectId={website.id} sparklineDays={30} />
-              <TrendBadge projectId={website.id} />
-            </div>
             <div className="relative z-10">
               <button
                 type="button"

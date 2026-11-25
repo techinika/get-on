@@ -4,6 +4,7 @@ import { readDomainsConfig } from "@/lib/domains/config";
 import type { DnsAnswer, DnsResolver } from "@/lib/domains/dns";
 import { DomainError } from "@/lib/domains/errors";
 import { FakeHostnameProvider } from "@/lib/domains/fake";
+import { hostnameStatusFromProvider } from "@/lib/domains/rows";
 import { DomainService, type DomainPointerStore } from "@/lib/domains/service";
 import type { DnsRecord, DnsRecordType } from "@/lib/domains/types";
 import type { PublishConfig } from "@/lib/publishing/config";
@@ -1277,5 +1278,111 @@ describe("domain service", () => {
     await expect(
       service.startDomain({ projectId: "project-1", domain: "geton.tech" }),
     ).rejects.toBeInstanceOf(DomainError);
+  });
+
+  it("maps transitional Cloudflare hostname statuses without reporting an error", () => {
+    expect(hostnameStatusFromProvider("switch_now", "initializing", "pending_validation")).toBe("pending");
+    expect(hostnameStatusFromProvider("switch_now", "active_redeploying", "pending_deployment")).toBe("preparing");
+    expect(hostnameStatusFromProvider("switch_now", "active", "active")).toBe("active");
+    expect(hostnameStatusFromProvider("prepare_first", "active", "active")).toBe("ready_to_switch");
+  });
+
+  it("promotes apex (@) domains using CNAME flattening when provider and health checks pass", async () => {
+    const { service, resolver, provider, pointers, db } = setup();
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "@",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady("rosebakery.com");
+    resolver.cname = [];
+
+    const first = await service.refreshAddress(host.id);
+    expect(first.status).toBe("live");
+    expect(pointers.site.hosts).toContain("rosebakery.com");
+    expect(db.rows.projects?.[0]?.primary_host).toBe("rosebakery.com");
+
+    const recheck = await service.refreshAddress(host.id);
+    expect(recheck.status).toBe("live");
+  });
+
+  it("keeps the KV host pointer on a transient initial health failure and links even before first publish", async () => {
+    const db = new FakeSupabase();
+    db.rows.projects!.push({
+      id: "project-1",
+      name: "Unpublished Bakery",
+      team_id: "team-1",
+      subdomain: "rose",
+      redirect_free_address: true,
+      primary_host: null,
+    });
+    db.rows.project_settings!.push({
+      project_id: "project-1",
+      auto_publish_on_domain: false,
+    });
+    const provider = new FakeHostnameProvider();
+    const resolver = new FakeResolver();
+    const pointers = memoryPointers(null);
+    let healthy = false;
+    const service = new DomainService({
+      supabase: db as unknown as SupabaseClient,
+      provider,
+      resolver,
+      config: domainsConfig,
+      pointers: pointers.store,
+      publishConfig,
+      healthCheck: async () => healthy,
+      now: () => new Date(iso()),
+    });
+
+    const started = await service.startDomain({
+      projectId: "project-1",
+      domain: "rosebakery.com",
+    });
+    resolver.txt = [
+      {
+        type: "TXT",
+        name: "_geton-verify.rosebakery.com",
+        value: started.verificationValue,
+      },
+    ];
+    await service.verifyDomain(started.id);
+    const host = await service.addAddress({
+      domainId: started.id,
+      label: "www",
+      role: "main",
+      mode: "switch_now",
+    });
+    provider.markDnsReady("www.rosebakery.com");
+    resolver.cname = [
+      {
+        type: "CNAME",
+        name: "www.rosebakery.com",
+        value: "customers.get-on.tech",
+      },
+    ];
+
+    const pendingHealth = await service.refreshAddress(host.id);
+    expect(pendingHealth.status).toBe("active");
+    expect(pointers.site.hosts).toContain("www.rosebakery.com");
+    expect(pointers.site.deleted).not.toContain("www.rosebakery.com");
+    expect(db.rows.projects?.[0]?.primary_host).toBe("www.rosebakery.com");
+
+    healthy = true;
+    const live = await service.refreshAddress(host.id);
+    expect(live.status).toBe("live");
   });
 });

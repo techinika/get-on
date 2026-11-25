@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 
 type Admin = SupabaseClient;
 
@@ -19,6 +20,82 @@ export function monthlyExpiry(now = new Date()): string {
   return new Date(
     Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 2, 1) - 1,
   ).toISOString();
+}
+
+function resolveMonthlyAmount(
+  planId: string,
+  amountByPlan: Map<string, number>,
+): number {
+  const configured = amountByPlan.get(planId) ?? 0;
+  if (configured > 0) return configured;
+  if (planId === "free") return 0;
+  return PLAN_BY_ID[planId as PlanId]?.aiMonthlyCredits ?? 0;
+}
+
+export async function ensureTeamMonthlyCredits(
+  admin: Admin,
+  teamId: string,
+  options?: { planId?: string; status?: string; now?: Date },
+): Promise<{ granted: boolean; amount: number }> {
+  const now = options?.now ?? new Date();
+  let planId = options?.planId;
+  let status = options?.status;
+
+  if (!planId || !status) {
+    const { data: access, error } = await admin.rpc("billing_resolve_team", {
+      p_team: teamId,
+    });
+    if (error || !access || typeof access !== "object") {
+      return { granted: false, amount: 0 };
+    }
+    const row = access as { plan_id?: string; status?: string };
+    planId = planId ?? String(row.plan_id ?? "free");
+    status = status ?? String(row.status ?? "free");
+  }
+
+  if (status === "lapsed" || planId === "free") {
+    return { granted: false, amount: 0 };
+  }
+
+  const period = monthlyPeriod(now);
+  const source = `monthly:${period}`;
+
+  const existing = await admin
+    .from("credit_buckets")
+    .select("id")
+    .eq("team_id", teamId)
+    .eq("source", source)
+    .limit(1)
+    .maybeSingle();
+  if (!existing.error && existing.data) {
+    return { granted: false, amount: 0 };
+  }
+
+  const { data: planRow } = await admin
+    .from("plans")
+    .select("ai_monthly_credits")
+    .eq("id", planId)
+    .maybeSingle();
+  const dbAmount = Number(planRow?.ai_monthly_credits ?? 0);
+  const amount =
+    dbAmount > 0 ? dbAmount : PLAN_BY_ID[planId as PlanId]?.aiMonthlyCredits ?? 0;
+  if (amount <= 0) {
+    return { granted: false, amount: 0 };
+  }
+
+  const { error: grantError } = await admin.rpc("grant_credits", {
+    p_team: teamId,
+    p_kind: "monthly",
+    p_amount: amount,
+    p_expires: monthlyExpiry(now),
+    p_source: source,
+    p_note: "Monthly AI credits",
+  });
+  if (grantError) {
+    console.error(`[ai] monthly ensure failed for ${teamId}`, grantError);
+    return { granted: false, amount: 0 };
+  }
+  return { granted: true, amount };
 }
 
 export async function grantMonthlyCredits(
@@ -52,8 +129,10 @@ export async function grantMonthlyCredits(
       console.error(`[ai] monthly plan lookup failed for ${team.id}`, accessError);
       continue;
     }
-    const planId = String((access as { plan_id?: string } | null)?.plan_id ?? "free");
-    const amount = amountByPlan.get(planId) ?? 0;
+    const resolved = access as { plan_id?: string; status?: string } | null;
+    if (resolved?.status === "lapsed") continue;
+    const planId = String(resolved?.plan_id ?? "free");
+    const amount = resolveMonthlyAmount(planId, amountByPlan);
     if (amount <= 0) continue;
     const { error } = await admin.rpc("grant_credits", {
       p_team: team.id,

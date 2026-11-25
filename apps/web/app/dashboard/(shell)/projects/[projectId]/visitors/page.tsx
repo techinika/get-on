@@ -3,6 +3,7 @@ import { AppCard } from "@/components/app/card";
 import { AppPage } from "@/components/app/app-page";
 import { PageHeader } from "@/components/app/page-header";
 import { createClient } from "@/lib/supabase/server";
+import { PLAN_BY_ID } from "@/lib/plans";
 import { getCurrentTeam } from "@/lib/team";
 import { VisitorStats } from "./visitor-stats";
 
@@ -13,44 +14,43 @@ export default async function VisitorsPage({ params }: Params) {
   const current = await getCurrentTeam();
   let published = false;
   let counting = true;
-  let planHistoryMonths: number | null = 0;
+  let planHistoryMonths: number | null = 90;
   let plan = "Free";
 
   if (current) {
     const supabase = await createClient();
-    const { data: project } = await supabase
-      .from("projects")
-      .select("status, plan_id")
-      .eq("id", projectId)
-      .eq("team_id", current.team.teamId)
-      .maybeSingle();
-
-    const [{ data: settings }, { data: planRow }] = await Promise.all([
-      supabase
-        .from("project_settings")
-        .select("stats_enabled")
-        .eq("project_id", projectId)
-        .maybeSingle(),
-      supabase
-        .from("plans")
-        .select("name, priority_class, priority_label")
-        .eq("id", project?.plan_id)
-        .maybeSingle(),
-    ]);
+    const [{ data: project }, { data: settings }, { data: planRow }] =
+      await Promise.all([
+        supabase
+          .from("projects")
+          .select("status")
+          .eq("id", projectId)
+          .eq("team_id", current.team.teamId)
+          .maybeSingle(),
+        supabase
+          .from("project_settings")
+          .select("stats_enabled")
+          .eq("project_id", projectId)
+          .maybeSingle(),
+        supabase
+          .from("plans")
+          .select("name, priority_class, priority_label")
+          .eq("id", current.team.planId)
+          .maybeSingle(),
+      ]);
 
     published = project?.status === "published";
     counting = settings?.stats_enabled !== false;
 
-    if (planRow) {
-      plan = planRow.name;
-      const historyMap: Record<string, number | null> = {
-        free: 90,
-        basic: 365,
-        pro: 730,
-        enterprise: null,
-      };
-      planHistoryMonths = historyMap[planRow.priority_class] ?? 90;
-    }
+    const historyMap: Record<string, number | null> = {
+      free: 90,
+      basic: 365,
+      pro: 730,
+      enterprise: null,
+    };
+    plan = planRow?.name ?? PLAN_BY_ID[current.team.planId]?.name ?? "Free";
+    const key = String(planRow?.priority_class ?? current.team.planId);
+    planHistoryMonths = key in historyMap ? (historyMap[key] ?? null) : 90;
   }
 
   return (
@@ -97,12 +97,12 @@ export default async function VisitorsPage({ params }: Params) {
               <h2 className="text-[17px] font-semibold text-text">No visitors yet</h2>
               <p className="text-[15px] text-text-muted">
                 When people visit your website, their visits show up here within a few minutes. Numbers are kept for {planHistoryMonths} months and never include personal details.
-                {planHistoryMonths !== null && (
-                  <p className="text-[14px] text-text-muted mt-2">
-                    Your {plan} plan shows {planHistoryMonths} months of history. Upgrade to see older numbers.
-                  </p>
-                )}
               </p>
+              {planHistoryMonths !== null && (
+                <p className="text-[14px] text-text-muted">
+                  Your {plan} plan shows {planHistoryMonths} months of history. Upgrade to see older numbers.
+                </p>
+              )}
             </div>
 
             <VisitorStats projectId={projectId} />

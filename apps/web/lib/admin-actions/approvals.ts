@@ -1,4 +1,5 @@
 import { createAdminClient } from "@/lib/supabase/admin";
+import { ensureTeamMonthlyCredits } from "@/lib/ai/jobs";
 import {
   beginApproval,
   finishApproval,
@@ -234,6 +235,12 @@ async function runManualPayment(request: ApprovalRequest, staffId: string) {
     }
   }
 
+  if (status === "confirmed" && invoice.team_id) {
+    await ensureTeamMonthlyCredits(admin, String(invoice.team_id)).catch(
+      () => undefined,
+    );
+  }
+
   await recordStaffAction({
     action: "billing.manual_payment_recorded",
     targetType: "invoice",
@@ -305,6 +312,9 @@ async function runFreeAccess(request: ApprovalRequest) {
     endsAt,
     note: request.reason,
   });
+  await ensureTeamMonthlyCredits(createAdminClient(), teamId).catch(
+    () => undefined,
+  );
 }
 
 async function runInvoiceVoid(request: ApprovalRequest) {
@@ -325,6 +335,9 @@ async function runPlanChange(request: ApprovalRequest) {
   const planId = text(request.payload, "plan_id");
   if (!planId) throw new ApprovalActionError("This request is missing a plan.");
   await setTeamPlan(teamId, planId, request.reason);
+  await ensureTeamMonthlyCredits(createAdminClient(), teamId).catch(
+    () => undefined,
+  );
 }
 
 async function runGraceExtend(request: ApprovalRequest) {

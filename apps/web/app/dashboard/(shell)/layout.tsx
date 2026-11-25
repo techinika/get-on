@@ -5,7 +5,6 @@ import { ToastProvider } from "@/components/ui/toast";
 import { OfflineListener } from "@/components/offline-listener";
 import { getShellData, getSidebarState } from "@/lib/dashboard";
 import { getAssistantFeature } from "@/lib/agent/settings";
-import { getStaffSession } from "@/lib/admin";
 
 /**
  * The persistent dashboard frame. This layout never unmounts while moving
@@ -18,9 +17,8 @@ export default async function ShellLayout({ children }: { children: ReactNode })
     redirect("/login");
   }
 
-  const [sidebar, staff, assistantFeature] = await Promise.all([
+  const [sidebar, assistantFeature] = await Promise.all([
     getSidebarState(),
-    getStaffSession(),
     getAssistantFeature(),
   ]);
 
@@ -35,8 +33,6 @@ export default async function ShellLayout({ children }: { children: ReactNode })
         assistant={data.assistant}
         assistantEnabled={assistantFeature.enabled}
         sidebar={sidebar}
-        isAdmin={Boolean(staff)}
-        isSuperAdmin={staff?.role === "super_admin"}
       >
         {children}
       </AppShell>

@@ -693,16 +693,29 @@ export class DomainService {
       return this.loadHostname(host.id);
     }
 
-    const cnameSeen = cname.status === "found";
+    const cnameWrong = cname.status === "wrong";
+    let cnameSeen = cname.status === "found";
     const providerReady =
       providerStatus === "active" ||
       providerStatus === "ready_to_switch" ||
       providerStatus === "live";
 
+    let preHealthOk: boolean | null = null;
+    if (!cnameSeen && !cnameWrong && providerReady) {
+      // Apex (@) domains using ALIAS/ANAME/CNAME flattening or Cloudflare-proxied
+      // hostnames resolve to A/AAAA records rather than a CNAME. Confirm live
+      // edge routing via our worker health endpoint before promoting.
+      preHealthOk = await this.healthCheck(host.hostname).catch(() => false);
+      if (preHealthOk) {
+        cnameSeen = true;
+      }
+    }
+
     await this.logStep(domain.id, hostnameId, "refresh_cname_checked", "CNAME record checked", {
       hostnameId,
       hostname: host.hostname,
       cnameSeen,
+      cnameStatus: cname.status,
       cnameRecords: cname.records,
       target: host.cnameTarget || this.cnameTarget(),
       providerStatus,
@@ -710,12 +723,27 @@ export class DomainService {
     });
 
     let nextStatus: HostnameStatus = providerStatus;
+    let nextFailures = host.healthFailures;
     if (providerStatus === "moved" || providerStatus === "blocked") {
       nextStatus = providerStatus;
     } else if (cnameSeen && providerReady) {
       nextStatus = "active";
-    } else if (host.status === "live" && cname != null) {
-      nextStatus = "moved";
+    } else if (host.status === "live") {
+      if (cnameWrong) {
+        nextStatus = "moved";
+      } else if (providerReady) {
+        const stillHealthy =
+          preHealthOk ?? (await this.healthCheck(host.hostname).catch(() => false));
+        if (stillHealthy) {
+          nextStatus = "active";
+          cnameSeen = true;
+        } else {
+          nextFailures = host.healthFailures + 1;
+          nextStatus = nextFailures >= 3 ? "moved" : "live";
+        }
+      } else {
+        nextStatus = "moved";
+      }
     } else if (providerStatus === "active") {
       nextStatus = "active";
     } else if (providerStatus === "ready_to_switch") {
@@ -729,16 +757,26 @@ export class DomainService {
       ...(nextStatus === "moved" || nextStatus === "blocked"
         ? { attention_since: host.attentionSince ?? checkedAt.toISOString() }
         : {}),
+      ...(nextFailures !== host.healthFailures
+        ? { health_failures: nextFailures, last_health_at: checkedAt.toISOString() }
+        : {}),
     };
 
     let live = false;
     let project: ProjectRow | null = null;
-    if (nextStatus === "active" && cnameSeen) {
+    if (nextStatus === "moved" || nextStatus === "blocked") {
+      await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
+    } else if (nextStatus === "active" && cnameSeen) {
       project = await this.loadProject(
         host.projectId ?? domain.projectId ?? "",
       );
-      await this.pointers.writeHostPointer(host.hostname, project.id);
-      const healthy = await this.healthCheck(host.hostname);
+      // Keep the host KV route written so edge SSL + Worker 60s KV cache can
+      // resolve immediately without thrashing into a cached 404.
+      await this.linkSitePointer(host, project);
+      const healthy =
+        preHealthOk === true
+          ? true
+          : await this.healthCheck(host.hostname).catch(() => false);
       patch.last_health_at = checkedAt.toISOString();
       if (healthy) {
         live = true;
@@ -747,7 +785,6 @@ export class DomainService {
         patch.live_at = host.liveAt ?? checkedAt.toISOString();
         patch.status_reason = null;
         patch.health_failures = 0;
-        await this.linkSitePointer(host, project);
         await this.logStep(domain.id, hostnameId, "address_live", "Address is live and healthy", {
           hostnameId,
           hostname: host.hostname,
@@ -756,7 +793,6 @@ export class DomainService {
         });
       } else {
         patch.health_failures = host.healthFailures + 1;
-        await this.pointers.deleteHostPointer(host.hostname).catch(() => undefined);
         await this.logStep(domain.id, hostnameId, "address_health_failed", "Address active but health check failed", {
           hostnameId,
           hostname: host.hostname,
@@ -854,17 +890,17 @@ export class DomainService {
   ): Promise<void> {
     const freeHost = siteHostname(this.publishConfig, project.subdomain);
     const pointer = await this.pointers.getPointer(freeHost);
-    if (!pointer) return;
+    if (pointer) {
+      const primaryHost =
+        host.role === "main" ? host.hostname : pointer.primaryHost ?? null;
 
-    const primaryHost =
-      host.role === "main" ? host.hostname : pointer.primaryHost ?? null;
-
-    await this.pointers.writePointer(freeHost, {
-      ...pointer,
-      primaryHost,
-      freeHost,
-      redirectToPrimary: project.redirect_free_address,
-    });
+      await this.pointers.writePointer(freeHost, {
+        ...pointer,
+        primaryHost,
+        freeHost,
+        redirectToPrimary: project.redirect_free_address,
+      });
+    }
     await this.pointers.writeHostPointer(host.hostname, project.id);
 
     if (host.role === "main") {

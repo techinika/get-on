@@ -137,12 +137,23 @@ export function hostnameStatusFromProvider(
   if (provider === "moved") return "moved";
   if (provider === "blocked") return "blocked";
   if (provider === "deleted") return "error";
+  if (ssl === "validation_timed_out" || ssl === "expired" || ssl === "deleted") {
+    return "error";
+  }
   if (ssl === "active") {
     return mode === "prepare_first" ? "ready_to_switch" : "active";
   }
   if (mode === "prepare_first") return "preparing";
-  if (provider === "active" || provider === "pending" || provider === "preparing") {
-    return provider === "pending" ? "pending" : "preparing";
+  if (
+    provider === "active" ||
+    provider === "active_redeploying" ||
+    provider === "initializing" ||
+    provider === "pending" ||
+    provider === "preparing"
+  ) {
+    return provider === "pending" || provider === "initializing"
+      ? "pending"
+      : "preparing";
   }
   return "error";
 }

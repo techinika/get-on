@@ -1,6 +1,9 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { isAdminSupabaseConfigured } from "@/lib/supabase/fallback";
+import { ensureTeamMonthlyCredits } from "@/lib/ai/jobs";
 import { PLAN_BY_ID, type PlanId } from "@/lib/plans";
 import { initialsFrom } from "@/lib/viewer";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
@@ -88,9 +91,15 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
         .in("id", teamIds)
     : { data: [] as TeamRow[] };
 
+  const resolverClient = isAdminSupabaseConfigured()
+    ? createAdminClient()
+    : supabase;
+
   const accesses = await Promise.all(
     (teamRows ?? []).map(async (team) => {
-      const { data } = await supabase.rpc("billing_resolve_team", { p_team: team.id });
+      const { data } = await resolverClient.rpc("billing_resolve_team", {
+        p_team: team.id,
+      });
       return { teamId: team.id, access: (data ?? {}) as { plan_id?: string; status?: string } };
     }),
   );
@@ -126,7 +135,18 @@ export const getShellData = cache(async (): Promise<ShellData | null> => {
     teams.find((team) => team.isPersonal) ??
     teams[0]!;
 
-  const { data: balance, error: balanceError } = await supabase.rpc(
+  if (
+    isAdminSupabaseConfigured() &&
+    currentTeam.planId !== "free" &&
+    currentTeam.billingStatus !== "lapsed"
+  ) {
+    await ensureTeamMonthlyCredits(createAdminClient(), currentTeam.id, {
+      planId: currentTeam.planId,
+      status: currentTeam.billingStatus,
+    }).catch(() => undefined);
+  }
+
+  const { data: balance, error: balanceError } = await resolverClient.rpc(
     "ai_balance",
     { p_team: currentTeam.id },
   );
