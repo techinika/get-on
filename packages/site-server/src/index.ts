@@ -242,6 +242,7 @@ export type HandleSiteRequestOptions = {
   formTokenSecretPrevious?: string;
   workerSharedSecret?: string;
   appOrigin?: string;
+  apiOrigin?: string;
   clientIp?: string;
   waitUntil?: (promise: Promise<unknown>) => void;
   statsSaltSecret?: string;
@@ -250,7 +251,7 @@ export type HandleSiteRequestOptions = {
 const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
 const MAX_FORM_BODY_BYTES = 16 * 1024;
 const SITE_CSP =
-  "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
+  "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; frame-src 'self' https://www.youtube-nocookie.com https://player.vimeo.com; form-action 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'";
 const PLUGIN_SANDBOX_HTML_RE = /^_plugins\/[a-z0-9_-]+\/(index|net)\.html$/i;
 const PLUGIN_SANDBOX_JS_RE = /^_plugins\/[a-z0-9_-]+\/plugin-[a-f0-9]+\.js$/i;
 
@@ -258,6 +259,60 @@ function sanitizePath(rawPath: string): string {
   const clean = rawPath.split("?")[0]?.split("#")[0] ?? "/";
   if (clean.includes("..")) return "/";
   return clean.startsWith("/") ? clean : `/${clean}`;
+}
+
+function safeBackPath(raw: string | null | undefined): string {
+  if (!raw) return "/";
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("\\") || /[\r\n]/.test(trimmed)) {
+    return "/";
+  }
+  return trimmed.slice(0, 200);
+}
+
+function wantsHtmlResponse(request: Request): boolean {
+  const accept = (request.headers.get("accept") ?? "").toLowerCase();
+  return accept.includes("text/html") && !accept.includes("application/json");
+}
+
+function problemCodeForStatus(status: number, bodyText: string): string {
+  if (status === 429) return "rate";
+  if (status === 400 || status === 413 || status === 415) return "invalid";
+  if (status === 403 || status === 404) return "closed";
+  if (bodyText.includes("form_unavailable")) return "unavailable";
+  return "unavailable";
+}
+
+function renderFormStatusHtml(
+  kind: "problem" | "sent",
+  code: string,
+  backPath: string,
+): string {
+  const safeBack = escapeHtml(safeBackPath(backPath));
+  if (kind === "sent") {
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Message sent</title><style>body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#fafaf9;color:#1c1917;display:grid;min-height:100vh;place-items:center;padding:24px}.card{max-width:440px;width:100%;background:#fff;border:1px solid #e7e5e4;border-radius:12px;padding:28px;text-align:center}h1{margin:0 0 10px;font-size:1.35rem}p{margin:0 0 20px;color:#57534e;line-height:1.5}.btn{display:inline-block;padding:10px 18px;border-radius:8px;background:#0b6b4f;color:#fff;text-decoration:none;font-weight:600}</style></head><body><main class="card"><h1>Message sent</h1><p>Thank you! Your message has been received and we will get back to you soon.</p><a class="btn" href="${safeBack}">Back to page</a></main></body></html>`;
+  }
+
+  const copy: Record<string, { title: string; body: string }> = {
+    rate: {
+      title: "Too many messages right now",
+      body: "Please wait a few minutes before sending another message.",
+    },
+    invalid: {
+      title: "Please check your message",
+      body: "One or more fields were missing or too long. Please review your entry and try again.",
+    },
+    closed: {
+      title: "Contact form unavailable",
+      body: "This contact form is not accepting messages at the moment.",
+    },
+    unavailable: {
+      title: "Could not send right now",
+      body: "The form service is temporarily unavailable. Please try again in a moment.",
+    },
+  };
+  const entry = copy[code] ?? copy.unavailable!;
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(entry.title)}</title><style>body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:#fafaf9;color:#1c1917;display:grid;min-height:100vh;place-items:center;padding:24px}.card{max-width:440px;width:100%;background:#fff;border:1px solid #e7e5e4;border-radius:12px;padding:28px;text-align:center}h1{margin:0 0 10px;font-size:1.35rem}p{margin:0 0 20px;color:#57534e;line-height:1.5}.btn{display:inline-block;padding:10px 18px;border-radius:8px;background:#1c1917;color:#fff;text-decoration:none;font-weight:600}</style></head><body><main class="card"><h1>${escapeHtml(entry.title)}</h1><p>${escapeHtml(entry.body)}</p><a class="btn" href="${safeBack}">Go back</a></main></body></html>`;
 }
 
 function escapeHtml(text: string): string {
@@ -360,7 +415,7 @@ function sendSignedStats(
   hostname: string,
   payload: Record<string, unknown>,
 ): void {
-  const origin = options.appOrigin?.replace(/\/$/, "");
+  const origin = (options.apiOrigin ?? options.appOrigin)?.replace(/\/$/, "");
   const secret = options.workerSharedSecret;
   if (!origin || !secret) return;
   const body = JSON.stringify(payload);
@@ -540,6 +595,34 @@ export async function handleSiteRequest(
     );
   }
 
+  if (reqPath === "/_forms/problem" || reqPath === "/_forms/sent") {
+    if (request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method not allowed", {
+        status: 405,
+        headers: {
+          Allow: "GET, HEAD",
+          "Content-Type": "text/plain; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
+    const url = new URL(request.url);
+    const kind = reqPath === "/_forms/sent" ? "sent" : "problem";
+    const code = url.searchParams.get("c") ?? "unavailable";
+    const back = safeBackPath(url.searchParams.get("b"));
+    const html = renderFormStatusHtml(kind, code, back);
+    return new Response(request.method === "HEAD" ? null : html, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html; charset=utf-8",
+        "Cache-Control": "no-store",
+        "X-Robots-Tag": "noindex",
+        ...securityHeaders(true),
+      },
+    });
+  }
+
   const tokenMatch = /^\/_forms\/([A-Za-z0-9_-]{6,32})\/token$/.exec(reqPath);
   if (tokenMatch) {
     if (request.method !== "GET") {
@@ -592,7 +675,18 @@ export async function handleSiteRequest(
         },
       });
     }
+    const htmlRedirect = wantsHtmlResponse(request);
     if (!FORM_ID_RE.test(formId)) {
+      if (htmlRedirect) {
+        return new Response(null, {
+          status: 303,
+          headers: {
+            Location: "/_forms/problem?c=closed&b=%2F",
+            "Cache-Control": "no-store",
+            ...securityHeaders(false),
+          },
+        });
+      }
       return new Response(JSON.stringify({ ok: false, error: "not_found" }), {
         status: 404,
         headers: {
@@ -602,9 +696,22 @@ export async function handleSiteRequest(
         },
       });
     }
-    const origin = options.appOrigin?.replace(/\/$/, "");
+
+    const rawBody = await request.text();
+    const backFromBody = safeBackPath(new URLSearchParams(rawBody).get("_b"));
+    const origin = (options.apiOrigin ?? options.appOrigin)?.replace(/\/$/, "");
     const secret = options.workerSharedSecret;
     if (!origin || !secret) {
+      if (htmlRedirect) {
+        return new Response(null, {
+          status: 303,
+          headers: {
+            Location: `/_forms/problem?c=unavailable&b=${encodeURIComponent(backFromBody)}`,
+            "Cache-Control": "no-store",
+            ...securityHeaders(false),
+          },
+        });
+      }
       return new Response(JSON.stringify({ ok: false, error: "form_unavailable" }), {
         status: 503,
         headers: {
@@ -615,8 +722,17 @@ export async function handleSiteRequest(
       });
     }
 
-    const rawBody = await request.text();
     if (new TextEncoder().encode(rawBody).byteLength > MAX_FORM_BODY_BYTES) {
+      if (htmlRedirect) {
+        return new Response(null, {
+          status: 303,
+          headers: {
+            Location: `/_forms/problem?c=invalid&b=${encodeURIComponent(backFromBody)}`,
+            "Cache-Control": "no-store",
+            ...securityHeaders(false),
+          },
+        });
+      }
       return new Response(JSON.stringify({ ok: false, error: "payload_too_large" }), {
         status: 413,
         headers: {
@@ -636,27 +752,63 @@ export async function handleSiteRequest(
       ip,
       bodyHash,
     });
-    const upstream = await fetch(`${origin}/api/public/forms/${encodeURIComponent(formId)}`, {
-      method: "POST",
-      headers: {
-        "content-type": "application/x-www-form-urlencoded",
-        "x-gs-host": parsedHost.hostname,
-        "x-gs-ip": ip,
-        "x-gs-ua": (request.headers.get("user-agent") ?? "").slice(0, 200),
-        "x-gs-ts": ts,
-        "x-gs-sig": sig,
-      },
-      body: rawBody,
-    });
-    const upstreamText = await upstream.text();
-    return new Response(upstreamText, {
-      status: upstream.status,
-      headers: {
-        "Content-Type": upstream.headers.get("content-type") ?? "application/json; charset=utf-8",
-        "Cache-Control": "no-store",
-        ...securityHeaders(false),
-      },
-    });
+    try {
+      const upstream = await fetch(`${origin}/api/public/forms/${encodeURIComponent(formId)}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/x-www-form-urlencoded",
+          "x-gs-host": parsedHost.hostname,
+          "x-gs-ip": ip,
+          "x-gs-ua": (request.headers.get("user-agent") ?? "").slice(0, 200),
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body: rawBody,
+      });
+      const upstreamText = await upstream.text();
+      if (htmlRedirect) {
+        const dest = upstream.ok
+          ? `/_forms/sent?b=${encodeURIComponent(backFromBody)}`
+          : `/_forms/problem?c=${encodeURIComponent(
+              problemCodeForStatus(upstream.status, upstreamText),
+            )}&b=${encodeURIComponent(backFromBody)}`;
+        return new Response(null, {
+          status: 303,
+          headers: {
+            Location: dest,
+            "Cache-Control": "no-store",
+            ...securityHeaders(false),
+          },
+        });
+      }
+      return new Response(upstreamText, {
+        status: upstream.status,
+        headers: {
+          "Content-Type": upstream.headers.get("content-type") ?? "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    } catch {
+      if (htmlRedirect) {
+        return new Response(null, {
+          status: 303,
+          headers: {
+            Location: `/_forms/problem?c=unavailable&b=${encodeURIComponent(backFromBody)}`,
+            "Cache-Control": "no-store",
+            ...securityHeaders(false),
+          },
+        });
+      }
+      return new Response(JSON.stringify({ ok: false, error: "form_unavailable" }), {
+        status: 503,
+        headers: {
+          "Content-Type": "application/json; charset=utf-8",
+          "Cache-Control": "no-store",
+          ...securityHeaders(false),
+        },
+      });
+    }
   }
 
   if (reqPath === "/_gs/stats") {

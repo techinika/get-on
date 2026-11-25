@@ -424,33 +424,151 @@ export function generateStarterContent(input: {
   address?: string;
   includeContactForm?: boolean;
 }): { schemaVersion: 3; blocks: Block[] } {
+  const kind = (input.businessType ?? "").toLowerCase();
   const kindLabel = input.businessType ? ` ${input.businessType}` : "";
-  const blocks: Block[] = [
-    createBlock("hero", {
-      layout: "split",
-      eyebrow: input.businessName,
-      heading: `Welcome to ${input.businessName}`,
-      subheading:
-        input.description ||
-        `A warm, dependable${kindLabel} website ready for your customers.`,
-      buttonLabel: "Get in touch",
-      buttonLink: { type: "anchor", anchor: "contact" },
-    }),
-    createBlock("features", {
-      layout: "rows",
-      heading: "What we do",
-      items: [
-        { title: "Quality service", text: "Built around what local customers actually need." },
-        { title: "Fast response", text: "Clear answers and easy booking." },
-      ],
-    }),
-    createBlock("cta", {
-      layout: "split",
-      heading: `Work with ${input.businessName}`,
-      buttonLabel: "Contact us",
-      buttonLink: { type: "anchor", anchor: "contact" },
-    }),
-  ];
+  const sub =
+    input.description ||
+    `A warm, dependable${kindLabel} website ready for your customers.`;
+
+  let blocks: Block[];
+  if (/restaurant|cafe|bakery|bistro|food/.test(kind)) {
+    blocks = [
+      createBlock("hero", {
+        layout: "fullbleed",
+        eyebrow: input.businessName,
+        heading: input.businessName,
+        subheading: sub,
+        buttonLabel: "View the menu",
+        buttonLink: { type: "anchor", anchor: "menu" },
+      }),
+      createBlock("menu", {
+        layout: "menu-list",
+        heading: "Fresh from the kitchen",
+        items: [
+          { title: "House specialty", price: "$14", text: "Prepared daily with seasonal local produce." },
+          { title: "Chef selection", price: "$18", text: "Slow-cooked favourite paired with warm sides." },
+          { title: "Sweet finish", price: "$9", text: "Small-batch pastry and freshly brewed coffee." },
+        ],
+      }),
+      createBlock("cta", {
+        layout: "centered",
+        heading: `Visit ${input.businessName}`,
+        subheading: input.address || "Drop in this week or message us for group bookings.",
+        buttonLabel: "Book a table",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+    ];
+  } else if (/software|saas|tech|app/.test(kind)) {
+    blocks = [
+      createBlock("hero", {
+        layout: "product-shot",
+        eyebrow: "Built for teams",
+        heading: input.businessName,
+        subheading: sub,
+        buttonLabel: "See plans",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+      createBlock("stats", {
+        layout: "compact",
+        heading: "Proven at scale",
+        items: [
+          { value: "99.9%", title: "Uptime", text: "Measured across regional edge nodes." },
+          { value: "2 min", title: "Setup", text: "Go from sign-up to live workspace quickly." },
+          { value: "24/7", title: "Monitoring", text: "Automated checks around the clock." },
+        ],
+      }),
+      createBlock("features", {
+        layout: "bento",
+        heading: "Everything your team needs",
+        items: [
+          { title: "Automated workflows", text: "Cut repetitive manual steps in minutes." },
+          { title: "Role controls", text: "Keep sensitive workspaces scoped cleanly." },
+          { title: "Clear reporting", text: "See progress without complex dashboards." },
+        ],
+      }),
+    ];
+  } else if (/law|legal|account|consult/.test(kind)) {
+    blocks = [
+      createBlock("hero", {
+        layout: "arch",
+        eyebrow: input.businessType || "Advisory",
+        heading: input.businessName,
+        subheading: sub,
+        buttonLabel: "Request a consultation",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+      createBlock("features", {
+        layout: "alternating",
+        heading: "Practice areas",
+        items: [
+          { title: "Clear counsel", text: "Practical guidance explained in plain language." },
+          { title: "Thorough review", text: "Careful documentation before every commitment." },
+        ],
+      }),
+      createBlock("faq", {
+        heading: "Client questions",
+        items: [
+          { title: "How do initial consultations work?", text: "Share a brief outline and we schedule a confidential call." },
+          { title: "Are fees explained upfront?", text: "Yes. Every scope starts with a written fee outline." },
+        ],
+      }),
+    ];
+  } else if (/plumb|repair|home|trade|clean|construct/.test(kind)) {
+    blocks = [
+      createBlock("hero", {
+        layout: "diagonal",
+        eyebrow: "Dependable local crew",
+        heading: input.businessName,
+        subheading: sub,
+        buttonLabel: "Request a quote",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+      createBlock("features", {
+        layout: "rows",
+        heading: "Services",
+        items: [
+          { title: "Same-week callouts", text: "Fast scheduling with clear arrival windows." },
+          { title: "Upfront quotes", text: "Written estimates before work starts." },
+          { title: "Workmanship guarantee", text: "Every job checked and tested on site." },
+        ],
+      }),
+      createBlock("testimonials", {
+        layout: "grid",
+        heading: "What neighbours say",
+        items: [
+          { quote: "Arrived on time, explained the fix clearly, and left everything spotless.", author: "Local homeowner" },
+          { quote: "Fair price and sorted the issue in a single visit.", author: "Repeat customer" },
+        ],
+      }),
+    ];
+  } else {
+    blocks = [
+      createBlock("hero", {
+        layout: "split",
+        eyebrow: input.businessName,
+        heading: `Welcome to ${input.businessName}`,
+        subheading: sub,
+        buttonLabel: "Get in touch",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+      createBlock("features", {
+        layout: "bento",
+        heading: "What we do",
+        items: [
+          { title: "Quality service", text: "Built around what local customers actually need." },
+          { title: "Fast response", text: "Clear answers and easy booking." },
+          { title: "Clear pricing", text: "Straightforward quotes with zero surprises." },
+        ],
+      }),
+      createBlock("cta", {
+        layout: "split",
+        heading: `Work with ${input.businessName}`,
+        buttonLabel: "Contact us",
+        buttonLink: { type: "anchor", anchor: "contact" },
+      }),
+    ];
+  }
+
   if (input.includeContactForm) {
     blocks.push(
       createBlock("contact-form", {

@@ -82,7 +82,8 @@ async function serve(
     cache &&
     (request.method === "GET" || request.method === "HEAD") &&
     !requestPath.startsWith("/_l/") &&
-    !requestPath.startsWith("/_gs/")
+    !requestPath.startsWith("/_gs/") &&
+    !requestPath.startsWith("/_forms/")
   ) {
     const host = parseHost(request.headers.get("host"), rootDomain);
     if (host.ok) {
@@ -115,6 +116,7 @@ async function serve(
     formTokenSecretPrevious: env.FORM_TOKEN_SECRET_PREVIOUS,
     workerSharedSecret: env.WORKER_SHARED_SECRET,
     appOrigin: env.APP_ORIGIN,
+    apiOrigin: env.API_ORIGIN,
     clientIp,
     waitUntil: ctx?.waitUntil.bind(ctx),
     statsSaltSecret: env.STATS_SALT_SECRET,

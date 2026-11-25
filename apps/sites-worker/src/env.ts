@@ -31,8 +31,10 @@ export type WorkerEnv = {
   FORM_TOKEN_SECRET_PREVIOUS?: string;
   /** Shared secret used to sign forwarded form requests. */
   WORKER_SHARED_SECRET?: string;
-  /** The app origin that receives forwarded form submissions. */
+  /** The app origin that receives forwarded form submissions when API_ORIGIN is unset. */
   APP_ORIGIN?: string;
+  /** Dedicated API worker origin (e.g. https://api.get-on.tech) for forms & stats. */
+  API_ORIGIN?: string;
   /** Daily-rotating salt used to count visitors without storing IPs. */
   STATS_SALT_SECRET?: string;
 };

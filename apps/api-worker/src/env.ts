@@ -1,0 +1,64 @@
+export interface JobMessageBody {
+  job: string;
+  payload?: Record<string, unknown>;
+  cron?: string;
+  enqueuedAt?: string;
+}
+
+export interface QueueSendOptions {
+  contentType?: "json" | "text" | "bytes" | "v8";
+  delaySeconds?: number;
+}
+
+export interface QueueMessageRequest<Body = JobMessageBody> {
+  body: Body;
+  contentType?: "json" | "text" | "bytes" | "v8";
+  delaySeconds?: number;
+}
+
+export interface QueueLike<Body = JobMessageBody> {
+  send(message: Body, options?: QueueSendOptions): Promise<void>;
+  sendBatch(messages: Iterable<QueueMessageRequest<Body>>): Promise<void>;
+}
+
+export interface MessageLike<Body = JobMessageBody> {
+  readonly id: string;
+  readonly timestamp: Date;
+  readonly body: Body;
+  readonly attempts: number;
+  ack(): void;
+  retry(options?: { delaySeconds?: number }): void;
+}
+
+export interface MessageBatchLike<Body = JobMessageBody> {
+  readonly queue: string;
+  readonly messages: readonly MessageLike<Body>[];
+  ackAll(): void;
+  retryAll(options?: { delaySeconds?: number }): void;
+}
+
+export interface ScheduledControllerLike {
+  readonly scheduledTime: number;
+  readonly cron: string;
+  noRetry?: () => void;
+}
+
+export interface KvNamespaceLike {
+  get(key: string, type: "json" | "text"): Promise<unknown>;
+  put?(key: string, value: string): Promise<void>;
+}
+
+export interface ExecutionContextLike {
+  waitUntil(promise: Promise<unknown>): void;
+}
+
+export interface ApiWorkerEnv {
+  ROOT_DOMAIN?: string;
+  APP_ORIGIN?: string;
+  API_ORIGIN?: string;
+  CRON_SECRET?: string;
+  JOBS_SECRET?: string;
+  WORKER_SHARED_SECRET?: string;
+  JOBS_QUEUE?: QueueLike<JobMessageBody>;
+  SITES_KV?: KvNamespaceLike;
+}

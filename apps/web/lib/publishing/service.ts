@@ -154,7 +154,7 @@ async function loadSite(
       supabase
         .from("project_settings")
         .select(
-          "theme, show_watermark, seo_site_title, seo_description, seo_title_format, social_image_url, search_indexing, tagline, timezone, theme_color, twitter_handle, address_parts, verification, maintenance, custom_404",
+          "theme, show_watermark, stats_enabled, seo_site_title, seo_description, seo_title_format, social_image_url, search_indexing, tagline, timezone, theme_color, twitter_handle, address_parts, verification, maintenance, custom_404",
         )
         .eq("project_id", projectId)
         .maybeSingle(),
@@ -184,6 +184,11 @@ async function loadSite(
   const activePlugins = (installs ?? []).map((row) =>
     String((row as { plugin_id: unknown }).plugin_id),
   );
+  const statsEnabled =
+    (settings as { stats_enabled?: boolean | null } | null)?.stats_enabled !== false;
+  if (statsEnabled && !activePlugins.includes("analytics")) {
+    activePlugins.push("analytics");
+  }
 
   return {
     project,

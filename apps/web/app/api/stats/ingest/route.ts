@@ -96,9 +96,13 @@ export async function POST(request: Request) {
   const dateStr = payload.date ? new Date(String(payload.date)).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10);
   const visitorHashStr = typeof payload.visitorHash === "string" ? payload.visitorHash.slice(0, 128) : null;
 
+  if (!projectId) {
+    return NextResponse.json({ error: "MISSING_PROJECT" }, { status: 400 });
+  }
+
   try {
-    await admin.rpc("record_stats_event", {
-      p_project: projectId ?? "",
+    const { error: rpcError } = await admin.rpc("record_stats_event", {
+      p_project: projectId,
       p_date: dateStr,
       p_visitor_hash: visitorHashStr ?? "",
       p_path: pathStr,
@@ -106,6 +110,36 @@ export async function POST(request: Request) {
       p_params: params,
       p_kind: payload.kind,
     });
+
+    if (rpcError) {
+      const { data: existing } = await admin
+        .from("site_stats_daily")
+        .select("views, visitors")
+        .eq("project_id", projectId)
+        .eq("day", dateStr)
+        .maybeSingle();
+
+      if (existing) {
+        await admin
+          .from("site_stats_daily")
+          .update({
+            views: Number(existing.views ?? 0) + 1,
+            visitors: Number(existing.visitors ?? 0) + (visitorHashStr ? 1 : 0),
+          })
+          .eq("project_id", projectId)
+          .eq("day", dateStr);
+      } else {
+        const { error: insertError } = await admin.from("site_stats_daily").insert({
+          project_id: projectId,
+          day: dateStr,
+          views: 1,
+          visitors: visitorHashStr ? 1 : 0,
+        });
+        if (insertError) {
+          return NextResponse.json({ error: "STATS_INGEST_FAILED" }, { status: 500 });
+        }
+      }
+    }
   } catch {
     return NextResponse.json({ error: "STATS_INGEST_FAILED" }, { status: 500 });
   }

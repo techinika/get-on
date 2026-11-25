@@ -11,9 +11,9 @@ import {
   type Theme,
 } from "@get-on/blocks";
 
-export const RENDERER_CSS_VERSION = 6;
+export const RENDERER_CSS_VERSION = 7;
 
-export const RENDERER_CSS = `.gs-root{container-type:inline-size;container-name:site;background:var(--s-bg);color:var(--s-text);font-family:var(--s-font-body);line-height:1.6;min-height:100%}.gs-root *, .gs-root *::before, .gs-root *::after{box-sizing:border-box}.gs-container{width:100%;max-width:1120px;margin-inline:auto;padding-inline:24px}.gs-header{border-bottom:1px solid var(--s-border);background:var(--s-bg);padding-block:16px;position:sticky;top:0;z-index:20}.gs-header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gs-brand{font-family:var(--s-font-heading);font-weight:700;font-size:1.25rem;color:var(--s-text);text-decoration:none;display:inline-flex;flex-direction:column;gap:2px}.gs-nav{display:flex;flex-wrap:wrap;gap:16px;align-items:center}.gs-nav a{color:var(--s-text);text-decoration:none;font-weight:500}.gs-nav a:hover{color:var(--s-primary)}.gs-nav-toggle{display:none;background:transparent;border:1px solid var(--s-border);color:var(--s-text);border-radius:var(--s-radius);padding:6px 12px;font:inherit;font-weight:600;cursor:pointer}.gs-section{padding-block:var(--s-section-pad)}.gs-section--soft{background:var(--s-soft)}.gs-section h1,.gs-section h2,.gs-section h3,.gs-section h4{font-family:var(--s-font-heading);line-height:1.15;margin:0 0 12px}.gs-btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:var(--s-btn-radius);background:var(--s-primary);color:var(--s-on-primary);font-weight:600;text-decoration:none;border:1px solid transparent;cursor:pointer;font-family:inherit;font-size:1rem}.gs-btn:disabled{opacity:.6;cursor:not-allowed}.gs-btn--secondary{background:transparent;color:var(--s-primary);border-color:var(--s-primary)}.gs-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.gs-columns{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}.gs-card{background:var(--s-bg);border:1px solid var(--s-border);border-radius:var(--s-radius);padding:20px}.gs-badge{display:inline-block;font-size:.82rem;font-weight:700;color:var(--s-primary);margin-bottom:8px;letter-spacing:.02em}.gs-stat-val{font-family:var(--s-font-heading);font-size:2rem;font-weight:700;color:var(--s-primary);margin:0 0 4px}.gs-form{display:grid;gap:14px;max-width:560px;margin-top:20px}.gs-field{display:grid;gap:6px;text-align:left}.gs-field label{font-size:.9rem;font-weight:600;color:var(--s-text)}.gs-input,.gs-textarea{width:100%;padding:10px 12px;border:1px solid var(--s-border);border-radius:var(--s-radius);background:var(--s-bg);color:var(--s-text);font:inherit}.gs-textarea{min-height:120px;resize:vertical}.gs-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}.gs-form-status{margin:4px 0 0;font-size:.92rem;font-weight:500;min-height:1.25em;color:var(--s-primary)}.gs-form-status[data-state="error"]{color:var(--s-text)}.gs-accordion{display:grid;gap:10px;margin-top:20px}.gs-accordion-item{background:var(--s-bg);border:1px solid var(--s-border);border-radius:var(--s-radius);overflow:hidden}.gs-accordion-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:transparent;border:0;color:var(--s-text);font:inherit;font-weight:600;text-align:left;cursor:pointer}.gs-accordion-panel{padding:0 18px 16px;color:var(--s-muted)}.gs-footer{border-top:1px solid var(--s-border);background:var(--s-soft);padding-block:40px;font-size:.925rem}.gs-watermark{margin-top:16px;font-size:.8rem;opacity:.75}@container site (max-width:639px){.gs-nav-toggle{display:inline-flex}.gs-nav{display:none;width:100%;flex-direction:column;align-items:flex-start;padding-top:12px;border-top:1px solid var(--s-border)}.gs-nav[data-open="true"]{display:flex}}`;
+export const RENDERER_CSS = `.gs-root{container-type:inline-size;container-name:site;background:var(--s-bg);color:var(--s-text);font-family:var(--s-font-body);line-height:1.6;min-height:100%}.gs-root *,.gs-root *::before,.gs-root *::after{box-sizing:border-box}.gs-container{width:100%;max-width:1120px;margin-inline:auto;padding-inline:24px}.gs-header{border-bottom:1px solid var(--s-border);background:var(--s-bg);padding-block:16px;position:sticky;top:0;z-index:20}.gs-header-inner{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}.gs-header[data-gs-header="centered"] .gs-header-inner{flex-direction:column;justify-content:center;text-align:center}.gs-header[data-gs-header="overlay"]{background:color-mix(in srgb,var(--s-bg) 82%,transparent);backdrop-filter:blur(10px);border-bottom-color:color-mix(in srgb,var(--s-border) 60%,transparent)}.gs-header[data-gs-header="minimal"]{border-bottom:1px solid color-mix(in srgb,var(--s-border) 55%,transparent);padding-block:12px}.gs-header[data-gs-header="minimal"] .gs-nav a{font-size:.82rem;text-transform:uppercase;letter-spacing:.08em}.gs-header[data-gs-header="split"] .gs-nav{margin-left:auto;background:var(--s-soft);padding:6px 14px;border-radius:var(--s-btn-radius)}.gs-brand{font-family:var(--s-font-heading);font-weight:700;font-size:1.25rem;color:var(--s-text);text-decoration:none;display:inline-flex;flex-direction:column;gap:2px}.gs-nav{display:flex;flex-wrap:wrap;gap:16px;align-items:center}.gs-nav a{color:var(--s-text);text-decoration:none;font-weight:500}.gs-nav a:hover{color:var(--s-primary)}.gs-nav-toggle{display:none;background:transparent;border:1px solid var(--s-border);color:var(--s-text);border-radius:var(--s-radius);padding:6px 12px;font:inherit;font-weight:600;cursor:pointer}.gs-section{padding-block:var(--s-section-pad)}.gs-section--soft{background:var(--s-soft)}.gs-root[data-gs-rhythm="even"] .gs-section{background:var(--s-bg)}.gs-root[data-gs-rhythm="even"] .gs-section--soft{background:var(--s-soft)}.gs-root[data-gs-rhythm="alternate"] .gs-section:nth-of-type(even){background:var(--s-soft)}.gs-root[data-gs-rhythm="tinted"] .gs-section:nth-of-type(odd){background:color-mix(in srgb,var(--s-soft) 62%,var(--s-bg))}.gs-root[data-gs-rhythm="tinted"] .gs-section--soft{background:var(--s-soft)}.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="cta"],.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="stats"]{background:var(--s-primary);color:var(--s-on-primary)}.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="cta"] h2,.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="stats"] h2,.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="stats"] .gs-stat-val{color:var(--s-on-primary)}.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="cta"] .gs-btn{background:var(--s-bg);color:var(--s-primary)}.gs-root[data-gs-rhythm="bold"] .gs-section[data-gs-block="stats"] .gs-card{background:color-mix(in srgb,var(--s-bg) 12%,transparent);border-color:color-mix(in srgb,var(--s-on-primary) 24%,transparent)}.gs-section h1,.gs-section h2,.gs-section h3,.gs-section h4{font-family:var(--s-font-heading);line-height:1.15;margin:0 0 12px}.gs-hero-grid{display:grid;gap:32px;grid-template-columns:1.1fr .9fr;align-items:center}.gs-hero-media img{display:block;width:100%;max-height:440px;object-fit:cover;border-radius:var(--s-radius)}.gs-section[data-gs-layout="centered"] .gs-hero-copy{text-align:center;margin-inline:auto;max-width:680px}.gs-section[data-gs-layout="centered"] .gs-hero-actions{justify-content:center}.gs-section[data-gs-layout="minimal"]{padding-block:calc(var(--s-section-pad) * 1.15);border-bottom:1px solid var(--s-border)}.gs-section[data-gs-layout="minimal"] h1{font-size:clamp(2.25rem,5vw,3.75rem);letter-spacing:-0.02em;max-width:16ch}.gs-section[data-gs-layout="editorial"] .gs-hero-grid{grid-template-columns:1.25fr .75fr;align-items:end}.gs-section[data-gs-layout="editorial"] h1{font-size:clamp(2.4rem,4.8vw,3.8rem);letter-spacing:-0.025em}.gs-section[data-gs-layout="arch"] .gs-hero-media img{border-radius:999px 999px var(--s-radius) var(--s-radius);max-height:460px;object-fit:cover}.gs-section[data-gs-layout="offset-frame"] .gs-hero-media{padding:12px;background:var(--s-soft);border-radius:var(--s-radius);box-shadow:14px 14px 0 var(--s-accent)}.gs-section[data-gs-layout="product-shot"] .gs-hero-media{padding:14px;background:var(--s-bg);border:1px solid var(--s-border);border-radius:calc(var(--s-radius) * 1.5);box-shadow:0 24px 48px -18px rgba(15,23,42,.18)}.gs-section[data-gs-layout="fullbleed"]{position:relative;overflow:hidden;background:var(--s-primary);color:var(--s-on-primary)}.gs-section[data-gs-layout="fullbleed"] .gs-badge{color:var(--s-accent)}.gs-section[data-gs-layout="fullbleed"] .gs-btn{background:var(--s-bg);color:var(--s-primary)}.gs-section[data-gs-layout="card-over-image"] .gs-hero-grid{position:relative;display:block}.gs-section[data-gs-layout="card-over-image"] .gs-hero-media img{max-height:460px}.gs-section[data-gs-layout="card-over-image"] .gs-hero-copy{position:relative;z-index:2;max-width:560px;background:var(--s-bg);padding:28px;border-radius:var(--s-radius);border:1px solid var(--s-border);margin-top:-120px;box-shadow:0 18px 40px -16px rgba(0,0,0,.16)}.gs-section[data-gs-layout="diagonal"]{background:linear-gradient(168deg,var(--s-soft) 58%,var(--s-bg) 58.3%)}.gs-btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 22px;border-radius:var(--s-btn-radius);background:var(--s-primary);color:var(--s-on-primary);font-weight:600;text-decoration:none;border:1px solid transparent;cursor:pointer;font-family:inherit;font-size:1rem}.gs-btn:disabled{opacity:.6;cursor:not-allowed}.gs-btn--secondary{background:transparent;color:var(--s-primary);border-color:var(--s-primary)}.gs-grid{display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.gs-grid[data-gs-layout="bento"]>:first-child{grid-column:span 2;background:var(--s-soft)}.gs-grid[data-gs-layout="mosaic"]{grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}.gs-grid[data-gs-layout="mosaic"]>:first-child img{height:240px}.gs-grid[data-gs-layout="alternating"],.gs-grid[data-gs-layout="menu-list"],.gs-grid[data-gs-layout="stacked"]{grid-template-columns:1fr}.gs-grid[data-gs-layout="menu-list"] .gs-card{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap;border:0;border-bottom:1px dashed var(--s-border);border-radius:0;padding:14px 4px;background:transparent}.gs-grid[data-gs-layout="compact"]{grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}.gs-columns{display:grid;gap:24px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}.gs-card{background:var(--s-bg);border:1px solid var(--s-border);border-radius:var(--s-radius);padding:20px}.gs-badge{display:inline-block;font-size:.82rem;font-weight:700;color:var(--s-primary);margin-bottom:8px;letter-spacing:.02em}.gs-stat-val{font-family:var(--s-font-heading);font-size:2rem;font-weight:700;color:var(--s-primary);margin:0 0 4px}.gs-form{display:grid;gap:14px;max-width:560px;margin-top:20px}.gs-field{display:grid;gap:6px;text-align:left}.gs-field label{font-size:.9rem;font-weight:600;color:var(--s-text)}.gs-input,.gs-textarea{width:100%;padding:10px 12px;border:1px solid var(--s-border);border-radius:var(--s-radius);background:var(--s-bg);color:var(--s-text);font:inherit}.gs-textarea{min-height:120px;resize:vertical}.gs-hp{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}.gs-form-status{margin:4px 0 0;font-size:.92rem;font-weight:500;min-height:1.25em;color:var(--s-primary)}.gs-form-status[data-state="error"]{color:var(--s-text)}.gs-accordion{display:grid;gap:10px;margin-top:20px}.gs-accordion-item{background:var(--s-bg);border:1px solid var(--s-border);border-radius:var(--s-radius);overflow:hidden}.gs-accordion-trigger{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:transparent;border:0;color:var(--s-text);font:inherit;font-weight:600;text-align:left;cursor:pointer}.gs-accordion-panel{padding:0 18px 16px;color:var(--s-muted)}.gs-footer{border-top:1px solid var(--s-border);background:var(--s-soft);padding-block:40px;font-size:.925rem}.gs-watermark{margin-top:16px;font-size:.8rem;opacity:.75}@container site (max-width:740px){.gs-hero-grid{grid-template-columns:1fr}.gs-grid[data-gs-layout="bento"]>:first-child{grid-column:span 1}.gs-section[data-gs-layout="card-over-image"] .gs-hero-copy{margin-top:16px}}@container site (max-width:639px){.gs-nav-toggle{display:inline-flex}.gs-nav{display:none;width:100%;flex-direction:column;align-items:flex-start;padding-top:12px;border-top:1px solid var(--s-border)}.gs-nav[data-open="true"]{display:flex}}`;
 
 export type RenderImage = {
   id?: string;
@@ -51,8 +51,9 @@ export function SiteRoot({
   children: React.ReactNode;
 }) {
   const tokens = themeTokens(theme);
+  const rhythm = theme?.design?.rhythm ?? "even";
   return (
-    <div className="gs-root" style={tokens as React.CSSProperties}>
+    <div className="gs-root" data-gs-rhythm={rhythm} style={tokens as React.CSSProperties}>
       {children}
     </div>
   );
@@ -63,6 +64,7 @@ export function SiteHeader({
   nav = [],
   logoUrl,
   tagline,
+  theme,
 }: {
   businessName: string;
   nav?: RenderNavItem[];
@@ -73,8 +75,9 @@ export function SiteHeader({
   businessType?: string | null;
   phone?: string | null;
 }) {
+  const headerStyle = theme?.header?.style ?? "classic";
   return (
-    <header className="gs-header">
+    <header className="gs-header" data-gs-header={headerStyle}>
       <div className="gs-container gs-header-inner">
         <a href="/" className="gs-brand">
           {logoUrl ? (
@@ -242,11 +245,12 @@ function SmartBlock({
   ctx?: RenderContext;
   nodeId?: string;
 }) {
+  const eyebrow = typeof props.eyebrow === "string" ? props.eyebrow : "";
   const heading = typeof props.heading === "string" ? props.heading : "";
   const subheading = typeof props.subheading === "string" ? props.subheading : "";
-  const eyebrow = typeof props.eyebrow === "string" ? props.eyebrow : "";
   const text = typeof props.text === "string" ? props.text : "";
   const imageId = typeof props.imageId === "string" ? props.imageId : "";
+  const layout = typeof props.layout === "string" ? props.layout : "";
   const img = imageId && ctx?.getImage ? ctx.getImage(imageId) : null;
   const items = Array.isArray(props.items)
     ? (props.items as Array<Record<string, unknown>>)
@@ -318,47 +322,92 @@ function SmartBlock({
     );
   }
 
+  const actions =
+    (typeof props.buttonLabel === "string" && props.buttonLabel) ||
+    (typeof props.button2Label === "string" && props.button2Label) ? (
+      <div className="gs-hero-actions" style={{ marginTop: 20, display: "flex", gap: 12, flexWrap: "wrap" }}>
+        {typeof props.buttonLabel === "string" && props.buttonLabel ? (
+          <a href={resolveLinkHref(props.buttonLink, ctx)} className="gs-btn">
+            {props.buttonLabel}
+          </a>
+        ) : null}
+        {typeof props.button2Label === "string" && props.button2Label ? (
+          <a href={resolveLinkHref(props.button2Link, ctx)} className="gs-btn gs-btn--secondary">
+            {props.button2Label}
+          </a>
+        ) : null}
+      </div>
+    ) : null;
+
+  const isSplitHero =
+    type === "hero" &&
+    Boolean(img) &&
+    layout !== "centered" &&
+    layout !== "minimal" &&
+    layout !== "fullbleed";
+
   return (
     <section
       className={`gs-section${type === "features" || type === "faq" || type === "testimonials" ? " gs-section--soft" : ""}`}
       data-gs-node={nodeId}
       data-gs-block={type}
+      data-gs-layout={layout || undefined}
     >
       <div className="gs-container">
-        {eyebrow ? <p className="gs-badge">{eyebrow}</p> : null}
-        {heading ? (
-          type === "hero" ? (
-            <h1 style={{ fontSize: "clamp(2rem, 4vw, 3.25rem)" }}>{heading}</h1>
-          ) : (
-            <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2.25rem)" }}>{heading}</h2>
-          )
-        ) : null}
-        {subheading ? (
-          <p style={{ fontSize: "1.125rem", opacity: 0.85, maxWidth: "60ch" }}>{subheading}</p>
-        ) : null}
-        {text ? <p style={{ maxWidth: "65ch" }}>{text}</p> : null}
-        {img ? (
-          <img
-            src={img.src}
-            alt={img.alt ?? heading ?? ""}
-            style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: "var(--s-radius)", marginTop: 20 }}
-          />
-        ) : null}
-        {(typeof props.buttonLabel === "string" && props.buttonLabel) ||
-        (typeof props.button2Label === "string" && props.button2Label) ? (
-          <div style={{ marginTop: 20, display: "flex", gap: 12, flexWrap: "wrap" }}>
-            {typeof props.buttonLabel === "string" && props.buttonLabel ? (
-              <a href={resolveLinkHref(props.buttonLink, ctx)} className="gs-btn">
-                {props.buttonLabel}
-              </a>
-            ) : null}
-            {typeof props.button2Label === "string" && props.button2Label ? (
-              <a href={resolveLinkHref(props.button2Link, ctx)} className="gs-btn gs-btn--secondary">
-                {props.button2Label}
-              </a>
-            ) : null}
+        {isSplitHero && img ? (
+          <div className="gs-hero-grid">
+            {layout === "card-over-image" ? (
+              <>
+                <div className="gs-hero-media">
+                  <img src={img.src} alt={img.alt ?? heading ?? ""} />
+                </div>
+                <div className="gs-hero-copy">
+                  {eyebrow ? <p className="gs-badge">{eyebrow}</p> : null}
+                  {heading ? <h1 style={{ fontSize: "clamp(2rem, 4vw, 3.25rem)" }}>{heading}</h1> : null}
+                  {subheading ? <p style={{ fontSize: "1.125rem", opacity: 0.85, maxWidth: "60ch" }}>{subheading}</p> : null}
+                  {text ? <p style={{ maxWidth: "65ch" }}>{text}</p> : null}
+                  {actions}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="gs-hero-copy">
+                  {eyebrow ? <p className="gs-badge">{eyebrow}</p> : null}
+                  {heading ? <h1 style={{ fontSize: "clamp(2rem, 4vw, 3.25rem)" }}>{heading}</h1> : null}
+                  {subheading ? <p style={{ fontSize: "1.125rem", opacity: 0.85, maxWidth: "60ch" }}>{subheading}</p> : null}
+                  {text ? <p style={{ maxWidth: "65ch" }}>{text}</p> : null}
+                  {actions}
+                </div>
+                <div className="gs-hero-media">
+                  <img src={img.src} alt={img.alt ?? heading ?? ""} />
+                </div>
+              </>
+            )}
           </div>
-        ) : null}
+        ) : (
+          <div className={type === "hero" ? "gs-hero-copy" : undefined}>
+            {eyebrow ? <p className="gs-badge">{eyebrow}</p> : null}
+            {heading ? (
+              type === "hero" ? (
+                <h1 style={{ fontSize: "clamp(2rem, 4vw, 3.25rem)" }}>{heading}</h1>
+              ) : (
+                <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2.25rem)" }}>{heading}</h2>
+              )
+            ) : null}
+            {subheading ? (
+              <p style={{ fontSize: "1.125rem", opacity: 0.85, maxWidth: "60ch" }}>{subheading}</p>
+            ) : null}
+            {text ? <p style={{ maxWidth: "65ch" }}>{text}</p> : null}
+            {img ? (
+              <img
+                src={img.src}
+                alt={img.alt ?? heading ?? ""}
+                style={{ width: "100%", maxHeight: 420, objectFit: "cover", borderRadius: "var(--s-radius)", marginTop: 20 }}
+              />
+            ) : null}
+            {actions}
+          </div>
+        )}
         {type === "faq" && items.length > 0 ? (
           <div className="gs-accordion">
             {items.map((item, idx) => {
@@ -382,7 +431,7 @@ function SmartBlock({
             })}
           </div>
         ) : items.length > 0 ? (
-          <div className="gs-grid" style={{ marginTop: 24 }}>
+          <div className="gs-grid" data-gs-layout={layout || undefined} style={{ marginTop: 24 }}>
             {items.map((item, idx) => {
               const itemImgId =
                 typeof item.imageId === "string"

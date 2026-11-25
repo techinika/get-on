@@ -227,6 +227,127 @@ function cleanSelectorList(rawSelector: string): { ok: true; selector: string } 
   return { ok: true, selector: mapped.join(",") };
 }
 
+function sanitizeRuleDeclarations(rawBody: string, errors: string[]): string[] {
+  const decls: string[] = [];
+  for (const part of rawBody.split(";")) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const colon = trimmed.indexOf(":");
+    if (colon === -1) {
+      errors.push(`Invalid CSS declaration "${trimmed.slice(0, 48)}" (missing ":").`);
+      continue;
+    }
+    const prop = trimmed.slice(0, colon).trim().toLowerCase();
+    let val = trimmed.slice(colon + 1).trim();
+    if (!prop || !val) {
+      errors.push(`Incomplete CSS declaration "${trimmed.slice(0, 48)}".`);
+      continue;
+    }
+    if (!/^[a-z-]+$/.test(prop)) {
+      errors.push(`Unsupported CSS property "${prop}".`);
+      continue;
+    }
+    if (/!important/i.test(val)) {
+      errors.push(`!important is not allowed on "${prop}".`);
+      continue;
+    }
+    if (/expression\s*\(|javascript:/i.test(val)) {
+      errors.push(`Unsafe CSS value on "${prop}".`);
+      continue;
+    }
+    const externalUrl = /url\s*\(\s*['"]?\s*((?:https?:)?\/\/[^)'"]+)['"]?\s*\)/i.exec(val);
+    if (externalUrl?.[1]) {
+      errors.push(`External URL not allowed: ${externalUrl[1]}`);
+      continue;
+    }
+    if (prop === "position" && val.toLowerCase() === "fixed") {
+      val = "sticky";
+    }
+    decls.push(`${prop}:${val}`);
+  }
+  return decls;
+}
+
+type ParsedCssBlock = { header: string; body: string };
+
+function splitTopLevelCssBlocks(css: string): { blocks: ParsedCssBlock[]; unbalanced: boolean } {
+  const blocks: ParsedCssBlock[] = [];
+  let i = 0;
+  let start = 0;
+  while (i < css.length) {
+    const openIdx = css.indexOf("{", i);
+    if (openIdx === -1) {
+      const trailing = css.slice(start).trim();
+      if (trailing.includes("}")) return { blocks, unbalanced: true };
+      break;
+    }
+    const header = css.slice(start, openIdx).trim();
+    let depth = 1;
+    let j = openIdx + 1;
+    let inSingle = false;
+    let inDouble = false;
+    while (j < css.length && depth > 0) {
+      const ch = css[j]!;
+      const prev = j > 0 ? css[j - 1] : "";
+      if (ch === "'" && !inDouble && prev !== "\\") inSingle = !inSingle;
+      else if (ch === '"' && !inSingle && prev !== "\\") inDouble = !inDouble;
+      else if (!inSingle && !inDouble) {
+        if (ch === "{") depth += 1;
+        else if (ch === "}") depth -= 1;
+      }
+      j += 1;
+    }
+    if (depth !== 0) {
+      return { blocks, unbalanced: true };
+    }
+    const body = css.slice(openIdx + 1, j - 1).trim();
+    blocks.push({ header, body });
+    start = j;
+    i = j;
+  }
+  return { blocks, unbalanced: false };
+}
+
+function sanitizeSafeBlocks(
+  rawCss: string,
+  errors: string[],
+  allowAtMedia: boolean,
+): string[] {
+  const { blocks, unbalanced } = splitTopLevelCssBlocks(rawCss);
+  if (unbalanced) {
+    errors.push("Unbalanced curly braces { } in custom CSS.");
+  }
+  const out: string[] = [];
+  for (const block of blocks) {
+    const rawHeader = block.header.trim();
+    if (!rawHeader) {
+      errors.push("CSS rule is missing a selector.");
+      continue;
+    }
+    if (rawHeader.startsWith("@")) {
+      if (allowAtMedia && /^@media\b/i.test(rawHeader)) {
+        const inner = sanitizeSafeBlocks(block.body, errors, false);
+        if (inner.length > 0) {
+          out.push(`${rawHeader}{${inner.join("")}}`);
+        }
+      } else {
+        errors.push(`At-rule "${rawHeader.split(/\s+/)[0]}" is not supported.`);
+      }
+      continue;
+    }
+    const selRes = cleanSelectorList(rawHeader);
+    if (!selRes.ok) {
+      errors.push(selRes.error);
+      continue;
+    }
+    const decls = sanitizeRuleDeclarations(block.body, errors);
+    if (decls.length > 0) {
+      out.push(`${selRes.selector}{${decls.join(";")}}`);
+    }
+  }
+  return out;
+}
+
 export function sanitizeCustomCss(rawCss: string): {
   ok: boolean;
   css: string;
@@ -239,55 +360,15 @@ export function sanitizeCustomCss(rawCss: string): {
   }
 
   const stripped = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
-  if (/!important/i.test(stripped)) errors.push("!important is not allowed in custom CSS.");
   if (/@import\b/i.test(stripped)) errors.push("@import is not allowed in custom CSS.");
   if (/@font-face\b/i.test(stripped)) errors.push("@font-face is not allowed in custom CSS.");
-  if (/expression\s*\(|javascript:/i.test(stripped)) errors.push("Unsafe CSS function.");
 
-  const urlMatches = stripped.matchAll(/url\s*\(\s*['"]?([^)'"]+)['"]?\s*\)/gi);
-  for (const match of urlMatches) {
-    const url = (match[1] ?? "").trim();
-    if (/^(https?:)?\/\//i.test(url)) {
-      errors.push(`External URL not allowed: ${url}`);
-    }
-  }
-
-  if (errors.length > 0) return { ok: false, css: "", errors };
-
-  const blocks: string[] = [];
-  const ruleRegex = /([^{}]+)\{([^{}]*)\}/g;
-  for (const match of stripped.matchAll(ruleRegex)) {
-    const rawSel = (match[1] ?? "").trim();
-    const rawBody = (match[2] ?? "").trim();
-    if (rawSel.startsWith("@")) {
-      errors.push(`At-rule "${rawSel}" is not supported.`);
-      continue;
-    }
-    const selRes = cleanSelectorList(rawSel);
-    if (!selRes.ok) {
-      errors.push(selRes.error);
-      continue;
-    }
-    const decls: string[] = [];
-    for (const part of rawBody.split(";")) {
-      const colon = part.indexOf(":");
-      if (colon === -1) continue;
-      const prop = part.slice(0, colon).trim().toLowerCase();
-      let val = part.slice(colon + 1).trim();
-      if (!prop || !val) continue;
-      if (prop === "position" && val.toLowerCase() === "fixed") {
-        val = "sticky";
-      }
-      decls.push(`${prop}:${val}`);
-    }
-    if (decls.length > 0) {
-      blocks.push(`${selRes.selector}{${decls.join(";")}}`);
-    }
-  }
+  const safeRules = sanitizeSafeBlocks(stripped, errors, true);
+  const compiledCss = safeRules.join("");
 
   return {
     ok: errors.length === 0,
-    css: errors.length === 0 ? blocks.join("") : "",
+    css: compiledCss,
     errors,
   };
 }
@@ -374,7 +455,7 @@ export function compileStyles(
 
   if (opts?.customCss) {
     const clean = sanitizeCustomCss(opts.customCss);
-    if (clean.ok && clean.css) {
+    if (clean.css) {
       chunks.push(`@layer gs-user{${clean.css}}`);
     }
   }
@@ -593,6 +674,185 @@ export function validateContentV5(
   }
 
   return errors.length === 0 ? { ok: true, content: page } : { ok: false, errors };
+}
+
+export type PageDiagnostic = {
+  id: string;
+  source: "css" | "node" | "layout";
+  severity: "error" | "warning";
+  nodeId?: string;
+  prop?: string;
+  styleKey?: string;
+  message: string;
+  hint?: string;
+};
+
+/**
+ * Validates only hard structural invariants (schemaVersion, root container, node cap)
+ * so drafts with work-in-progress CSS or style mistakes always save cleanly while
+ * unsafe rules are neutralized on render/publish and surfaced in the Errors panel.
+ */
+export function preparePageContentForSave(
+  page: PageContentV5,
+): { ok: true; content: PageContentV5 } | { ok: false; errors: ValidationError[] } {
+  if (!page || page.schemaVersion !== 5 || !page.root || typeof page.root !== "object") {
+    return { ok: false, errors: [{ code: "schema.invalid", message: "Invalid page content." }] };
+  }
+  let totalNodes = 0;
+  function countTree(node: ContentNode) {
+    totalNodes += 1;
+    for (const child of node.children ?? []) {
+      countTree(child);
+    }
+  }
+  countTree(page.root);
+  if (totalNodes > customCodeLimits.maxNodes) {
+    return { ok: false, errors: [{ code: "tree.too_large", message: "Page has too many nodes." }] };
+  }
+  return { ok: true, content: page };
+}
+
+export function collectPageDiagnostics(
+  page: PageContentV5,
+  opts?: { theme?: Theme; isHome?: boolean },
+): PageDiagnostic[] {
+  const diagnostics: PageDiagnostic[] = [];
+  if (!page || page.schemaVersion !== 5 || !page.root) return diagnostics;
+
+  if (page.css && page.css.trim()) {
+    const cssRes = sanitizeCustomCss(page.css);
+    cssRes.errors.forEach((msg, index) => {
+      diagnostics.push({
+        id: `css-${index}`,
+        source: "css",
+        severity: "error",
+        message: msg,
+        hint: "Edit Page CSS without selecting an element.",
+      });
+    });
+  }
+
+  const seenIds = new Set<string>();
+  function visit(node: ContentNode) {
+    if (seenIds.has(node.id)) {
+      diagnostics.push({
+        id: `dup-${node.id}`,
+        source: "node",
+        severity: "error",
+        nodeId: node.id,
+        message: `Duplicate element ID "${node.id}".`,
+        hint: "Duplicate or remove one of the conflicting elements.",
+      });
+    }
+    seenIds.add(node.id);
+
+    if (node.type === "smart") {
+      const kind = String(node.props?.kind ?? "");
+      if (!KNOWN_SMART_KINDS.has(kind)) {
+        diagnostics.push({
+          id: `kind-${node.id}`,
+          source: "node",
+          severity: "error",
+          nodeId: node.id,
+          message: `Unknown section kind "${kind}".`,
+        });
+      }
+    }
+
+    if (node.type === "html") {
+      const res = sanitizeHtml(String(node.props?.html ?? ""));
+      if (!res.ok) {
+        diagnostics.push({
+          id: `html-${node.id}`,
+          source: "node",
+          severity: "warning",
+          nodeId: node.id,
+          message: res.errors.join(" "),
+          hint: "Unsafe tags and inline handlers are stripped automatically when published.",
+        });
+      }
+    }
+
+    if (node.type === "richtext" && node.props?.doc) {
+      const res = sanitizeRichText(node.props.doc as RichNode);
+      if (!res.ok) {
+        diagnostics.push({
+          id: `rt-${node.id}`,
+          source: "node",
+          severity: "warning",
+          nodeId: node.id,
+          message: res.errors.join(" "),
+          hint: "Use https://, mailto:, tel:, or / links.",
+        });
+      }
+    }
+
+    if (node.styles) {
+      for (const [styleKey, decls] of Object.entries(node.styles)) {
+        if (!decls) continue;
+        for (const [prop, val] of Object.entries(decls)) {
+          const checked = validateStyleValue(prop, val);
+          if (!checked.ok) {
+            diagnostics.push({
+              id: `style-${node.id}-${styleKey}-${prop}`,
+              source: "node",
+              severity: "error",
+              nodeId: node.id,
+              prop,
+              styleKey,
+              message: checked.error,
+              hint: `Check "${prop}" in the Style tab (${styleKey}).`,
+            });
+          }
+        }
+      }
+    }
+
+    if (Array.isArray(node.classes)) {
+      for (const cls of node.classes) {
+        if (PROTECTED_CLASSES.has(cls)) {
+          diagnostics.push({
+            id: `cls-${node.id}-${cls}`,
+            source: "node",
+            severity: "error",
+            nodeId: node.id,
+            message: `Class "${cls}" is protected and cannot be used here.`,
+            hint: "Remove this class name in the Advanced tab.",
+          });
+        }
+      }
+    }
+
+    for (const child of node.children ?? []) {
+      visit(child);
+    }
+  }
+
+  visit(page.root);
+
+  const topBlocks = (page.root.children ?? [])
+    .filter((child) => child.type === "smart")
+    .map((child) => ({
+      id: child.id,
+      type: String(child.props?.kind ?? "text"),
+      props: child.props,
+    }));
+
+  if (topBlocks.length > 0 && opts?.theme) {
+    const layout = lintLayout({ theme: opts.theme, blocks: topBlocks });
+    for (const issue of layout.issues) {
+      if (opts.isHome === false && issue.id === "hero_first") continue;
+      diagnostics.push({
+        id: `layout-${issue.id}-${issue.blockId ?? "page"}`,
+        source: "layout",
+        severity: issue.severity,
+        nodeId: issue.blockId,
+        message: issue.message,
+      });
+    }
+  }
+
+  return diagnostics;
 }
 
 const baseBlockObjectSchema = z.object({

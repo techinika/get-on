@@ -122,7 +122,7 @@ describe("cloudflare store", () => {
     });
     const store = createCloudflareStore({ kv: fakeKv(), bucket });
 
-    const file = await store.getFile("site-1", "pub-1", "index.html");
+    const file = await store.getFile!("site-1", "pub-1", "index.html");
 
     expect(file?.contentType).toBe("text/html; charset=utf-8");
     expect(file?.etag).toBe('"abc123"');
@@ -138,7 +138,7 @@ describe("cloudflare store", () => {
     const store = createCloudflareStore({ kv: fakeKv(), bucket });
 
     await expect(
-      store.getFile("site-1", "pub-1", "assets/app.js"),
+      store.getFile!("site-1", "pub-1", "assets/app.js"),
     ).resolves.toMatchObject({ contentType: "text/javascript; charset=utf-8" });
   });
 
@@ -165,7 +165,7 @@ describe("cloudflare store", () => {
     });
 
     await expect(
-      store.getFile("site-1", "pub-1", "missing.html"),
+      store.getFile!("site-1", "pub-1", "missing.html"),
     ).resolves.toBeNull();
   });
 
@@ -174,10 +174,10 @@ describe("cloudflare store", () => {
     const store = createCloudflareStore({ kv: fakeKv(), bucket });
 
     await expect(
-      store.getFile("site-1", "pub-1", "../other/index.html"),
+      store.getFile!("site-1", "pub-1", "../other/index.html"),
     ).resolves.toBeNull();
     await expect(
-      store.getFile("site-1", "pub-1", "/index.html"),
+      store.getFile!("site-1", "pub-1", "/index.html"),
     ).resolves.toBeNull();
     await expect(
       store.getSharedFile!("fonts/../../secret"),

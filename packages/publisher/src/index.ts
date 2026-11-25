@@ -719,6 +719,7 @@ function renderSmartBlockHtml(
   const subheading = typeof props.subheading === "string" ? props.subheading : "";
   const text = typeof props.text === "string" ? props.text : "";
   const imageId = typeof props.imageId === "string" ? props.imageId : "";
+  const layout = typeof props.layout === "string" ? props.layout : "";
   const img = imageId ? ctx.images.get(imageId) : undefined;
   const items = Array.isArray(props.items)
     ? (props.items as Array<Record<string, unknown>>)
@@ -728,39 +729,64 @@ function renderSmartBlockHtml(
   const sectionClass = ["gs-section", soft ? "gs-section--soft" : "", extraClasses]
     .filter(Boolean)
     .join(" ");
+  const layoutAttr = layout ? ` data-gs-layout="${escapeHtml(layout)}"` : "";
 
   const inner: string[] = [];
-  if (eyebrow) inner.push(`<p class="gs-badge">${escapeHtml(eyebrow)}</p>`);
+  const copyParts: string[] = [];
+  if (eyebrow) copyParts.push(`<p class="gs-badge">${escapeHtml(eyebrow)}</p>`);
   if (heading) {
-    inner.push(
+    copyParts.push(
       type === "hero"
         ? `<h1>${escapeHtml(heading)}</h1>`
         : `<h2>${escapeHtml(heading)}</h2>`,
     );
   }
-  if (subheading) inner.push(`<p>${escapeHtml(subheading)}</p>`);
-  if (text) inner.push(`<p>${escapeHtml(text)}</p>`);
-  if (img) {
-    inner.push(
-      `<img src="${escapeHtml(img.src)}" alt="${escapeHtml(img.alt ?? heading)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:var(--s-radius);margin-top:16px">`,
-    );
-  }
+  if (subheading) copyParts.push(`<p>${escapeHtml(subheading)}</p>`);
+  if (text) copyParts.push(`<p>${escapeHtml(text)}</p>`);
 
   const btn1 = typeof props.buttonLabel === "string" ? props.buttonLabel : "";
   const btn2 = typeof props.button2Label === "string" ? props.button2Label : "";
+  const actionsParts: string[] = [];
   if (btn1 || btn2) {
-    inner.push(`<div style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap">`);
+    actionsParts.push(`<div class="gs-hero-actions" style="margin-top:20px;display:flex;gap:12px;flex-wrap:wrap">`);
     if (btn1) {
-      inner.push(
+      actionsParts.push(
         `<a class="gs-btn" href="${escapeHtml(resolveLinkHref(props.buttonLink, ctx.pageHrefById))}">${escapeHtml(btn1)}</a>`,
       );
     }
     if (btn2) {
-      inner.push(
+      actionsParts.push(
         `<a class="gs-btn gs-btn--secondary" href="${escapeHtml(resolveLinkHref(props.button2Link, ctx.pageHrefById))}">${escapeHtml(btn2)}</a>`,
       );
     }
-    inner.push(`</div>`);
+    actionsParts.push(`</div>`);
+  }
+
+  const isSplitHero =
+    type === "hero" &&
+    Boolean(img) &&
+    layout !== "centered" &&
+    layout !== "minimal" &&
+    layout !== "fullbleed";
+
+  if (isSplitHero && img) {
+    const mediaHtml = `<div class="gs-hero-media"><img src="${escapeHtml(img.src)}" alt="${escapeHtml(img.alt ?? heading)}"></div>`;
+    const copyHtml = `<div class="gs-hero-copy">${copyParts.join("")}${actionsParts.join("")}</div>`;
+    inner.push(
+      `<div class="gs-hero-grid">${
+        layout === "card-over-image" ? `${mediaHtml}${copyHtml}` : `${copyHtml}${mediaHtml}`
+      }</div>`,
+    );
+  } else {
+    if (type === "hero") inner.push(`<div class="gs-hero-copy">`);
+    inner.push(...copyParts);
+    if (img) {
+      inner.push(
+        `<img src="${escapeHtml(img.src)}" alt="${escapeHtml(img.alt ?? heading)}" style="width:100%;max-height:420px;object-fit:cover;border-radius:var(--s-radius);margin-top:16px">`,
+      );
+    }
+    inner.push(...actionsParts);
+    if (type === "hero") inner.push(`</div>`);
   }
 
   if (type === "faq" && items.length > 0) {
@@ -779,7 +805,7 @@ function renderSmartBlockHtml(
     });
     inner.push(`</div>`);
   } else if (items.length > 0) {
-    inner.push(`<div class="gs-grid" style="margin-top:24px">`);
+    inner.push(`<div class="gs-grid"${layoutAttr} style="margin-top:24px">`);
     for (const item of items) {
       const itemImgId =
         typeof item.imageId === "string"
@@ -809,7 +835,7 @@ function renderSmartBlockHtml(
     inner.push(`</div>`);
   }
 
-  return `<section class="${escapeHtml(sectionClass)}" ${attrs}><div class="gs-container">${inner.join("")}</div></section>`;
+  return `<section class="${escapeHtml(sectionClass)}" ${attrs}${layoutAttr}><div class="gs-container">${inner.join("")}</div></section>`;
 }
 
 function renderV5NodeHtml(
@@ -1014,6 +1040,10 @@ if(res.status===400){
 setStatus("Please check all required fields and try again.",true);
 return;
 }
+if(res.status===503||res.status===404){
+setStatus("Contact form is temporarily unavailable. Please try again soon.",true);
+return;
+}
 setStatus("Could not send your message. Please try again shortly.",true);
 }).catch(function(){
 setStatus("Network error while sending your message. Please try again.",true);
@@ -1058,10 +1088,17 @@ if(expanded){panel.setAttribute("hidden","");}else{panel.removeAttribute("hidden
 api.register("analytics",{
 init:function(ctx){
 if(!ctx.has("analytics"))return;
-if(navigator.doNotTrack==="1"||typeof navigator.sendBeacon!=="function")return;
+if(navigator.doNotTrack==="1")return;
+var payload=JSON.stringify({path:ctx.pagePath});
+var sent=false;
 try{
-navigator.sendBeacon("/_gs/stats",new Blob([JSON.stringify({path:ctx.pagePath})],{type:"application/json"}));
+if(typeof navigator.sendBeacon==="function"){
+sent=navigator.sendBeacon("/_gs/stats",new Blob([payload],{type:"application/json"}));
+}
 }catch(_e){}
+if(!sent&&typeof fetch==="function"){
+fetch("/_gs/stats",{method:"POST",keepalive:true,credentials:"same-origin",headers:{"Content-Type":"application/json"},body:payload}).catch(function(){});
+}
 }
 });
 function bootAll(){
@@ -1264,6 +1301,9 @@ export function renderHtml(input: {
     ? `\n<script src="${escapeHtml(input.scriptSrc)}" defer></script>`
     : "";
 
+  const rhythm = input.settings.theme?.design?.rhythm ?? "even";
+  const headerStyle = input.settings.theme?.header?.style ?? "classic";
+
   return `<!doctype html>
 <html lang="${escapeHtml(input.settings.locale || "en")}">
 <head>
@@ -1276,10 +1316,10 @@ ${input.page.noindex ? '<meta name="robots" content="noindex">' : ""}
 <style data-gs="1">${css}</style>${scriptTag}
 </head>
 <body>
-<div class="gs-root" data-gs-plugins="${escapeHtml(activePlugins.join(","))}" data-gs-page="${escapeHtml(
+<div class="gs-root" data-gs-rhythm="${escapeHtml(String(rhythm))}" data-gs-plugins="${escapeHtml(activePlugins.join(","))}" data-gs-page="${escapeHtml(
     input.pagePath,
   )}" style="${cssVarsInline(input.settings.theme)}">
-<header class="gs-header"><div class="gs-container gs-header-inner"><a class="gs-brand" href="/">${
+<header class="gs-header" data-gs-header="${escapeHtml(String(headerStyle))}"><div class="gs-container gs-header-inner"><a class="gs-brand" href="/">${
     input.logoUrl
       ? `<img src="${escapeHtml(input.logoUrl)}" alt="${escapeHtml(input.settings.businessName)}" style="height:32px;width:auto">`
       : escapeHtml(input.settings.businessName)

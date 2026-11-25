@@ -106,3 +106,24 @@ export function heroImageIdForSlug(slug: string): string {
   const hexIdx = ((idx === -1 ? 0 : idx) + 1).toString(16).padStart(2, "0");
   return `200000${hexIdx}-0000-4000-8000-000000000001`;
 }
+
+export function imagesForSlug(slug: string): {
+  hero: BuiltinTemplateImage;
+  section1: BuiltinTemplateImage;
+  section2: BuiltinTemplateImage;
+  portrait: BuiltinTemplateImage;
+  logo: BuiltinTemplateImage;
+} {
+  const idx = TEMPLATE_SLUGS.indexOf(slug as (typeof TEMPLATE_SLUGS)[number]);
+  const hexIdx = ((idx === -1 ? 0 : idx) + 1).toString(16).padStart(2, "0");
+  const prefix = `200000${hexIdx}-0000-4000-8000-0000000000`;
+  const byId = builtinImageMap();
+  const fallback = SHARED_IMAGES[0]!;
+  return {
+    hero: byId.get(`${prefix}01`) ?? fallback,
+    section1: byId.get(`${prefix}02`) ?? SHARED_IMAGES[1] ?? fallback,
+    section2: byId.get(`${prefix}03`) ?? SHARED_IMAGES[2] ?? fallback,
+    portrait: byId.get(`${prefix}04`) ?? SHARED_IMAGES[1] ?? fallback,
+    logo: byId.get(`${prefix}05`) ?? fallback,
+  };
+}
