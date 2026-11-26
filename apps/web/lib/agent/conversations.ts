@@ -131,10 +131,10 @@ export async function listAgentMessages(
     .from("agent_messages")
     .select("id, role, content, credits, request_id, created_at")
     .eq("conversation_id", conversationId)
-    .order("created_at", { ascending: true })
+    .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
-  return ((data ?? []) as MessageRow[]).map(messageFromRow);
+  return ((data ?? []) as MessageRow[]).reverse().map(messageFromRow);
 }
 
 export async function appendAgentMessage(
@@ -210,7 +210,36 @@ export async function startAgentRun(
     .select("id")
     .single();
   if (error) {
-    if (error.code === "23505") return { ok: false, code: "AI_BUSY" };
+    if (error.code === "23505") {
+      const staleCutoff = new Date(Date.now() - 90_000).toISOString();
+      const { data: expired } = await admin
+        .from("agent_runs")
+        .update({
+          status: "failed",
+          error_code: "AGENT_TIMEOUT",
+          finished_at: new Date().toISOString(),
+        })
+        .eq("conversation_id", input.conversationId)
+        .in("status", ["running", "queued"])
+        .lt("created_at", staleCutoff)
+        .select("id");
+      if (expired && expired.length > 0) {
+        const retry = await admin
+          .from("agent_runs")
+          .insert({
+            conversation_id: input.conversationId,
+            team_id: input.teamId,
+            user_id: input.userId,
+            status: "running",
+          })
+          .select("id")
+          .single();
+        if (!retry.error && retry.data) {
+          return { ok: true, id: String(retry.data.id) };
+        }
+      }
+      return { ok: false, code: "AI_BUSY" };
+    }
     throw error;
   }
   return { ok: true, id: String(data.id) };

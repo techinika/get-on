@@ -241,6 +241,23 @@ export const MODEL_SEEDS: AiModel[] = [
     notes: "Safety moderation",
     verifiedAt: null,
   },
+  {
+    id: "image-default",
+    provider: "workers-ai",
+    modelId: "@cf/black-forest-labs/flux-1-schnell",
+    purposes: ["image"],
+    neuronsPerMInput: null,
+    neuronsPerMOutput: null,
+    neuronsPerImage: 173,
+    contextTokens: 2048,
+    maxOutputTokens: 0,
+    supportsJson: false,
+    supportsVision: false,
+    enabled: true,
+    fallbackId: null,
+    notes: "Default image generator",
+    verifiedAt: null,
+  },
 ];
 
 export type ModelRequirement = {
@@ -276,7 +293,12 @@ export function modelFor(
       (!req.needsVision || m.supportsVision),
   );
   if (candidates.length === 0) {
-    return models.find((m) => m.enabled && m.purposes.includes(purpose)) ?? models[0] ?? null;
+    const samePurpose = models.find((m) => m.enabled && m.purposes.includes(purpose));
+    if (samePurpose) return samePurpose;
+    if (purpose === "image" || purpose === "vision" || purpose === "guard") {
+      return null;
+    }
+    return models[0] ?? null;
   }
   return candidates[0] ?? null;
 }
@@ -284,8 +306,17 @@ export function modelFor(
 export type AiUsage = {
   inputTokens?: number;
   outputTokens?: number;
+  totalTokens?: number;
   images?: number;
   neurons?: number;
+  generationNeurons?: number;
+  moderationInputTokens?: number;
+  moderationOutputTokens?: number;
+  moderationTotalTokens?: number;
+  moderationNeurons?: number;
+  totalNeurons?: number;
+  creditNeurons?: number;
+  tokensEstimated?: boolean;
 };
 
 export type AiMessage = {
@@ -314,6 +345,7 @@ export type AiImageResult = {
 export type AiModerationResult = {
   safe: boolean;
   categories: string[];
+  usage?: AiUsage;
   raw?: unknown;
 };
 
@@ -425,7 +457,8 @@ export class FakeAiProvider implements AiProvider {
 
   async generateImage(input: GenerateImageInput): Promise<AiImageResult> {
     return {
-      imageBase64: "",
+      imageBase64:
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=",
       mime: "image/png",
       usage: { images: 1 },
       modelId: input.modelId,
@@ -433,7 +466,7 @@ export class FakeAiProvider implements AiProvider {
   }
 
   async moderate(): Promise<AiModerationResult> {
-    return { safe: true, categories: [] };
+    return { safe: true, categories: [], usage: { inputTokens: 12, outputTokens: 2, totalTokens: 14 } };
   }
 
   async chatWithTools(input: ChatWithToolsInput): Promise<ChatWithToolsOutput> {
@@ -586,10 +619,83 @@ export function usageToNeurons(usage: AiUsage, model: AiModel): number;
 export function usageToNeurons(a: AiModel | AiUsage, b: AiUsage | AiModel): number {
   const model = isAiModel(a) ? a : (b as AiModel);
   const usage = isAiModel(a) ? (b as AiUsage) : a;
-  const inNeurons = ((usage.inputTokens ?? 0) / 1_000_000) * (model.neuronsPerMInput ?? 250);
-  const outNeurons = ((usage.outputTokens ?? 0) / 1_000_000) * (model.neuronsPerMOutput ?? 750);
+  const defaultIn = model.neuronsPerImage != null ? 0 : 250;
+  const defaultOut = model.neuronsPerImage != null ? 0 : 750;
+  const inNeurons = ((usage.inputTokens ?? 0) / 1_000_000) * (model.neuronsPerMInput ?? defaultIn);
+  const outNeurons = ((usage.outputTokens ?? 0) / 1_000_000) * (model.neuronsPerMOutput ?? defaultOut);
   const imgNeurons = (usage.images ?? 0) * (model.neuronsPerImage ?? 100);
   return Math.ceil(inNeurons + outNeurons + imgNeurons);
+}
+
+export function buildRequestUsage(input: {
+  model: AiModel;
+  generationUsage?: AiUsage;
+  moderationInputUsage?: AiUsage;
+  moderationOutputUsage?: AiUsage;
+  guardModel?: AiModel | null;
+  creditNeurons?: number;
+}): AiUsage & { totalTokens: number; totalNeurons: number } {
+  const genIn = Math.max(0, Math.round(input.generationUsage?.inputTokens ?? 0));
+  const genOut = Math.max(0, Math.round(input.generationUsage?.outputTokens ?? 0));
+  const images = Math.max(0, Math.round(input.generationUsage?.images ?? 0));
+  const genProviderNeurons =
+    typeof input.generationUsage?.neurons === "number" && Number.isFinite(input.generationUsage.neurons)
+      ? Math.max(0, Math.ceil(input.generationUsage.neurons))
+      : undefined;
+  const generationNeurons =
+    genProviderNeurons ??
+    usageToNeurons(input.model, {
+      inputTokens: genIn,
+      outputTokens: genOut,
+      images,
+    });
+
+  const modModel = input.guardModel ?? null;
+  const modParts = [input.moderationInputUsage, input.moderationOutputUsage].filter(
+    (part): part is AiUsage => Boolean(part),
+  );
+  let modIn = 0;
+  let modOut = 0;
+  let moderationNeurons = 0;
+  for (const part of modParts) {
+    const pIn = Math.max(0, Math.round(part.inputTokens ?? 0));
+    const pOut = Math.max(0, Math.round(part.outputTokens ?? 0));
+    modIn += pIn;
+    modOut += pOut;
+    if (typeof part.neurons === "number" && Number.isFinite(part.neurons)) {
+      moderationNeurons += Math.max(0, Math.ceil(part.neurons));
+    } else if (modModel) {
+      moderationNeurons += usageToNeurons(modModel, { inputTokens: pIn, outputTokens: pOut });
+    } else {
+      moderationNeurons += Math.ceil((pIn / 1_000_000) * 200 + (pOut / 1_000_000) * 200);
+    }
+  }
+
+  const totalTokens = genIn + genOut + modIn + modOut;
+  const totalNeurons = generationNeurons + moderationNeurons;
+  const creditNeurons =
+    typeof input.creditNeurons === "number" && input.creditNeurons > 0
+      ? Math.round(input.creditNeurons)
+      : undefined;
+  const tokensEstimated = Boolean(
+    input.generationUsage?.tokensEstimated || modParts.some((p) => p.tokensEstimated),
+  );
+
+  return {
+    inputTokens: genIn,
+    outputTokens: genOut,
+    totalTokens,
+    ...(images > 0 ? { images } : {}),
+    neurons: totalNeurons,
+    generationNeurons,
+    moderationInputTokens: modIn,
+    moderationOutputTokens: modOut,
+    moderationTotalTokens: modIn + modOut,
+    moderationNeurons,
+    totalNeurons,
+    ...(creditNeurons ? { creditNeurons } : {}),
+    ...(tokensEstimated ? { tokensEstimated: true } : {}),
+  };
 }
 
 export function estimateCredits(input: {

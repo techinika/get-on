@@ -79,6 +79,11 @@ export interface ApiWorkerEnv {
   CRON_SECRET?: string;
   JOBS_SECRET?: string;
   WORKER_SHARED_SECRET?: string;
+  CLOUDFLARE_ANALYTICS_API_TOKEN?: string;
+  CLOUDFLARE_API_TOKEN?: string;
+  CF_API_TOKEN_DOMAINS?: string;
+  CLOUDFLARE_ZONE_ID?: string;
+  CF_SAAS_ZONE_ID?: string;
   AI?: AiBindingLike;
   JOBS_QUEUE?: QueueLike<JobMessageBody>;
   SITES_KV?: KvNamespaceLike;

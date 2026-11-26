@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   collectPageDiagnostics,
+  defaultSmartProps,
   preparePageContentForSave,
   sanitizeCustomCss,
+  validateContentV5,
 } from "@get-on/blocks";
 import type { PageContentV5 } from "@get-on/blocks";
 
@@ -68,6 +70,28 @@ describe("page editor forgiving save and diagnostics", () => {
       schemaVersion: 4,
     } as unknown as PageContentV5);
     expect(invalidSchema.ok).toBe(false);
+  });
+
+  it("accepts image-text and services smart sections in validation and diagnostics", () => {
+    const page = makePage({
+      root: {
+        id: "page",
+        type: "page",
+        children: [
+          { id: "hero-1", type: "smart", props: defaultSmartProps("hero") },
+          { id: "split-1", type: "smart", props: defaultSmartProps("image-text") },
+          { id: "svc-1", type: "smart", props: defaultSmartProps("services") },
+        ],
+      },
+    });
+
+    const validated = validateContentV5(page);
+    expect(validated.ok).toBe(true);
+    const diagnostics = collectPageDiagnostics(page, {
+      theme: { palette: "ocean", fontPair: "classic" },
+      isHome: true,
+    });
+    expect(diagnostics.some((d) => d.message.includes("Unknown"))).toBe(false);
   });
 
   it("collects CSS, node style, and layout diagnostics accurately", () => {

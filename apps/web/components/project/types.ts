@@ -1,3 +1,5 @@
+import type { PagePublishStatus } from "@/lib/publishing/status";
+
 export type PageRow = {
   id: string;
   project_id: string;
@@ -8,6 +10,7 @@ export type PageRow = {
   blocks: unknown[] | null;
   created_at?: string;
   updated_at?: string;
+  publishStatus?: PagePublishStatus;
 };
 
 export type ProjectSummary = {

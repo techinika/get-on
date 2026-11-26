@@ -1,5 +1,21 @@
 export const DEFAULT_ROOT_DOMAIN = "get-on.tech";
 
+export {
+  fetchCloudflareSiteAnalytics,
+  normalizeAnalyticsHostnames,
+  normalizeAnalyticsRange,
+  normalizeReferrerSource,
+  resolveCloudflareZoneId,
+  type CloudflareSiteAnalytics,
+  type FetchCloudflareSiteAnalyticsInput,
+  type SiteAnalyticsRange,
+  type SiteCountryPoint,
+  type SiteDailyPoint,
+  type SiteDevicePoint,
+  type SitePagePoint,
+  type SiteReferrerPoint,
+} from "./cloudflare-analytics";
+
 export type SiteState =
   | "live"
   | "offline"
@@ -246,6 +262,7 @@ export type HandleSiteRequestOptions = {
   clientIp?: string;
   waitUntil?: (promise: Promise<unknown>) => void;
   statsSaltSecret?: string;
+  country?: string;
 };
 
 const FORM_ID_RE = /^[A-Za-z0-9_-]{6,32}$/;
@@ -825,14 +842,57 @@ export async function handleSiteRequest(
     }
     const raw = await request.text().catch(() => "");
     let pagePath = "/";
+    let referrerHost = "";
+    let utmSource = "";
     try {
-      const parsed = JSON.parse(raw) as { path?: unknown };
+      const parsed = JSON.parse(raw) as {
+        path?: unknown;
+        referrerHost?: unknown;
+        utmSource?: unknown;
+      };
       if (typeof parsed.path === "string" && parsed.path.startsWith("/")) {
         pagePath = parsed.path.slice(0, 200);
+      }
+      if (typeof parsed.referrerHost === "string") {
+        const cleaned = parsed.referrerHost.trim().toLowerCase().slice(0, 120);
+        if (/^[a-z0-9.-]+$/i.test(cleaned) && cleaned !== parsedHost.hostname) {
+          referrerHost = cleaned;
+        }
+      }
+      if (typeof parsed.utmSource === "string") {
+        const cleaned = parsed.utmSource.trim().slice(0, 80);
+        if (cleaned && !/[\r\n]/.test(cleaned)) {
+          utmSource = cleaned;
+        }
       }
     } catch {
       // Ignore malformed beacon JSON
     }
+    if (!referrerHost) {
+      const headerRef = request.headers.get("referer");
+      if (headerRef) {
+        try {
+          const refHost = new URL(headerRef).hostname.trim().toLowerCase();
+          if (refHost && refHost !== parsedHost.hostname) {
+            referrerHost = refHost.slice(0, 120);
+          }
+        } catch {
+          // Ignore invalid referer URL
+        }
+      }
+    }
+    const rawCountry = (options.country ?? request.headers.get("cf-ipcountry") ?? "")
+      .trim()
+      .toUpperCase();
+    const country =
+      /^[A-Z]{2}$/.test(rawCountry) && rawCountry !== "XX" && rawCountry !== "T1"
+        ? rawCountry
+        : undefined;
+    const statsParams: Record<string, string> = {};
+    if (country) statsParams.country = country;
+    if (referrerHost) statsParams.referrer = referrerHost;
+    if (utmSource) statsParams.utm_source = utmSource;
+
     const visitorSeed = `${options.clientIp ?? ""}|${request.headers.get("user-agent") ?? ""}|${options.statsSaltSecret ?? pointer.siteId}`;
     const visitorHash = await sha256Hex(visitorSeed);
     sendSignedStats(options, parsedHost.hostname, {
@@ -841,6 +901,9 @@ export async function handleSiteRequest(
       projectId: pointer.siteId,
       path: pagePath,
       visitorHash,
+      ...(country ? { country } : {}),
+      ...(referrerHost ? { referrerHost } : {}),
+      ...(Object.keys(statsParams).length > 0 ? { params: statsParams } : {}),
     });
     return new Response(null, {
       status: 204,

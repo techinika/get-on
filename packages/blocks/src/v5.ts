@@ -84,6 +84,23 @@ export function defaultSmartProps(kind: string): Record<string, unknown> {
         showPhone: false,
         phoneRequired: false,
       };
+    case "image-text":
+      return {
+        kind: "image-text",
+        heading: "About our work",
+        text: "Share your story with a balanced photo and clear, helpful details for visitors.",
+        imageId: null,
+      };
+    case "services":
+      return {
+        kind: "services",
+        heading: "Services",
+        items: [
+          { title: "Core service", text: "Tailored help delivered on time with transparent pricing." },
+          { title: "Consultation", text: "One-on-one guidance to scope what you need." },
+          { title: "Ongoing support", text: "Reliable follow-through after launch." },
+        ],
+      };
     default:
       return { kind };
   }
@@ -674,6 +691,8 @@ const BLOCK_LABELS: Record<string, string> = {
   stats: "Stats",
   menu: "Menu",
   schedule: "Schedule",
+  "image-text": "Image & text",
+  services: "Services",
   shared: "Shared pattern",
 };
 

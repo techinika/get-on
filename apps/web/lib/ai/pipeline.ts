@@ -5,13 +5,13 @@ import {
   AiError,
   actualCredits,
   aiErrorMessage,
+  buildRequestUsage,
   composePrompt,
   estimateCredits,
   estimateTokens,
   isAiError,
   modelFor,
   reserveCredits,
-  usageToNeurons,
   type AiErrorCode,
   type AiMessage,
   type AiTaskId,
@@ -284,7 +284,7 @@ export async function moderateText(
   text: string,
   timeoutMs: number,
   metadata: Record<string, string>,
-): Promise<{ safe: boolean; categories: string[] }> {
+): Promise<{ safe: boolean; categories: string[]; usage: AiUsage }> {
   if (!modelId) {
     throw new AiError("AI_PROVIDER_ERROR", {
       details: { reason: "guard_model_missing" },
@@ -296,7 +296,25 @@ export async function moderateText(
     timeoutMs,
     metadata,
   });
-  return { safe: result.safe, categories: result.categories };
+  const providerIn = result.usage?.inputTokens;
+  const providerOut = result.usage?.outputTokens;
+  const inputTokens =
+    typeof providerIn === "number" && providerIn > 0 ? providerIn : estimateTokens(text);
+  const outputTokens =
+    typeof providerOut === "number" && providerOut > 0
+      ? providerOut
+      : Math.max(1, estimateTokens(result.categories.join(" ") || "safe"));
+  return {
+    safe: result.safe,
+    categories: result.categories,
+    usage: {
+      inputTokens,
+      outputTokens,
+      totalTokens: result.usage?.totalTokens ?? inputTokens + outputTokens,
+      ...(result.usage?.neurons !== undefined ? { neurons: result.usage.neurons } : {}),
+      ...(providerIn === undefined || providerOut === undefined ? { tokensEstimated: true } : {}),
+    },
+  };
 }
 
 function parseJsonValue(value: string): unknown {
@@ -320,11 +338,19 @@ function sanitiseDeep(value: unknown): unknown {
 }
 
 function addUsage(a: AiUsage, b: AiUsage): AiUsage {
+  const inputTokens = (a.inputTokens ?? 0) + (b.inputTokens ?? 0) || undefined;
+  const outputTokens = (a.outputTokens ?? 0) + (b.outputTokens ?? 0) || undefined;
+  const images = (a.images ?? 0) + (b.images ?? 0) || undefined;
+  const neurons = (a.neurons ?? 0) + (b.neurons ?? 0) || undefined;
   return {
-    inputTokens: (a.inputTokens ?? 0) + (b.inputTokens ?? 0) || undefined,
-    outputTokens: (a.outputTokens ?? 0) + (b.outputTokens ?? 0) || undefined,
-    images: (a.images ?? 0) + (b.images ?? 0) || undefined,
-    neurons: (a.neurons ?? 0) + (b.neurons ?? 0) || undefined,
+    inputTokens,
+    outputTokens,
+    totalTokens:
+      inputTokens !== undefined || outputTokens !== undefined
+        ? (inputTokens ?? 0) + (outputTokens ?? 0)
+        : undefined,
+    images,
+    neurons,
   };
 }
 
@@ -492,6 +518,7 @@ async function runTextTaskWithConfig(
       requestId,
     );
 
+    let moderationInputUsage: AiUsage | undefined;
     if (settings.moderationEnabled) {
       const moderation = await moderateText(
         provider,
@@ -500,13 +527,22 @@ async function runTextTaskWithConfig(
         AI_TASKS.moderate.timeoutMs,
         metadata,
       );
+      moderationInputUsage = moderation.usage;
+      const moderationOnlyUsage = buildRequestUsage({
+        model,
+        moderationInputUsage,
+        guardModel: guard,
+        creditNeurons: settings.creditNeurons,
+      });
       await updateRequest(admin, requestId, {
-        moderation,
+        moderation: { safe: moderation.safe, categories: moderation.categories },
+        usage: moderationOnlyUsage,
         ...(moderation.safe
           ? {}
           : { status: "refused", finished_at: new Date().toISOString() }),
       });
       if (!moderation.safe) {
+        await recordUsage(admin, input.teamId, 0, moderationOnlyUsage.totalNeurons);
         return failure(new AiError("AI_REFUSED"), requestId);
       }
     }
@@ -640,20 +676,40 @@ async function runTextTaskWithConfig(
       return failure(mapped, requestId);
     }
 
+    const rawIn = providerUsage.inputTokens;
+    const rawOut = providerUsage.outputTokens;
+    const generationUsage: AiUsage = {
+      inputTokens: rawIn ?? estimateInputTokens,
+      outputTokens: rawOut ?? estimateTokens(outputText),
+      ...(task.kind === "vision" ? { images: 1 } : {}),
+      ...(providerUsage.neurons !== undefined ? { neurons: providerUsage.neurons } : {}),
+      ...(rawIn === undefined || rawOut === undefined ? { tokensEstimated: true } : {}),
+    };
+
     const flags = scanOutput(outputText);
     if (flags.empty || flags.injection) {
+      const failedUsage = buildRequestUsage({
+        model,
+        generationUsage,
+        moderationInputUsage,
+        guardModel: guard,
+        creditNeurons: settings.creditNeurons,
+      });
       const mapped = new AiError("AI_BAD_RESULT");
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {
         status: "failed",
         error_code: mapped.code,
+        usage: failedUsage,
         flags,
         latency_ms: Date.now() - startedAt,
         finished_at: new Date().toISOString(),
       });
+      await recordUsage(admin, input.teamId, 0, failedUsage.totalNeurons);
       return failure(mapped, requestId);
     }
 
+    let moderationOutputUsage: AiUsage | undefined;
     if (task.moderateOutput && settings.moderationEnabled) {
       try {
         const outputModeration = await moderateText(
@@ -663,45 +719,79 @@ async function runTextTaskWithConfig(
           AI_TASKS.moderate.timeoutMs,
           metadata,
         );
+        moderationOutputUsage = outputModeration.usage;
         if (!outputModeration.safe) {
+          const refusedUsage = buildRequestUsage({
+            model,
+            generationUsage,
+            moderationInputUsage,
+            moderationOutputUsage,
+            guardModel: guard,
+            creditNeurons: settings.creditNeurons,
+          });
           await releaseRequest(admin, requestId);
           await updateRequest(admin, requestId, {
             status: "refused",
-            moderation: outputModeration,
+            moderation: { safe: outputModeration.safe, categories: outputModeration.categories },
+            usage: refusedUsage,
             flags,
             latency_ms: Date.now() - startedAt,
             finished_at: new Date().toISOString(),
           });
+          await recordUsage(admin, input.teamId, 0, refusedUsage.totalNeurons);
           return failure(new AiError("AI_REFUSED"), requestId);
         }
       } catch (error) {
         const mapped = isAiError(error)
           ? error
           : new AiError("AI_PROVIDER_ERROR", { cause: error });
+        const failedUsage = buildRequestUsage({
+          model,
+          generationUsage,
+          moderationInputUsage,
+          moderationOutputUsage,
+          guardModel: guard,
+          creditNeurons: settings.creditNeurons,
+        });
         logTaskFailure(task.taskId, requestId, mapped);
         await releaseRequest(admin, requestId);
         await updateRequest(admin, requestId, {
           status: "failed",
           error_code: mapped.code,
+          usage: failedUsage,
           flags,
           latency_ms: Date.now() - startedAt,
           finished_at: new Date().toISOString(),
         });
+        await recordUsage(admin, input.teamId, 0, failedUsage.totalNeurons);
         return failure(mapped, requestId);
       }
     }
 
-    const usage: AiUsage = {
-      inputTokens: providerUsage.inputTokens ?? estimateInputTokens,
-      outputTokens: providerUsage.outputTokens ?? estimateTokens(outputText),
-    };
-    const neurons = usageToNeurons(usage, model);
+    const usage = buildRequestUsage({
+      model,
+      generationUsage,
+      moderationInputUsage,
+      moderationOutputUsage,
+      guardModel: guard,
+      creditNeurons: settings.creditNeurons,
+    });
+    const neurons = usage.totalNeurons;
     const credits =
       reserved > 0
-        ? actualCredits(usage, model, true, {
-            creditNeurons: settings.creditNeurons,
-            usdPerNeuron: config.usdPerNeuron,
-          })
+        ? actualCredits(
+            {
+              inputTokens: generationUsage.inputTokens,
+              outputTokens: generationUsage.outputTokens,
+              images: generationUsage.images,
+            },
+            model,
+            true,
+            {
+              creditNeurons: settings.creditNeurons,
+              usdPerNeuron: config.usdPerNeuron,
+            },
+          )
         : 0;
 
     let charged = 0;
@@ -716,10 +806,12 @@ async function runTextTaskWithConfig(
         await updateRequest(admin, requestId, {
           status: "failed",
           error_code: mapped.code,
+          usage,
           flags,
           latency_ms: Date.now() - startedAt,
           finished_at: new Date().toISOString(),
         });
+        await recordUsage(admin, input.teamId, 0, neurons);
         return failure(mapped, requestId);
       }
       charged = numeric(settled, credits);

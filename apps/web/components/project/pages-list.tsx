@@ -323,9 +323,19 @@ export function PagesList({ project, teamName, planName, pageLimit, pages }: Pag
                     ) : null}
                   </div>
 
-                  <Badge variant="draft" className="hidden shrink-0 xs:inline-flex">
-                    Draft
-                  </Badge>
+                  {page.publishStatus === "live" ? (
+                    <Badge variant="live" dot className="hidden shrink-0 xs:inline-flex">
+                      Live
+                    </Badge>
+                  ) : page.publishStatus === "changes" ? (
+                    <Badge variant="accent" className="hidden shrink-0 xs:inline-flex">
+                      Edited
+                    </Badge>
+                  ) : (
+                    <Badge variant="draft" className="hidden shrink-0 xs:inline-flex">
+                      Draft
+                    </Badge>
+                  )}
 
                   <Link
                     href={`/dashboard/projects/${project.id}/pages/${page.id}`}

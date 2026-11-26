@@ -7,6 +7,7 @@ export const runtime = "nodejs";
 const DEFAULT_WHITELIST = new Set([
   "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
   "utm_id", "ref", "fbclid", "gclid", "msclkid", "ttclid", "gs_link",
+  "country", "referrer",
 ]);
 
 function sanitizeValue(value: string): string | null {

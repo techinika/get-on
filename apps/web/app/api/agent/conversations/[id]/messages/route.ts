@@ -193,6 +193,7 @@ export async function POST(
         userId: actor.userId,
         projectId: conversation.projectId,
         turnId: userMessage.id,
+        timeoutMs: 48000,
         tools: Object.values(assistantTools),
         context: {
           route: context.route,
@@ -209,7 +210,8 @@ export async function POST(
           errorCode: result.code,
         });
         runFinished = true;
-        send("error", { code: result.code, message: result.message });
+        const balance = await getAgentBalance(admin, actor.teamId);
+        send("error", { code: result.code, message: result.message, balance });
         return;
       }
 

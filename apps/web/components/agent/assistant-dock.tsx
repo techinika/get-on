@@ -121,6 +121,25 @@ function removeStorage(key: string): void {
   }
 }
 
+function dispatchSseBlock(
+  block: string,
+  onEvent: (event: string, data: Record<string, unknown>) => void,
+) {
+  let event = "message";
+  const dataLines: string[] = [];
+  for (const line of block.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+  if (dataLines.length > 0) {
+    try {
+      onEvent(event, JSON.parse(dataLines.join("\n")) as Record<string, unknown>);
+    } catch {
+      // Ignore a malformed event and keep the stream alive.
+    }
+  }
+}
+
 async function readSse(
   body: ReadableStream<Uint8Array>,
   onEvent: (event: string, data: Record<string, unknown>) => void,
@@ -131,8 +150,7 @@ async function readSse(
 
   for (;;) {
     const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
 
     // Drop a runaway buffer so a malformed stream cannot grow memory forever.
     if (buffer.length > MAX_SSE_BUFFER) {
@@ -144,20 +162,15 @@ async function readSse(
     while (boundary >= 0) {
       const block = buffer.slice(0, boundary);
       buffer = buffer.slice(boundary + 2);
-      let event = "message";
-      const dataLines: string[] = [];
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event:")) event = line.slice(6).trim();
-        if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-      }
-      if (dataLines.length > 0) {
-        try {
-          onEvent(event, JSON.parse(dataLines.join("\n")) as Record<string, unknown>);
-        } catch {
-          // Ignore a malformed event and keep the stream alive.
-        }
-      }
+      dispatchSseBlock(block, onEvent);
       boundary = buffer.indexOf("\n\n");
+    }
+
+    if (done) {
+      if (buffer.trim()) {
+        dispatchSseBlock(buffer, onEvent);
+      }
+      break;
     }
   }
 }
@@ -648,6 +661,7 @@ export function AssistantDock({
               ? data.message
               : "The assistant could not answer.",
           );
+          if (typeof data.balance === "number") setBalance(data.balance);
           setStatusLabel("");
           return;
         }
@@ -655,7 +669,11 @@ export function AssistantDock({
           const saved = messageFrom(data.message);
           clearStreamBuffer();
           if (saved) {
-            setMessages((current) => keepLast([...current, saved], MAX_MESSAGES));
+            setMessages((current) =>
+              current.some((message) => message.id === saved.id)
+                ? current
+                : keepLast([...current, saved], MAX_MESSAGES),
+            );
             setConversations((current) =>
               current
                 .map((conversation) =>

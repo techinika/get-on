@@ -1089,7 +1089,25 @@ api.register("analytics",{
 init:function(ctx){
 if(!ctx.has("analytics"))return;
 if(navigator.doNotTrack==="1")return;
-var payload=JSON.stringify({path:ctx.pagePath});
+var referrerHost="";
+try{
+if(document.referrer){
+var refUrl=new URL(document.referrer);
+if(refUrl.hostname&&refUrl.hostname!==window.location.hostname){referrerHost=refUrl.hostname.slice(0,120);}
+}
+}catch(_e){}
+var utmSource="";
+try{
+if(window.location.search&&typeof URLSearchParams==="function"){
+var sp=new URLSearchParams(window.location.search);
+var us=sp.get("utm_source");
+if(us){utmSource=us.trim().slice(0,80);}
+}
+}catch(_e){}
+var bodyObj={path:ctx.pagePath};
+if(referrerHost)bodyObj.referrerHost=referrerHost;
+if(utmSource)bodyObj.utmSource=utmSource;
+var payload=JSON.stringify(bodyObj);
 var sent=false;
 try{
 if(typeof navigator.sendBeacon==="function"){

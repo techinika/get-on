@@ -1,4 +1,10 @@
-import { sha256Hex, verifyWorkerRequest } from "@get-on/site-server";
+import {
+  fetchCloudflareSiteAnalytics,
+  normalizeAnalyticsHostnames,
+  normalizeAnalyticsRange,
+  sha256Hex,
+  verifyWorkerRequest,
+} from "@get-on/site-server";
 import type {
   AiRunOptions,
   ApiWorkerEnv,
@@ -141,6 +147,89 @@ async function streamToBytes(stream: ReadableStream<Uint8Array>): Promise<Uint8A
     offset += chunk.byteLength;
   }
   return combined;
+}
+
+const DEFAULT_IMAGE_MODEL = "@cf/black-forest-labs/flux-1-schnell";
+
+function cleanBase64Image(value: string): string {
+  return value
+    .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "")
+    .replace(/\s+/g, "");
+}
+
+function binaryToBytes(value: unknown): Uint8Array | null {
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (
+    Array.isArray(value) &&
+    value.length > 0 &&
+    value.every((entry) => typeof entry === "number" && entry >= 0 && entry <= 255)
+  ) {
+    return new Uint8Array(value);
+  }
+  return null;
+}
+
+function extractNormalizedImage(value: unknown): string | null {
+  if (typeof value === "string") {
+    const cleaned = cleanBase64Image(value);
+    return cleaned.length > 0 ? cleaned : null;
+  }
+  const bytes = binaryToBytes(value);
+  if (bytes && bytes.length > 0) {
+    return bytesToBase64(bytes);
+  }
+  return null;
+}
+
+async function normalizeModelRunResult(rawResult: unknown): Promise<Record<string, unknown>> {
+  if (typeof ReadableStream !== "undefined" && rawResult instanceof ReadableStream) {
+    const bytes = await streamToBytes(rawResult as ReadableStream<Uint8Array>);
+    return { result: { image: bytesToBase64(bytes) } };
+  }
+  if (typeof Response !== "undefined" && rawResult instanceof Response) {
+    const bytes = new Uint8Array(await rawResult.arrayBuffer());
+    return { result: { image: bytesToBase64(bytes) } };
+  }
+  if (typeof Blob !== "undefined" && rawResult instanceof Blob) {
+    const bytes = new Uint8Array(await rawResult.arrayBuffer());
+    return { result: { image: bytesToBase64(bytes) } };
+  }
+  const directBytes = binaryToBytes(rawResult);
+  if (directBytes) {
+    return { result: { image: bytesToBase64(directBytes) } };
+  }
+  if (rawResult && typeof rawResult === "object") {
+    const obj = rawResult as Record<string, unknown>;
+    const inner =
+      obj.result && typeof obj.result === "object"
+        ? (obj.result as Record<string, unknown>)
+        : obj;
+    const usage =
+      inner.usage && typeof inner.usage === "object"
+        ? inner.usage
+        : obj.usage && typeof obj.usage === "object"
+          ? obj.usage
+          : undefined;
+    const maybeImage = extractNormalizedImage(inner.image ?? obj.image);
+    if (maybeImage) {
+      return {
+        result: {
+          ...(inner !== obj ? inner : obj),
+          image: maybeImage,
+        },
+        ...(usage ? { usage } : {}),
+      };
+    }
+    if ("result" in obj) {
+      return obj;
+    }
+    return { result: obj, ...(usage ? { usage } : {}) };
+  }
+  return { result: { response: String(rawResult ?? "") } };
 }
 
 function buildAiRunOptions(
@@ -340,24 +429,117 @@ async function handleAiModelRun(
 
   try {
     const rawResult = await env.AI.run(model, inputs, runOptions);
-    if (typeof ReadableStream !== "undefined" && rawResult instanceof ReadableStream) {
-      const bytes = await streamToBytes(rawResult as ReadableStream<Uint8Array>);
-      return jsonResponse(200, { result: { image: bytesToBase64(bytes) } });
+    return jsonResponse(200, await normalizeModelRunResult(rawResult));
+  } catch (error) {
+    return mapAiErrorResponse(error);
+  }
+}
+
+async function handleAiImageGenerate(
+  request: Request,
+  env: ApiWorkerEnv,
+): Promise<Response> {
+  if (!env.AI) {
+    return jsonResponse(503, {
+      errors: [{ code: "AI_BINDING_MISSING", message: "Cloudflare Workers AI binding is not configured." }],
+    });
+  }
+  const rawBody = await request.text();
+  const verified = await verifySignedEdgePayload(request, rawBody, env, true);
+  if (!verified.ok) {
+    return jsonResponse(verified.status, {
+      errors: [{ code: verified.status, message: verified.error }],
+    });
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return jsonResponse(400, { errors: [{ code: 400, message: "Invalid JSON body." }] });
+  }
+
+  const rawModel = typeof parsed.model === "string" ? parsed.model.trim() : "";
+  const model = rawModel || DEFAULT_IMAGE_MODEL;
+  if (!MODEL_ID_RE.test(model)) {
+    return jsonResponse(400, { errors: [{ code: 400, message: "Invalid model identifier." }] });
+  }
+
+  const rawInputs =
+    parsed.inputs && typeof parsed.inputs === "object" && !Array.isArray(parsed.inputs)
+      ? (parsed.inputs as Record<string, unknown>)
+      : parsed;
+  const prompt = typeof rawInputs.prompt === "string" ? rawInputs.prompt.trim() : "";
+  if (!prompt || prompt.length > 4000) {
+    return jsonResponse(400, {
+      errors: [{ code: 400, message: "A valid image prompt (1-4000 chars) is required." }],
+    });
+  }
+
+  const isFlux = model.toLowerCase().includes("flux");
+  const inputs: Record<string, unknown> = { prompt };
+  const stepsVal =
+    typeof rawInputs.steps === "number" && Number.isFinite(rawInputs.steps)
+      ? Math.max(1, Math.min(20, Math.round(rawInputs.steps)))
+      : undefined;
+  const numStepsVal =
+    typeof rawInputs.num_steps === "number" && Number.isFinite(rawInputs.num_steps)
+      ? Math.max(1, Math.min(20, Math.round(rawInputs.num_steps)))
+      : stepsVal;
+
+  if (isFlux) {
+    if (stepsVal !== undefined) {
+      inputs.steps = Math.min(8, stepsVal);
     }
-    if (rawResult instanceof Uint8Array) {
-      return jsonResponse(200, { result: { image: bytesToBase64(rawResult) } });
+  } else {
+    if (numStepsVal !== undefined) inputs.num_steps = numStepsVal;
+    if (typeof rawInputs.width === "number" && Number.isFinite(rawInputs.width)) {
+      inputs.width = Math.max(256, Math.min(2048, Math.round(rawInputs.width)));
     }
-    if (rawResult instanceof ArrayBuffer) {
-      return jsonResponse(200, { result: { image: bytesToBase64(new Uint8Array(rawResult)) } });
+    if (typeof rawInputs.height === "number" && Number.isFinite(rawInputs.height)) {
+      inputs.height = Math.max(256, Math.min(2048, Math.round(rawInputs.height)));
     }
-    if (rawResult && typeof rawResult === "object") {
-      const obj = rawResult as Record<string, unknown>;
-      if ("result" in obj) {
-        return jsonResponse(200, obj);
+  }
+
+  const runOptions = buildAiRunOptions(parsed.gatewayId, parsed.metadata, env);
+
+  try {
+    const rawResult = await env.AI.run(model, inputs, runOptions);
+    if (typeof rawResult === "string") {
+      const cleaned = cleanBase64Image(rawResult);
+      if (!cleaned) {
+        return jsonResponse(502, {
+          errors: [{ code: "AI_BAD_RESULT", message: "Image model returned empty output." }],
+        });
       }
-      return jsonResponse(200, { result: obj });
+      return jsonResponse(200, {
+        result: { image: cleaned },
+        mime: "image/jpeg",
+        model,
+      });
     }
-    return jsonResponse(200, { result: { response: String(rawResult ?? "") } });
+
+    const normalized = await normalizeModelRunResult(rawResult);
+    const resultObj =
+      normalized.result && typeof normalized.result === "object"
+        ? (normalized.result as Record<string, unknown>)
+        : {};
+    const image = extractNormalizedImage(resultObj.image);
+    if (!image) {
+      return jsonResponse(502, {
+        errors: [{ code: "AI_BAD_RESULT", message: "Image model returned empty output." }],
+      });
+    }
+    return jsonResponse(200, {
+      result: { image },
+      mime: "image/jpeg",
+      model,
+      ...(normalized.usage && typeof normalized.usage === "object"
+        ? { usage: normalized.usage }
+        : resultObj.usage && typeof resultObj.usage === "object"
+          ? { usage: resultObj.usage }
+          : {}),
+    });
   } catch (error) {
     return mapAiErrorResponse(error);
   }
@@ -457,6 +639,83 @@ async function relayWebhookPost(
   }
 }
 
+async function handleAnalyticsSite(
+  request: Request,
+  env: ApiWorkerEnv,
+): Promise<Response> {
+  const rawBody = await request.text();
+  const verified = await verifySignedEdgePayload(request, rawBody, env, true);
+  if (!verified.ok) {
+    return jsonResponse(verified.status, {
+      ok: false,
+      error: verified.error,
+    });
+  }
+
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(rawBody) as Record<string, unknown>;
+  } catch {
+    return jsonResponse(400, { ok: false, error: "INVALID_JSON" });
+  }
+
+  const hostnames = normalizeAnalyticsHostnames(
+    Array.isArray(parsed.hostnames)
+      ? parsed.hostnames.filter((v): v is string => typeof v === "string")
+      : [],
+  );
+  if (hostnames.length === 0) {
+    return jsonResponse(400, { ok: false, error: "NO_HOSTNAMES" });
+  }
+
+  const apiToken = (
+    env.CLOUDFLARE_ANALYTICS_API_TOKEN ||
+    env.CLOUDFLARE_API_TOKEN ||
+    env.CF_API_TOKEN_DOMAINS ||
+    ""
+  ).trim();
+  if (!apiToken) {
+    return jsonResponse(503, { ok: false, error: "ANALYTICS_NOT_CONFIGURED" });
+  }
+
+  const range = normalizeAnalyticsRange(
+    typeof parsed.range === "string" ? parsed.range : undefined,
+  );
+  const zoneId =
+    typeof parsed.zoneId === "string" && parsed.zoneId.trim()
+      ? parsed.zoneId.trim()
+      : (env.CLOUDFLARE_ZONE_ID || env.CF_SAAS_ZONE_ID || "").trim() || undefined;
+  const rootDomain =
+    typeof parsed.rootDomain === "string" && parsed.rootDomain.trim()
+      ? parsed.rootDomain.trim()
+      : (env.ROOT_DOMAIN ?? "get-on.tech").trim();
+
+  const analytics = await fetchCloudflareSiteAnalytics({
+    apiToken,
+    hostnames,
+    range,
+    zoneId,
+    rootDomain,
+  });
+
+  if (!analytics.ok) {
+    const status =
+      analytics.errorCode === "CLOUDFLARE_UNAUTHORIZED"
+        ? 403
+        : analytics.errorCode === "ANALYTICS_NOT_CONFIGURED" ||
+            analytics.errorCode === "ZONE_NOT_CONFIGURED"
+          ? 503
+          : 502;
+    return jsonResponse(status, {
+      ok: false,
+      error: analytics.errorCode ?? "CLOUDFLARE_GRAPHQL_ERROR",
+      message: analytics.errorMessage,
+    });
+  }
+
+  return jsonResponse(200, analytics as unknown as Record<string, unknown>);
+}
+
 async function dispatchJobsToOrigin(
   env: ApiWorkerEnv,
   jobs: string[],
@@ -525,6 +784,13 @@ export function createApiWorker() {
         return handleAiChatCompletions(request, env);
       }
 
+      if (pathname === "/ai/images/generate") {
+        if (request.method !== "POST") {
+          return jsonResponse(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, { Allow: "POST" });
+        }
+        return handleAiImageGenerate(request, env);
+      }
+
       if (pathname === "/ai/run" || pathname.startsWith("/ai/run/")) {
         if (request.method !== "POST") {
           return jsonResponse(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, { Allow: "POST" });
@@ -550,6 +816,13 @@ export function createApiWorker() {
           return jsonResponse(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, { Allow: "POST" });
         }
         return relaySignedPost(request, "/api/stats/ingest", env);
+      }
+
+      if (pathname === "/analytics/site") {
+        if (request.method !== "POST") {
+          return jsonResponse(405, { ok: false, error: "METHOD_NOT_ALLOWED" }, { Allow: "POST" });
+        }
+        return handleAnalyticsSite(request, env);
       }
 
       if (pathname === "/webhooks/ses" || pathname === "/api/webhooks/ses") {

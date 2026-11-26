@@ -384,5 +384,242 @@ describe("api-worker", () => {
       undefined,
     );
   });
+
+  it("handles signed /ai/images/generate requests and normalizes Response, byte array, and data-URI outputs", async () => {
+    const worker = createApiWorker();
+    const secret = "ai-image-worker-secret";
+    const pngBytes = new Uint8Array([137, 80, 78, 71]);
+    const runMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(pngBytes, { status: 200 }))
+      .mockResolvedValueOnce({ image: "data:image/jpeg;base64,/9j/4AAQ" })
+      .mockResolvedValueOnce({ result: { image: [137, 80, 78, 71] } });
+
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: secret,
+      AI_GATEWAY_ID: "gw-images",
+      AI: { run: runMock },
+    };
+
+    const unsignedRes = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/images/generate", {
+        method: "POST",
+        body: JSON.stringify({ prompt: "Fresh croissants" }),
+      }),
+      env,
+    );
+    expect(unsignedRes.status).toBe(401);
+
+    const signAndPost = async (bodyObj: Record<string, unknown>) => {
+      const body = JSON.stringify(bodyObj);
+      const ts = String(Date.now());
+      const host = "api.get-on.tech";
+      const sig = await signWorkerRequest(secret, {
+        ts,
+        host,
+        ip: "",
+        bodyHash: await sha256Hex(body),
+      });
+      return worker.fetch(
+        new Request("https://api.get-on.tech/ai/images/generate", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "x-gs-host": host,
+            "x-gs-ip": "",
+            "x-gs-ts": ts,
+            "x-gs-sig": sig,
+          },
+          body,
+        }),
+        env,
+      );
+    };
+
+    const fluxRes = await signAndPost({
+      prompt: "Fresh croissants",
+      steps: 4,
+      width: 1024,
+      height: 1024,
+      metadata: { task: "image.generate" },
+    });
+    expect(fluxRes.status).toBe(200);
+    expect(await fluxRes.json()).toEqual({
+      result: { image: "iVBORw==" },
+      mime: "image/jpeg",
+      model: "@cf/black-forest-labs/flux-1-schnell",
+    });
+    expect(runMock).toHaveBeenNthCalledWith(
+      1,
+      "@cf/black-forest-labs/flux-1-schnell",
+      { prompt: "Fresh croissants", steps: 4 },
+      {
+        gateway: {
+          id: "gw-images",
+          skipCache: true,
+          collectLog: false,
+          metadata: { task: "image.generate" },
+        },
+      },
+    );
+
+    const sdRes = await signAndPost({
+      model: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+      prompt: "Minimalist studio",
+      steps: 12,
+      width: 768,
+      height: 768,
+    });
+    expect(sdRes.status).toBe(200);
+    expect(await sdRes.json()).toEqual({
+      result: { image: "/9j/4AAQ" },
+      mime: "image/jpeg",
+      model: "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+    });
+    expect(runMock).toHaveBeenNthCalledWith(
+      2,
+      "@cf/stabilityai/stable-diffusion-xl-base-1.0",
+      { prompt: "Minimalist studio", num_steps: 12, width: 768, height: 768 },
+      {
+        gateway: {
+          id: "gw-images",
+          skipCache: true,
+          collectLog: false,
+        },
+      },
+    );
+
+    const arrayBytesRes = await signAndPost({
+      prompt: "Coffee bar",
+      steps: 4,
+    });
+    expect(arrayBytesRes.status).toBe(200);
+    expect(await arrayBytesRes.json()).toEqual({
+      result: { image: "iVBORw==" },
+      mime: "image/jpeg",
+      model: "@cf/black-forest-labs/flux-1-schnell",
+    });
+  });
+
+  it("serves signed /analytics/site queries from Cloudflare GraphQL Analytics", async () => {
+    const worker = createApiWorker();
+    const secret = "analytics-worker-secret";
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: secret,
+      CLOUDFLARE_ANALYTICS_API_TOKEN: "cf-analytics-token",
+      ROOT_DOMAIN: "get-on.tech",
+    };
+
+    const unsigned = await worker.fetch(
+      new Request("https://api.get-on.tech/analytics/site", {
+        method: "POST",
+        body: JSON.stringify({ hostnames: ["rosebakery.get-on.tech"], range: "7d" }),
+      }),
+      env,
+    );
+    expect(unsigned.status).toBe(401);
+
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/client/v4/zones?")) {
+        return new Response(
+          JSON.stringify({ success: true, result: [{ id: "zone-auto-123" }] }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      if (url.includes("/client/v4/graphql")) {
+        const body = JSON.parse(String(init?.body)) as {
+          variables: { zoneTag: string; filter: { clientRequestHTTPHost_in: string[] } };
+        };
+        expect(body.variables.zoneTag).toBe("zone-auto-123");
+        expect(body.variables.filter.clientRequestHTTPHost_in).toEqual([
+          "rosebakery.get-on.tech",
+          "rosebakery.com",
+        ]);
+        const today = new Date().toISOString().slice(0, 10);
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                zones: [
+                  {
+                    daily: [
+                      { count: 14, sum: { visits: 9 }, dimensions: { date: today } },
+                    ],
+                    countries: [
+                      { count: 10, sum: { visits: 6 }, dimensions: { clientCountryName: "KE" } },
+                      { count: 4, sum: { visits: 3 }, dimensions: { clientCountryName: "US" } },
+                    ],
+                    referrers: [
+                      { count: 6, sum: { visits: 4 }, dimensions: { clientRefererHost: "" } },
+                      { count: 5, sum: { visits: 3 }, dimensions: { clientRefererHost: "www.google.com" } },
+                      { count: 3, sum: { visits: 2 }, dimensions: { clientRefererHost: "t.co" } },
+                    ],
+                    pages: [
+                      { count: 11, sum: { visits: 7 }, dimensions: { clientRequestPath: "/" } },
+                      { count: 2, sum: { visits: 2 }, dimensions: { clientRequestPath: "/_gs/stats" } },
+                      { count: 3, sum: { visits: 2 }, dimensions: { clientRequestPath: "/menu" } },
+                    ],
+                    devices: [
+                      { count: 9, sum: { visits: 6 }, dimensions: { clientDeviceType: "mobile" } },
+                      { count: 5, sum: { visits: 3 }, dimensions: { clientDeviceType: "desktop" } },
+                    ],
+                  },
+                ],
+              },
+            },
+          }),
+          { status: 200, headers: { "content-type": "application/json" } },
+        );
+      }
+      return new Response("Not found", { status: 404 });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    const body = JSON.stringify({
+      hostnames: ["rosebakery.get-on.tech", "rosebakery.com"],
+      range: "7d",
+    });
+    const ts = String(Date.now());
+    const host = "api.get-on.tech";
+    const sig = await signWorkerRequest(secret, {
+      ts,
+      host,
+      ip: "",
+      bodyHash: await sha256Hex(body),
+    });
+
+    const res = await worker.fetch(
+      new Request("https://api.get-on.tech/analytics/site", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body,
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    const json = (await res.json()) as {
+      ok: boolean;
+      visitors: number;
+      views: number;
+      countries: Array<{ code: string; name: string; visitors: number }>;
+      referrers: Array<{ source: string; visitors: number }>;
+      pages: Array<{ path: string }>;
+      devices: Array<{ device: string }>;
+    };
+    expect(json.ok).toBe(true);
+    expect(json.visitors).toBe(9);
+    expect(json.views).toBe(14);
+    expect(json.countries[0]).toMatchObject({ code: "KE", name: "Kenya", visitors: 6 });
+    expect(json.referrers.map((r) => r.source)).toEqual(["Direct", "google.com", "x.com"]);
+    expect(json.pages.map((p) => p.path)).toEqual(["/", "/menu"]);
+    expect(json.devices.map((d) => d.device)).toEqual(["Mobile", "Desktop"]);
+  });
 });
 

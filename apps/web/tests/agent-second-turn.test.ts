@@ -1,8 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+import { AiError } from "@get-on/ai";
 
 const insertedIdempotencyKeys: string[] = [];
 const rpcCalls: Array<{ fn: string; params: Record<string, unknown> }> = [];
+const updatedRequests: Array<{ id: string; patch: Record<string, unknown> }> = [];
 const seenKeys = new Set<string>();
+const chatQueue: Array<() => Promise<{
+  text: string;
+  toolCalls: Array<{ id: string; name: string; arguments: unknown }>;
+  usage: { inputTokens?: number; outputTokens?: number; neurons?: number };
+  modelId: string;
+  raw?: unknown;
+}>> = [];
+let moderationEnabledMock = false;
 let reqCounter = 0;
 
 vi.mock("@/lib/supabase/admin", () => ({
@@ -26,8 +37,11 @@ vi.mock("@/lib/supabase/admin", () => ({
               }),
             };
           },
-          update: () => ({
-            eq: async () => ({ error: null }),
+          update: (patch: Record<string, unknown>) => ({
+            eq: async (_col: string, id: string) => {
+              updatedRequests.push({ id, patch });
+              return { error: null };
+            },
           }),
         };
       }
@@ -37,7 +51,7 @@ vi.mock("@/lib/supabase/admin", () => ({
     },
     rpc: async (fn: string, params: Record<string, unknown>) => {
       rpcCalls.push({ fn, params });
-      if (fn === "ai_settle") return { data: 1, error: null };
+      if (fn === "ai_settle") return { data: Number(params.p_actual ?? 1), error: null };
       return { data: null, error: null };
     },
   }),
@@ -46,7 +60,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 vi.mock("@/lib/agent/settings", () => ({
   getAssistantFeature: async () => ({
     enabled: true,
-    turnCapCredits: 3,
+    turnCapCredits: 5,
     allowedRoles: ["owner", "admin"],
   }),
 }));
@@ -56,7 +70,7 @@ vi.mock("@/lib/ai/settings", () => ({
     enabled: true,
     imagesEnabled: true,
     gatewayId: "get-on-gw",
-    moderationEnabled: false,
+    moderationEnabled: moderationEnabledMock,
     creditNeurons: 100,
     dailyCapCredits: 5000,
   }),
@@ -72,6 +86,23 @@ vi.mock("@/lib/ai/settings", () => ({
       contextTokens: 32000,
       maxOutputTokens: 900,
       supportsJson: true,
+      supportsVision: false,
+      enabled: true,
+      fallbackId: null,
+      notes: null,
+      verifiedAt: null,
+    },
+    {
+      id: "model-guard",
+      provider: "workers-ai",
+      modelId: "@cf/meta/llama-guard-3-8b",
+      purposes: ["guard"],
+      neuronsPerMInput: 200,
+      neuronsPerMOutput: 200,
+      neuronsPerImage: null,
+      contextTokens: 8192,
+      maxOutputTokens: 256,
+      supportsJson: false,
       supportsVision: false,
       enabled: true,
       fallbackId: null,
@@ -113,27 +144,45 @@ vi.mock("@/lib/ai/config", () => ({
 vi.mock("@/lib/ai/provider-factory", () => ({
   createAiProvider: () => ({
     id: "fake",
-    chatWithTools: async () => ({
-      text: "Here is your answer.",
-      toolCalls: [],
-      usage: { inputTokens: 10, outputTokens: 5 },
-      modelId: "@cf/meta/llama-3.1-8b-instruct",
-      raw: {},
-    }),
+    chatWithTools: async () => {
+      const next = chatQueue.shift();
+      if (next) return next();
+      return {
+        text: "Here is your answer.",
+        toolCalls: [],
+        usage: { inputTokens: 10, outputTokens: 5 },
+        modelId: "@cf/meta/llama-3.1-8b-instruct",
+        raw: {},
+      };
+    },
   }),
 }));
 
 vi.mock("@/lib/ai/pipeline", () => ({
-  moderateText: async () => ({ safe: true, categories: [] }),
+  moderateText: async () => ({
+    safe: true,
+    categories: [],
+    usage: { inputTokens: 15, outputTokens: 3, totalTokens: 18 },
+  }),
 }));
 
 import { runAgentLoop } from "@/lib/agent/loop";
 
-describe("agent second turn idempotency", () => {
+const baseContext = {
+  route: "/dashboard",
+  pageTitle: "Dashboard",
+  projectName: "My Site",
+  teamName: "Acme",
+};
+
+describe("agent second turn & credit safety", () => {
   beforeEach(() => {
     insertedIdempotencyKeys.length = 0;
     rpcCalls.length = 0;
+    updatedRequests.length = 0;
+    chatQueue.length = 0;
     seenKeys.clear();
+    moderationEnabledMock = false;
     reqCounter = 0;
   });
 
@@ -145,12 +194,7 @@ describe("agent second turn idempotency", () => {
       projectId: null,
       turnId: "msg-turn-1",
       tools: [],
-      context: {
-        route: "/dashboard",
-        pageTitle: "Dashboard",
-        projectName: "My Site",
-        teamName: "Acme",
-      },
+      context: baseContext,
     });
 
     const second = await runAgentLoop({
@@ -160,12 +204,7 @@ describe("agent second turn idempotency", () => {
       projectId: null,
       turnId: "msg-turn-2",
       tools: [],
-      context: {
-        route: "/dashboard",
-        pageTitle: "Dashboard",
-        projectName: "My Site",
-        teamName: "Acme",
-      },
+      context: baseContext,
     });
 
     expect(first.ok).toBe(true);
@@ -183,12 +222,7 @@ describe("agent second turn idempotency", () => {
       userId: "user-1",
       projectId: null,
       tools: [],
-      context: {
-        route: "/dashboard",
-        pageTitle: "Dashboard",
-        projectName: "My Site",
-        teamName: "Acme",
-      },
+      context: baseContext,
     });
 
     const second = await runAgentLoop({
@@ -197,17 +231,106 @@ describe("agent second turn idempotency", () => {
       userId: "user-1",
       projectId: null,
       tools: [],
-      context: {
-        route: "/dashboard",
-        pageTitle: "Dashboard",
-        projectName: "My Site",
-        teamName: "Acme",
-      },
+      context: baseContext,
     });
 
     expect(first.ok).toBe(true);
     expect(second.ok).toBe(true);
     expect(insertedIdempotencyKeys).toHaveLength(2);
     expect(insertedIdempotencyKeys[0]).not.toBe(insertedIdempotencyKeys[1]);
+  });
+
+  it("releases ALL reserved credits and charges 0 when step 2 of a multi-step turn fails", async () => {
+    moderationEnabledMock = true;
+    chatQueue.push(
+      async () => ({
+        text: "",
+        toolCalls: [{ id: "tc-1", name: "lookup_site", arguments: {} }],
+        usage: { inputTokens: 120, outputTokens: 25 },
+        modelId: "@cf/meta/llama-3.1-8b-instruct",
+      }),
+      async () => {
+        throw new AiError("AI_TIMEOUT");
+      },
+    );
+
+    const res = await runAgentLoop({
+      conversationId: "conv-fail",
+      teamId: "team-1",
+      userId: "user-1",
+      projectId: null,
+      turnId: "turn-fail-1",
+      tools: [
+        {
+          name: "lookup_site",
+          schema: z.object({}),
+          description: "Inspect website",
+          jsonSchema: { type: "object", properties: {} },
+          execute: async () => ({ ok: true, data: { pages: 3 } }),
+        },
+      ],
+      context: baseContext,
+    });
+
+    expect(res.ok).toBe(false);
+    expect(res.credits).toBe(0);
+    expect(rpcCalls.some((c) => c.fn === "ai_settle")).toBe(false);
+    const releases = rpcCalls.filter((c) => c.fn === "ai_release");
+    expect(releases).toHaveLength(2);
+
+    const usageCalls = rpcCalls.filter((c) => c.fn === "ai_record_usage");
+    expect(usageCalls.length).toBeGreaterThanOrEqual(1);
+    expect(usageCalls.every((c) => c.params.p_credits === 0)).toBe(true);
+    const totalNeurons = usageCalls.reduce((sum, c) => sum + Number(c.params.p_neurons ?? 0), 0);
+    expect(totalNeurons).toBeGreaterThan(0);
+  });
+
+  it("records full token and neuron breakdown on succeeded turns and retries blank output", async () => {
+    moderationEnabledMock = true;
+    chatQueue.push(
+      async () => ({
+        text: "   ",
+        toolCalls: [],
+        usage: { inputTokens: 80, outputTokens: 2 },
+        modelId: "@cf/meta/llama-3.1-8b-instruct",
+      }),
+      async () => ({
+        text: "All done — your homepage headline is ready.",
+        toolCalls: [],
+        usage: { inputTokens: 90, outputTokens: 18 },
+        modelId: "@cf/meta/llama-3.1-8b-instruct",
+      }),
+    );
+
+    const res = await runAgentLoop({
+      conversationId: "conv-ok",
+      teamId: "team-1",
+      userId: "user-1",
+      projectId: null,
+      turnId: "turn-ok-1",
+      tools: [],
+      context: baseContext,
+    });
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.text).toBe("All done — your homepage headline is ready.");
+      expect(res.credits).toBeGreaterThan(0);
+    }
+    const settles = rpcCalls.filter((c) => c.fn === "ai_settle");
+    expect(settles).toHaveLength(2);
+
+    const req1Final = updatedRequests.find(
+      (u) => u.id === "req-1" && u.patch.status === "succeeded",
+    );
+    expect(req1Final?.patch.usage).toMatchObject({
+      inputTokens: 80,
+      outputTokens: 2,
+      moderationInputTokens: 15,
+      moderationOutputTokens: 3,
+      moderationTotalTokens: 18,
+      totalTokens: 100,
+    });
+    expect(Number((req1Final?.patch.usage as Record<string, unknown>).totalNeurons)).toBeGreaterThan(0);
   });
 });

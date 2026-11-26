@@ -186,7 +186,7 @@ export default async function AdminAiPage({
                 <span>
                   <span className="block text-sm font-semibold text-text">AI pictures</span>
                   <span className="text-sm text-text-muted">
-                    Also needs AI_IMAGES_ENABLED=true.
+                    Allow teams to generate pictures unless AI_IMAGES_ENABLED=false.
                   </span>
                 </span>
               </label>

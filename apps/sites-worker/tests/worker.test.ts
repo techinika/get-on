@@ -454,5 +454,60 @@ describe("health, CSP, and interactive endpoints", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  it("forwards Cloudflare country and external referrerHost on /_gs/stats", async () => {
+    const pending = context();
+    const env: WorkerEnv = {
+      ...liveEnv(),
+      WORKER_SHARED_SECRET: "worker-secret-test-value",
+      API_ORIGIN: "https://api.get-on.tech",
+    };
+    const worker = createSiteWorker({ cache: null });
+
+    const originalFetch = globalThis.fetch;
+    let capturedUrl = "";
+    let capturedBody: Record<string, unknown> = {};
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+      capturedUrl = String(input);
+      capturedBody = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }) as typeof fetch;
+
+    try {
+      const res = await worker.fetch(
+        requestFor("rosebakery.get-on.tech", "/_gs/stats", {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            "cf-ipcountry": "ke",
+          },
+          body: JSON.stringify({
+            path: "/menu",
+            referrerHost: "www.google.com",
+            utmSource: "newsletter",
+          }),
+        }),
+        env,
+        pending.ctx,
+      );
+      await Promise.all(pending.pending);
+      expect(res.status).toBe(204);
+      expect(capturedUrl).toBe("https://api.get-on.tech/api/stats/ingest");
+      expect(capturedBody).toMatchObject({
+        kind: "view",
+        siteId: "site-1",
+        path: "/menu",
+        country: "KE",
+        referrerHost: "www.google.com",
+        params: {
+          country: "KE",
+          referrer: "www.google.com",
+          utm_source: "newsletter",
+        },
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 

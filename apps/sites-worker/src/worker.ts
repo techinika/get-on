@@ -109,6 +109,11 @@ async function serve(
     request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ??
     "";
 
+  const cfCountry =
+    typeof (request as Request & { cf?: { country?: unknown } }).cf?.country === "string"
+      ? String((request as Request & { cf?: { country?: unknown } }).cf?.country)
+      : request.headers.get("cf-ipcountry") ?? undefined;
+
   const response = await handleSiteRequest(request, store, {
     rootDomain,
     rawPath: rawPathOf(request.url),
@@ -118,6 +123,7 @@ async function serve(
     appOrigin: env.APP_ORIGIN,
     apiOrigin: env.API_ORIGIN,
     clientIp,
+    country: cfCountry,
     waitUntil: ctx?.waitUntil.bind(ctx),
     statsSaltSecret: env.STATS_SALT_SECRET,
   });

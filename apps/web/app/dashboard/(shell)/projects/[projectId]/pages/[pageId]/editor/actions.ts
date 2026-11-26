@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { blockSchema, countNodes, customCodeLimits, migrateV4ToV5, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
+import { blockSchema, countNodes, customCodeLimits, migrateV4ToV5, preparePageContentForSave, smartNodeFromBlock, validateContentV5, type ContentNode, type PageContentV5 } from "@get-on/blocks";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentTeam } from "@/lib/team";
 import { publicMediaUrl } from "@/lib/media";
@@ -57,7 +57,7 @@ export async function savePageContent(input: {
     return { ok: false, code: "FORBIDDEN", message: "Only editors, admins and the owner can change this page." };
   }
 
-  const validated = validateContentV5(input.content);
+  const validated = preparePageContentForSave(input.content);
   if (!validated.ok) {
     return {
       ok: false,

@@ -47,11 +47,23 @@ function usageFrom(value: unknown): AiUsage {
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
       : {};
-  const input = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
-  const output = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
+  const input = Number(usage.prompt_tokens ?? usage.input_tokens ?? usage.inputTokens ?? 0);
+  const output = Number(usage.completion_tokens ?? usage.output_tokens ?? usage.outputTokens ?? 0);
+  const total = Number(usage.total_tokens ?? usage.totalTokens ?? 0);
+  const neurons = Number(usage.neurons ?? usage.total_neurons ?? usage.totalNeurons ?? 0);
+  const inputTokens = Number.isFinite(input) && input > 0 ? Math.round(input) : undefined;
+  const outputTokens = Number.isFinite(output) && output > 0 ? Math.round(output) : undefined;
+  const totalTokens =
+    Number.isFinite(total) && total > 0
+      ? Math.round(total)
+      : inputTokens !== undefined || outputTokens !== undefined
+        ? (inputTokens ?? 0) + (outputTokens ?? 0)
+        : undefined;
   return {
-    inputTokens: Number.isFinite(input) && input > 0 ? input : undefined,
-    outputTokens: Number.isFinite(output) && output > 0 ? output : undefined,
+    ...(inputTokens !== undefined ? { inputTokens } : {}),
+    ...(outputTokens !== undefined ? { outputTokens } : {}),
+    ...(totalTokens !== undefined ? { totalTokens } : {}),
+    ...(Number.isFinite(neurons) && neurons > 0 ? { neurons: Math.ceil(neurons) } : {}),
   };
 }
 
@@ -225,6 +237,18 @@ export class WorkersAiProvider implements AiProvider {
         body: JSON.stringify(body),
         signal: timer.signal,
       });
+
+      const contentType = (response.headers.get("content-type") ?? "").toLowerCase();
+      if (
+        response.ok &&
+        (contentType.startsWith("image/") || contentType.startsWith("application/octet-stream"))
+      ) {
+        const bytes = await response.arrayBuffer();
+        return {
+          result: { image: Buffer.from(bytes).toString("base64") },
+          mime: contentType.split(";")[0]?.trim() || "image/jpeg",
+        };
+      }
 
       const text = await response.text();
       let parsed: unknown = null;
@@ -400,12 +424,25 @@ export class WorkersAiProvider implements AiProvider {
         details: { reason: "image_model_missing" },
       });
     }
-    const response = await this.request(
-      `/ai/run/${input.modelId}`,
-      { prompt: input.prompt, steps: input.steps },
-      timeoutMs,
-      input.metadata,
-    );
+    const response = this.usesWorkerBackend()
+      ? await this.workerRequest(
+          "/ai/images/generate",
+          {
+            model: input.modelId,
+            prompt: input.prompt,
+            ...(input.steps !== undefined ? { steps: input.steps } : {}),
+            ...(input.width !== undefined ? { width: input.width } : {}),
+            ...(input.height !== undefined ? { height: input.height } : {}),
+          },
+          timeoutMs,
+          input.metadata,
+        )
+      : await this.request(
+          `/ai/run/${input.modelId}`,
+          { prompt: input.prompt, steps: input.steps },
+          timeoutMs,
+          input.metadata,
+        );
     const envelope =
       response && typeof response === "object"
         ? (response as Record<string, unknown>)
@@ -414,19 +451,29 @@ export class WorkersAiProvider implements AiProvider {
       envelope.result && typeof envelope.result === "object"
         ? (envelope.result as Record<string, unknown>)
         : {};
-    const image =
+    const rawImage =
       typeof result.image === "string"
         ? result.image
         : typeof envelope.image === "string"
           ? envelope.image
-          : "";
+          : typeof envelope.result === "string"
+            ? envelope.result
+            : "";
+    const image = rawImage
+      .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "")
+      .replace(/\s+/g, "");
     if (!image) {
       throw new AiError("AI_BAD_RESULT");
     }
+    const mime =
+      typeof envelope.mime === "string" && envelope.mime.startsWith("image/")
+        ? envelope.mime
+        : "image/jpeg";
+    const providerUsage = usageFrom(envelope.usage ?? result.usage);
     return {
       imageBase64: image,
-      mime: "image/jpeg",
-      usage: { images: 1 },
+      mime,
+      usage: { ...providerUsage, images: 1 },
       modelId: input.modelId,
       raw: response,
     };
@@ -454,6 +501,7 @@ export class WorkersAiProvider implements AiProvider {
       result && typeof result === "object"
         ? (result as Record<string, unknown>)
         : {};
+    const usage = usageFrom(envelope.usage ?? value.usage);
     const raw =
       value.response ??
       result ??
@@ -467,6 +515,7 @@ export class WorkersAiProvider implements AiProvider {
         categories: Array.isArray(object.categories)
           ? object.categories.map(String)
           : [],
+        usage,
         raw: response,
       };
     }
@@ -477,7 +526,7 @@ export class WorkersAiProvider implements AiProvider {
       .split(/\s+/)
       .filter((part) => /^S\d{1,2}$/i.test(part))
       .map((part) => part.toUpperCase());
-    return { safe, categories, raw: response };
+    return { safe, categories, usage, raw: response };
   }
 
   async chatWithTools(

@@ -25,7 +25,7 @@ function number(value: string | undefined, fallback: number): number {
 }
 
 export function aiConfig(): AiConfig {
-  const workerUrl = (
+  const explicitWorkerUrl = (
     process.env.AI_WORKER_URL ||
     process.env.API_ORIGIN ||
     ""
@@ -33,11 +33,23 @@ export function aiConfig(): AiConfig {
     .trim()
     .replace(/\/+$/, "");
   const workerSecret = (process.env.WORKER_SHARED_SECRET ?? "").trim();
+  const appOrigin = (
+    process.env.APP_ORIGIN ||
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    ""
+  ).trim();
+  const inferredWorkerUrl =
+    !explicitWorkerUrl &&
+    workerSecret &&
+    /(?:^|\/\/)(?:www\.)?get-on\.tech(?:\/|$)/i.test(appOrigin)
+      ? "https://api.get-on.tech"
+      : "";
+  const workerUrl = explicitWorkerUrl || inferredWorkerUrl;
 
   return {
     provider: process.env.AI_PROVIDER === "workers-ai" ? "workers-ai" : "fake",
     enabled: process.env.AI_ENABLED !== "false",
-    imagesEnabled: process.env.AI_IMAGES_ENABLED === "true",
+    imagesEnabled: process.env.AI_IMAGES_ENABLED !== "false",
     accountId: process.env.CF_AI_ACCOUNT_ID ?? "",
     apiToken: process.env.CF_AI_API_TOKEN ?? "",
     gatewayId: process.env.AI_GATEWAY_ID ?? "",

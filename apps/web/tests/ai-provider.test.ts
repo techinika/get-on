@@ -38,7 +38,7 @@ describe("Workers AI provider", () => {
     });
 
     expect(result.value).toBe("Hello");
-    expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 3 });
+    expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 3, totalTokens: 15 });
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const headers = init.headers as Record<string, string>;
     expect(headers["cf-aig-gateway-id"]).toBe("gateway");
@@ -169,7 +169,7 @@ describe("Workers AI provider", () => {
     });
 
     expect(textResult.value).toBe("Worker reply");
-    expect(textResult.usage).toEqual({ inputTokens: 9, outputTokens: 4 });
+    expect(textResult.usage).toEqual({ inputTokens: 9, outputTokens: 4, totalTokens: 13 });
 
     const [chatUrl, chatInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(chatUrl).toBe("https://api.get-on.tech/ai/v1/chat/completions");
@@ -208,6 +208,57 @@ describe("Workers AI provider", () => {
       inputs: { messages: [{ role: "user", content: "Check me" }] },
       gatewayId: "get-on-gw",
     });
+
+    const imgFetchMock = vi.fn(async () =>
+      jsonResponse({
+        result: { image: "data:image/jpeg;base64,/9j/4AAQ" },
+        mime: "image/jpeg",
+      }),
+    );
+    vi.stubGlobal("fetch", imgFetchMock);
+    const generated = await provider.generateImage({
+      modelId: "@cf/black-forest-labs/flux-1-schnell",
+      prompt: "Artisan sourdough display",
+      width: 1024,
+      height: 1024,
+      steps: 4,
+      metadata: { team: "t1", task: "image.generate" },
+    });
+    expect(generated.imageBase64).toBe("/9j/4AAQ");
+    expect(generated.mime).toBe("image/jpeg");
+    const [imgUrl, imgInit] = imgFetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(imgUrl).toBe("https://api.get-on.tech/ai/images/generate");
+    const imgHeaders = imgInit.headers as Record<string, string>;
+    expect(imgHeaders["x-gs-sig"]).toBeTruthy();
+    expect(JSON.parse(String(imgInit.body))).toEqual({
+      model: "@cf/black-forest-labs/flux-1-schnell",
+      prompt: "Artisan sourdough display",
+      steps: 4,
+      width: 1024,
+      height: 1024,
+      gatewayId: "get-on-gw",
+      metadata: { team: "t1", task: "image.generate" },
+    });
+  });
+
+  it("handles raw binary image/* responses from direct Cloudflare REST calls", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(new Uint8Array([137, 80, 78, 71]), {
+          status: 200,
+          headers: { "content-type": "image/png" },
+        }),
+      ),
+    );
+    const result = await new WorkersAiProvider(config).generateImage({
+      modelId: "@cf/black-forest-labs/flux-1-schnell",
+      prompt: "Coffee cup",
+      steps: 4,
+    });
+    expect(result.imageBase64).toBe("iVBORw==");
+    expect(result.mime).toBe("image/png");
   });
 });
+
 

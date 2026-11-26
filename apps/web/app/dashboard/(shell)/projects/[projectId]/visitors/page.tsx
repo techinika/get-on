@@ -12,20 +12,27 @@ type Params = { params: Promise<{ projectId: string }> };
 export default async function VisitorsPage({ params }: Params) {
   const { projectId } = await params;
   const current = await getCurrentTeam();
+  let projectName = "your website";
   let published = false;
   let counting = true;
-  let planHistoryMonths: number | null = 90;
+  let planHistoryDays: number | null = 90;
   let plan = "Free";
 
   if (current) {
     const supabase = await createClient();
-    const [{ data: project }, { data: settings }, { data: planRow }] =
+    const [{ data: project }, { data: livePublish }, { data: settings }, { data: planRow }] =
       await Promise.all([
         supabase
           .from("projects")
-          .select("status")
+          .select("name, status")
           .eq("id", projectId)
           .eq("team_id", current.team.teamId)
+          .maybeSingle(),
+        supabase
+          .from("publishes")
+          .select("id")
+          .eq("project_id", projectId)
+          .eq("status", "live")
           .maybeSingle(),
         supabase
           .from("project_settings")
@@ -34,12 +41,15 @@ export default async function VisitorsPage({ params }: Params) {
           .maybeSingle(),
         supabase
           .from("plans")
-          .select("name, priority_class, priority_label")
+          .select("name, priority_class")
           .eq("id", current.team.planId)
           .maybeSingle(),
       ]);
 
-    published = project?.status === "published";
+    if (typeof project?.name === "string" && project.name.trim()) {
+      projectName = project.name.trim();
+    }
+    published = project?.status === "published" || Boolean(livePublish?.id);
     counting = settings?.stats_enabled !== false;
 
     const historyMap: Record<string, number | null> = {
@@ -50,7 +60,7 @@ export default async function VisitorsPage({ params }: Params) {
     };
     plan = planRow?.name ?? PLAN_BY_ID[current.team.planId]?.name ?? "Free";
     const key = String(planRow?.priority_class ?? current.team.planId);
-    planHistoryMonths = key in historyMap ? (historyMap[key] ?? null) : 90;
+    planHistoryDays = key in historyMap ? (historyMap[key] ?? null) : 90;
   }
 
   return (
@@ -61,11 +71,11 @@ export default async function VisitorsPage({ params }: Params) {
           { label: "Visitors" },
         ]}
         title="Visitors"
-        description="How many people visit {project name}."
+        description={`How many people visit ${projectName} and where they come from.`}
       />
 
-      <AppCard className="max-w-[960px] p-6">
-        {!published ? (
+      {!published ? (
+        <AppCard className="max-w-[960px] p-6">
           <div className="flex flex-col items-start gap-3">
             <h2 className="text-[17px] font-semibold text-text">Publish your website to start counting</h2>
             <p className="text-[15px] text-text-muted">
@@ -78,11 +88,14 @@ export default async function VisitorsPage({ params }: Params) {
               Go to publishing
             </Link>
           </div>
-        ) : !counting ? (
+        </AppCard>
+      ) : !counting ? (
+        <AppCard className="max-w-[960px] p-6">
           <div className="flex flex-col items-start gap-3">
             <h2 className="text-[17px] font-semibold text-text">Visitor counting is off</h2>
             <p className="text-[15px] text-text-muted">
-              Turn it on to see how many people visit your website. Numbers are kept for {planHistoryMonths} months.
+              Turn it on to see how many people visit your website and where they come from.
+              {planHistoryDays !== null ? ` Numbers are kept for ${planHistoryDays} days.` : ""}
             </p>
             <Link
               href={`/dashboard/projects/${projectId}/settings/analytics`}
@@ -91,38 +104,21 @@ export default async function VisitorsPage({ params }: Params) {
               Turn counting on
             </Link>
           </div>
-        ) : (
-          <>
-            <div className="flex flex-col items-start gap-3">
-              <h2 className="text-[17px] font-semibold text-text">No visitors yet</h2>
-              <p className="text-[15px] text-text-muted">
-                When people visit your website, their visits show up here within a few minutes. Numbers are kept for {planHistoryMonths} months and never include personal details.
-              </p>
-              {planHistoryMonths !== null && (
-                <p className="text-[14px] text-text-muted">
-                  Your {plan} plan shows {planHistoryMonths} months of history. Upgrade to see older numbers.
-                </p>
-              )}
-            </div>
+        </AppCard>
+      ) : (
+        <div className="flex max-w-[1040px] flex-col gap-6">
+          <VisitorStats projectId={projectId} />
 
-            <VisitorStats projectId={projectId} />
-
-            {/* Plan history strip at bottom */}
-            {planHistoryMonths !== null && (
-              <div className="mt-8 pt-8 border-t border-border-strong text-[14px] text-text-muted">
-                Your {plan} plan shows {planHistoryMonths} months of history.
-                We keep your numbers, so older months appear when you upgrade.
-                <Link
-                  href={`/dashboard/plan`}
-                  className="font-semibold text-primary hover:underline"
-                >
-                  See plans
-                </Link>
-              </div>
-            )}
-          </>
-        )}
-      </AppCard>
+          {planHistoryDays !== null ? (
+            <AppCard className="p-4 text-[14px] text-text-muted">
+              Your {plan} plan keeps up to {planHistoryDays} days of visit totals, and Cloudflare Analytics provides detailed country and source breakdowns for the last 30 days.{" "}
+              <Link href="/dashboard/plan" className="font-semibold text-primary hover:underline">
+                See plans
+              </Link>
+            </AppCard>
+          ) : null}
+        </div>
+      )}
     </AppPage>
   );
 }

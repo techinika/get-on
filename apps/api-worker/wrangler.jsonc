@@ -18,6 +18,8 @@
   },
   // Secrets set with `wrangler secret put`:
   //   CRON_SECRET, JOBS_SECRET, WORKER_SHARED_SECRET
+  // Optional analytics secrets:
+  //   CLOUDFLARE_ANALYTICS_API_TOKEN (or CLOUDFLARE_API_TOKEN), CLOUDFLARE_ZONE_ID
   "ai": {
     "binding": "AI"
   },
@@ -47,6 +49,18 @@
     }
   ],
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "head_sampling_rate": 1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "invocation_logs": true,
+      "persist": true
+    },
+    "traces": {
+      "enabled": true,
+      "head_sampling_rate": 1,
+      "persist": true
+    }
   }
 }

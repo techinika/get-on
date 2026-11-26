@@ -2,11 +2,14 @@ import { createHash, randomUUID } from "node:crypto";
 import {
   AI_TASKS,
   AiError,
+  MODEL_SEEDS,
+  buildRequestUsage,
+  estimateTokens,
   imageCredits,
-  imageNeurons,
   isAiError,
   modelFor,
   reserveCredits,
+  type AiModel,
   type AiUsage,
 } from "@get-on/ai";
 import sharp from "sharp";
@@ -105,6 +108,58 @@ function emptyFlags(): AiFlags {
   };
 }
 
+function logImageFailure(
+  requestId: string | undefined,
+  error: unknown,
+): void {
+  const ai = isAiError(error)
+    ? error
+    : new AiError("AI_PROVIDER_ERROR", { cause: error });
+  console.error("[ai] image task failed", {
+    requestId,
+    code: ai.code,
+    status: ai.status,
+    providerCode: ai.providerCode,
+    reason:
+      typeof ai.details.reason === "string" ? ai.details.reason : undefined,
+  });
+}
+
+async function resolveImageModel(
+  admin: ReturnType<typeof createAdminClient>,
+  models: AiModel[],
+): Promise<AiModel | null> {
+  const enabledModel = modelFor("image", {}, models);
+  if (enabledModel) return enabledModel;
+
+  // If the database table exists without any image row seeded yet, fall back
+  // to the built-in image seed while still respecting an explicitly disabled DB row.
+  try {
+    const query = admin
+      .from("ai_models")
+      .select("id, enabled, purposes") as unknown as {
+      contains?: (
+        col: string,
+        val: string[],
+      ) => {
+        limit: (
+          n: number,
+        ) => PromiseLike<{ data: Array<{ enabled?: boolean }> | null }>;
+      };
+    };
+    if (typeof query.contains === "function") {
+      const { data } = await query.contains("purposes", ["image"]).limit(1);
+      if (data && data.length > 0) {
+        return null;
+      }
+    }
+  } catch {
+    // Ignore partial mock lookup failures and use built-in image seed.
+  }
+
+  return modelFor("image", {}, MODEL_SEEDS);
+}
+
 export async function runImageTask(
   input: RunImageTaskInput,
 ): Promise<RunImageTaskResult> {
@@ -113,6 +168,7 @@ export async function runImageTask(
   let requestId: string | undefined;
   let storagePath: string | undefined;
   let mediaId: string | undefined;
+  let reservedCredit = false;
 
   try {
     if (!config.enabled) throw new AiError("AI_DISABLED");
@@ -123,7 +179,14 @@ export async function runImageTask(
       throw new AiError("AI_IMAGES_OFF");
     }
 
-    const { planId } = await loadAccess(admin, input.teamId, input.userId);
+    const { planId, status: accessStatus } = await loadAccess(
+      admin,
+      input.teamId,
+      input.userId,
+    );
+    if (accessStatus === "lapsed") {
+      throw new AiError("AI_PLAN_INACTIVE");
+    }
     await verifyProject(admin, input.teamId, input.projectId);
     if (!input.projectId) {
       throw new AiError("AI_PROVIDER_ERROR", {
@@ -157,7 +220,7 @@ export async function runImageTask(
     }
 
     const models = await loadAiModels(admin);
-    const model = modelFor("image", {}, models);
+    const model = await resolveImageModel(admin, models);
     if (!model) {
       throw new AiError("AI_PROVIDER_ERROR", {
         details: { reason: "no_image_model" },
@@ -223,6 +286,7 @@ export async function runImageTask(
     });
     const metadata = gatewayMetadata(input.teamId, "image.generate", requestId);
 
+    let moderationInputUsage: AiUsage | undefined;
     if (settings.moderationEnabled) {
       const moderation = await moderateText(
         provider,
@@ -231,13 +295,22 @@ export async function runImageTask(
         AI_TASKS.moderate.timeoutMs,
         metadata,
       );
+      moderationInputUsage = moderation.usage;
+      const moderationOnlyUsage = buildRequestUsage({
+        model,
+        moderationInputUsage,
+        guardModel: guard,
+        creditNeurons: settings.creditNeurons,
+      });
       await updateRequest(admin, requestId, {
-        moderation,
+        moderation: { safe: moderation.safe, categories: moderation.categories },
+        usage: moderationOnlyUsage,
         ...(moderation.safe
           ? {}
           : { status: "refused", finished_at: new Date().toISOString() }),
       });
       if (!moderation.safe) {
+        await recordUsage(admin, input.teamId, 0, moderationOnlyUsage.totalNeurons);
         return failure(new AiError("AI_REFUSED"), requestId);
       }
     }
@@ -258,6 +331,7 @@ export async function runImageTask(
       });
       return failure(mapped, requestId);
     }
+    reservedCredit = true;
 
     const startedAt = Date.now();
     await updateRequest(admin, requestId, {
@@ -280,6 +354,7 @@ export async function runImageTask(
       const mapped = isAiError(error)
         ? error
         : new AiError("AI_PROVIDER_ERROR", { cause: error });
+      logImageFailure(requestId, mapped);
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {
         status: mapped.code === "AI_REFUSED" ? "refused" : "failed",
@@ -290,16 +365,37 @@ export async function runImageTask(
       return failure(mapped, requestId);
     }
 
-    const source = Buffer.from(generated.imageBase64, "base64");
+    const imageUsage = buildRequestUsage({
+      model,
+      generationUsage: {
+        ...generated.usage,
+        inputTokens: generated.usage.inputTokens ?? estimateTokens(prompt),
+        images: 1,
+        ...(generated.usage.inputTokens === undefined ? { tokensEstimated: true } : {}),
+      },
+      moderationInputUsage,
+      guardModel: guard,
+      creditNeurons: settings.creditNeurons,
+    });
+
+    const normalizedBase64 = generated.imageBase64
+      .replace(/^data:image\/[a-z0-9.+-]+;base64,/i, "")
+      .replace(/\s+/g, "");
+    const source = Buffer.from(normalizedBase64, "base64");
     if (source.length === 0 || source.length > MAX_IMAGE_BYTES) {
-      const mapped = new AiError("AI_BAD_RESULT");
+      const mapped = new AiError("AI_BAD_RESULT", {
+        details: { reason: source.length === 0 ? "empty_image" : "image_too_large" },
+      });
+      logImageFailure(requestId, mapped);
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {
         status: "failed",
         error_code: mapped.code,
+        usage: imageUsage,
         latency_ms: Date.now() - startedAt,
         finished_at: new Date().toISOString(),
       });
+      await recordUsage(admin, input.teamId, 0, imageUsage.totalNeurons);
       return failure(mapped, requestId);
     }
 
@@ -318,15 +414,21 @@ export async function runImageTask(
         })
         .webp({ quality: 82 })
         .toBuffer({ resolveWithObject: true });
-    } catch {
-      const mapped = new AiError("AI_BAD_RESULT");
+    } catch (error) {
+      const mapped = new AiError("AI_BAD_RESULT", {
+        cause: error,
+        details: { reason: "sharp_decode_failed" },
+      });
+      logImageFailure(requestId, mapped);
       await releaseRequest(admin, requestId);
       await updateRequest(admin, requestId, {
         status: "failed",
         error_code: mapped.code,
+        usage: imageUsage,
         latency_ms: Date.now() - startedAt,
         finished_at: new Date().toISOString(),
       });
+      await recordUsage(admin, input.teamId, 0, imageUsage.totalNeurons);
       return failure(mapped, requestId);
     }
 
@@ -343,9 +445,11 @@ export async function runImageTask(
       await updateRequest(admin, requestId, {
         status: "failed",
         error_code: mapped.code,
+        usage: imageUsage,
         latency_ms: Date.now() - startedAt,
         finished_at: new Date().toISOString(),
       });
+      await recordUsage(admin, input.teamId, 0, imageUsage.totalNeurons);
       return failure(mapped, requestId);
     }
 
@@ -373,9 +477,11 @@ export async function runImageTask(
       await updateRequest(admin, requestId, {
         status: "failed",
         error_code: mapped.code,
+        usage: imageUsage,
         latency_ms: Date.now() - startedAt,
         finished_at: new Date().toISOString(),
       });
+      await recordUsage(admin, input.teamId, 0, imageUsage.totalNeurons);
       return failure(mapped, requestId);
     }
 
@@ -402,20 +508,21 @@ export async function runImageTask(
         await updateRequest(admin, requestId, {
           status: "failed",
           error_code: mapped.code,
+          usage: imageUsage,
           latency_ms: Date.now() - startedAt,
           finished_at: new Date().toISOString(),
         });
+        await recordUsage(admin, input.teamId, 0, imageUsage.totalNeurons);
         return failure(mapped, requestId);
       }
       charged = numeric(settled, actual);
     }
 
-    const usage: AiUsage = { images: 1 };
     const flags = emptyFlags();
     await updateRequest(admin, requestId, {
       status: "succeeded",
       charged_credits: charged,
-      usage,
+      usage: imageUsage,
       flags,
       latency_ms: Date.now() - startedAt,
       finished_at: new Date().toISOString(),
@@ -438,12 +545,7 @@ export async function runImageTask(
       },
       settings.payloadRetentionDays,
     );
-    await recordUsage(
-      admin,
-      input.teamId,
-      charged,
-      imageNeurons({ width: WIDTH, height: HEIGHT, steps: STEPS }),
-    );
+    await recordUsage(admin, input.teamId, charged, imageUsage.totalNeurons);
 
     const { data: signed } = await admin.storage
       .from(BUCKET)
@@ -474,8 +576,11 @@ export async function runImageTask(
     const mapped = isAiError(error)
       ? error
       : new AiError("AI_PROVIDER_ERROR", { cause: error });
+    logImageFailure(requestId, mapped);
     if (requestId) {
-      await releaseRequest(admin, requestId);
+      if (reservedCredit) {
+        await releaseRequest(admin, requestId);
+      }
       await updateRequest(admin, requestId, {
         status: mapped.code === "AI_REFUSED" ? "refused" : "failed",
         error_code: mapped.code,
