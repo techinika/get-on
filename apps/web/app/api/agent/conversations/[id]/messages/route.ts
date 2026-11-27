@@ -216,12 +216,10 @@ export async function POST(
       }
 
       if (result.confirmation) {
-        // Waiting for the user to confirm a risky action. Keep the run open so
-        // the confirm endpoint can resolve it, and surface the card to the UI.
-        await admin
-          .from("agent_runs")
-          .update({ status: "running" })
-          .eq("id", run.id);
+        await finishAgentRun(admin, run.id, {
+          status: "succeeded",
+          requestId: result.requestId,
+        });
         runFinished = true;
         send("confirmation_required", {
           action: result.confirmation,
@@ -256,6 +254,7 @@ export async function POST(
         requestId: result.requestId,
         balance,
         status: result.status,
+        nextSteps: result.nextSteps,
       });
     } finally {
       if (!runFinished) {

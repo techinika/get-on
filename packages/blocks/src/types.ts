@@ -4,7 +4,16 @@ export type Palette =
   | "berry"
   | "sunset"
   | "midnight"
-  | "charcoal";
+  | "charcoal"
+  | "frame"
+  | "meridian"
+  | "ember"
+  | "concrete"
+  | "willow"
+  | "pulse"
+  | "clearview"
+  | "bloom"
+  | "sprout";
 
 export type FontPair = "friendly" | "classic" | "modern" | "warm";
 export type Corners = "soft" | "sharp" | "round";
@@ -18,6 +27,8 @@ export type ThemeColors = {
   text: string;
   soft: string;
   onPrimary?: string;
+  muted?: string;
+  border?: string;
 };
 
 export type Theme = {

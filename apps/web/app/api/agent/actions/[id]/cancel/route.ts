@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseAssistant, getAgentActor } from "@/lib/agent/auth";
-import { finishAgentRun } from "@/lib/agent/conversations";
+import { finishOpenRunsForConversation } from "@/lib/agent/conversations";
 import { getAssistantFeature } from "@/lib/agent/settings";
 
 export async function POST(
@@ -47,16 +47,7 @@ export async function POST(
     .eq("id", id);
 
   try {
-    const { data: run } = await admin
-      .from("agent_runs")
-      .select("id")
-      .eq("conversation_id", action.conversation_id)
-      .eq("user_id", actor.userId)
-      .eq("status", "running")
-      .maybeSingle();
-    if (run?.id) {
-      await finishAgentRun(admin, String(run.id), { status: "cancelled" });
-    }
+    await finishOpenRunsForConversation(admin, String(action.conversation_id), "cancelled", "CANCELLED");
   } catch {
     // Best effort.
   }

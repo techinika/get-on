@@ -4,6 +4,7 @@ import {
   isPageContentV5,
   richTextToPlain,
   sanitizeHtml,
+  themeGoogleFontsUrl,
   themeTokens,
   type Block,
   type ContentNode,
@@ -691,6 +692,91 @@ function renderContactFormHtml(
   return parts.join("");
 }
 
+function renderCardItemHtml(
+  item: Record<string, unknown>,
+  idx: number,
+  ctx: RenderHtmlContext,
+  options: { numbered?: boolean; expandable?: boolean } = {},
+): string {
+  const itemImgId =
+    typeof item.imageId === "string"
+      ? item.imageId
+      : typeof item.photoId === "string"
+        ? item.photoId
+        : "";
+  const itemImg = itemImgId ? ctx.images.get(itemImgId) : undefined;
+  const indexLabel =
+    typeof item.number === "string"
+      ? item.number
+      : options.numbered
+        ? String(idx + 1).padStart(2, "0")
+        : "";
+  const metaParts = [item.time, item.duration, item.level, item.year, item.coordinates]
+    .filter((v): v is string => typeof v === "string" && v.trim().length > 0);
+  const features = Array.isArray(item.features)
+    ? item.features.map((f) => String(f)).filter(Boolean)
+    : [];
+  const priceMonthly = typeof item.price === "string" ? item.price : "";
+  const priceAnnual = typeof item.annualPrice === "string" ? item.annualPrice : "";
+  const highlightedAttr = item.highlighted ? ' data-gs-highlighted="true"' : "";
+
+  const parts: string[] = [`<div class="gs-card"${highlightedAttr}>`];
+  if (indexLabel) parts.push(`<span class="gs-index-num">${escapeHtml(indexLabel)}</span>`);
+  if (itemImg) {
+    parts.push(
+      `<img src="${escapeHtml(itemImg.src)}" alt="${escapeHtml(String(item.alt ?? item.name ?? item.title ?? itemImg.alt ?? ""))}" class="gs-card-img">`,
+    );
+  }
+  parts.push(`<div class="gs-card-body"><div class="gs-card-head"><div>`);
+  if (typeof item.category === "string" && item.category) {
+    parts.push(`<p class="gs-meta-tag">${escapeHtml(item.category)}</p>`);
+  }
+  if (typeof item.value === "string") parts.push(`<p class="gs-stat-val">${escapeHtml(item.value)}</p>`);
+  if (typeof item.title === "string") parts.push(`<h3>${escapeHtml(item.title)}</h3>`);
+  if (typeof item.name === "string") parts.push(`<h3>${escapeHtml(item.name)}</h3>`);
+  if (typeof item.role === "string") parts.push(`<p class="gs-card-sub">${escapeHtml(item.role)}</p>`);
+  parts.push(`</div>`);
+  if (priceMonthly) {
+    parts.push(
+      `<span class="gs-price"${priceAnnual ? ` data-gs-price-monthly="${escapeHtml(priceMonthly)}" data-gs-price-annual="${escapeHtml(priceAnnual)}"` : ""}>${escapeHtml(priceMonthly)}</span>`,
+    );
+  }
+  parts.push(`</div>`);
+  if (metaParts.length > 0) {
+    parts.push(`<p class="gs-meta-row">${escapeHtml(metaParts.join(" · "))}</p>`);
+  }
+  if (typeof item.text === "string" && item.text) parts.push(`<p class="gs-card-copy">${escapeHtml(item.text)}</p>`);
+  if (typeof item.description === "string" && item.description) {
+    parts.push(`<p class="gs-card-copy">${escapeHtml(item.description)}</p>`);
+  }
+  if (typeof item.quote === "string" && item.quote) {
+    parts.push(`<p class="gs-card-copy gs-quote">${escapeHtml(item.quote)}</p>`);
+  }
+  if (features.length > 0) {
+    parts.push(`<ul class="gs-card-list">${features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>`);
+  }
+  if (typeof item.author === "string" && item.author) {
+    parts.push(`<p class="gs-card-author">${escapeHtml(item.author)}</p>`);
+  }
+  if (typeof item.buttonLabel === "string" && item.buttonLabel && item.buttonLink) {
+    parts.push(
+      `<p style="margin:12px 0 0"><a href="${escapeHtml(resolveLinkHref(item.buttonLink, ctx.pageHrefById))}" class="gs-inline-link">${escapeHtml(item.buttonLabel)}</a></p>`,
+    );
+  }
+  if (options.expandable && typeof item.details === "string" && item.details) {
+    const expanded = idx === 0;
+    parts.push(
+      `<div style="margin-top:12px"><button type="button" class="gs-expand-btn" data-gs-expand-trigger="" aria-expanded="${
+        expanded ? "true" : "false"
+      }">${expanded ? "Hide details" : "Treatment details"}</button><p class="gs-expand-panel" data-gs-expand-panel=""${
+        expanded ? "" : " hidden"
+      }>${escapeHtml(item.details)}</p></div>`,
+    );
+  }
+  parts.push(`</div></div>`);
+  return parts.join("");
+}
+
 function renderSmartBlockHtml(
   rawId: string,
   type: string,
@@ -699,10 +785,12 @@ function renderSmartBlockHtml(
   extraClasses = "",
   anchorId?: string,
 ): string {
+  const tone = typeof props.tone === "string" ? props.tone : "";
   const attrs = [
     anchorId ? `id="${escapeHtml(anchorId)}"` : "",
     rawId ? `data-gs-node="${escapeHtml(rawId)}"` : "",
     `data-gs-block="${escapeHtml(type)}"`,
+    tone ? `data-gs-tone="${escapeHtml(tone)}"` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -724,25 +812,15 @@ function renderSmartBlockHtml(
   const items = Array.isArray(props.items)
     ? (props.items as Array<Record<string, unknown>>)
     : [];
+  const rawTabs = Array.isArray(props.tabs)
+    ? (props.tabs as Array<Record<string, unknown>>)
+    : [];
 
-  const soft = type === "features" || type === "faq" || type === "testimonials";
+  const soft = type === "features" || type === "faq" || type === "testimonials" || type === "newsletter";
   const sectionClass = ["gs-section", soft ? "gs-section--soft" : "", extraClasses]
     .filter(Boolean)
     .join(" ");
   const layoutAttr = layout ? ` data-gs-layout="${escapeHtml(layout)}"` : "";
-
-  const inner: string[] = [];
-  const copyParts: string[] = [];
-  if (eyebrow) copyParts.push(`<p class="gs-badge">${escapeHtml(eyebrow)}</p>`);
-  if (heading) {
-    copyParts.push(
-      type === "hero"
-        ? `<h1>${escapeHtml(heading)}</h1>`
-        : `<h2>${escapeHtml(heading)}</h2>`,
-    );
-  }
-  if (subheading) copyParts.push(`<p>${escapeHtml(subheading)}</p>`);
-  if (text) copyParts.push(`<p>${escapeHtml(text)}</p>`);
 
   const btn1 = typeof props.buttonLabel === "string" ? props.buttonLabel : "";
   const btn2 = typeof props.button2Label === "string" ? props.button2Label : "";
@@ -762,12 +840,53 @@ function renderSmartBlockHtml(
     actionsParts.push(`</div>`);
   }
 
+  if (type === "image-text") {
+    const reverseAttr = layout === "split-reverse" ? ' data-gs-reverse="true"' : "";
+    const mediaHtml = img
+      ? `<div class="gs-split-media"><img src="${escapeHtml(img.src)}" alt="${escapeHtml(img.alt ?? heading)}"></div>`
+      : "";
+    const textHtml = `<div>${eyebrow ? `<p class="gs-badge">${escapeHtml(eyebrow)}</p>` : ""}${
+      heading ? `<h2>${escapeHtml(heading)}</h2>` : ""
+    }${subheading ? `<p style="font-size:1.125rem;opacity:.85">${escapeHtml(subheading)}</p>` : ""}${
+      text ? `<p style="max-width:60ch">${escapeHtml(text)}</p>` : ""
+    }${actionsParts.join("")}</div>`;
+    return `<section class="${escapeHtml(sectionClass)}" ${attrs}${layoutAttr}><div class="gs-container"><div class="gs-split-feature"${reverseAttr}>${mediaHtml}${textHtml}</div></div></section>`;
+  }
+
+  if (type === "newsletter") {
+    const label = btn1 || "Subscribe";
+    const placeholder = typeof props.placeholder === "string" ? props.placeholder : "you@example.com";
+    return `<section class="${escapeHtml(sectionClass)}" ${attrs}${layoutAttr}><div class="gs-container"><div class="gs-card" style="max-width:680px;margin-inline:auto;padding:28px">${
+      eyebrow ? `<p class="gs-badge">${escapeHtml(eyebrow)}</p>` : ""
+    }${heading ? `<h2>${escapeHtml(heading)}</h2>` : ""}${
+      subheading ? `<p style="opacity:.85;margin:0 0 8px">${escapeHtml(subheading)}</p>` : ""
+    }${text ? `<p style="margin:0">${escapeHtml(text)}</p>` : ""}<form class="gs-newsletter-form" data-gs-newsletter=""><input type="email" required placeholder="${escapeHtml(
+      placeholder,
+    )}" class="gs-input" aria-label="Email address"><button type="submit" class="gs-btn">${escapeHtml(
+      label,
+    )}</button></form></div></div></section>`;
+  }
+
+  const inner: string[] = [];
+  const copyParts: string[] = [];
+  if (eyebrow) copyParts.push(`<p class="gs-badge">${escapeHtml(eyebrow)}</p>`);
+  if (heading) {
+    copyParts.push(
+      type === "hero"
+        ? `<h1>${escapeHtml(heading)}</h1>`
+        : `<h2>${escapeHtml(heading)}</h2>`,
+    );
+  }
+  if (subheading) copyParts.push(`<p>${escapeHtml(subheading)}</p>`);
+  if (text) copyParts.push(`<p>${escapeHtml(text)}</p>`);
+
   const isSplitHero =
     type === "hero" &&
     Boolean(img) &&
     layout !== "centered" &&
     layout !== "minimal" &&
-    layout !== "fullbleed";
+    layout !== "fullbleed" &&
+    layout !== "statement";
 
   if (isSplitHero && img) {
     const mediaHtml = `<div class="gs-hero-media"><img src="${escapeHtml(img.src)}" alt="${escapeHtml(img.alt ?? heading)}"></div>`;
@@ -789,7 +908,51 @@ function renderSmartBlockHtml(
     if (type === "hero") inner.push(`</div>`);
   }
 
-  if (type === "faq" && items.length > 0) {
+  const numbered = layout === "index-list";
+  const expandable = (type === "services" || type === "features") && Boolean(props.expandable);
+
+  if (rawTabs.length > 0) {
+    inner.push(`<div class="gs-tabs-wrap" data-gs-tabs=""><div class="gs-tablist" role="tablist" aria-label="Categories">`);
+    rawTabs.forEach((tab, tIdx) => {
+      const tabId = String(tab.id ?? `tab-${tIdx + 1}`);
+      const label = String(tab.label ?? `Category ${tIdx + 1}`);
+      inner.push(
+        `<button type="button" role="tab" aria-selected="${tIdx === 0 ? "true" : "false"}" data-gs-tab="${escapeHtml(
+          tabId,
+        )}" class="gs-tab-btn${tIdx === 0 ? " is-active" : ""}">${escapeHtml(label)}</button>`,
+      );
+    });
+    inner.push(`</div>`);
+    rawTabs.forEach((tab, tIdx) => {
+      const tabId = String(tab.id ?? `tab-${tIdx + 1}`);
+      const tabImgId =
+        typeof tab.featuredImageId === "string"
+          ? tab.featuredImageId
+          : typeof tab.imageId === "string"
+            ? tab.imageId
+            : "";
+      const tabImg = tabImgId ? ctx.images.get(tabImgId) : undefined;
+      const tabIntro = typeof tab.intro === "string" ? tab.intro : "";
+      const tabItems = Array.isArray(tab.items) ? (tab.items as Array<Record<string, unknown>>) : [];
+      inner.push(`<div data-gs-tab-panel="${escapeHtml(tabId)}"${tIdx === 0 ? "" : " hidden"}>`);
+      if (tabImg || tabIntro) {
+        inner.push(`<div class="gs-tab-feature">`);
+        if (tabImg) {
+          inner.push(
+            `<img src="${escapeHtml(tabImg.src)}" alt="${escapeHtml(tabImg.alt ?? String(tab.label ?? ""))}" class="gs-tab-feature-img">`,
+          );
+        }
+        if (tabIntro) inner.push(`<p class="gs-tab-intro">${escapeHtml(tabIntro)}</p>`);
+        inner.push(`</div>`);
+      }
+      inner.push(`<div class="gs-grid"${layoutAttr} style="margin-top:18px">`);
+      tabItems.forEach((item, idx) => {
+        inner.push(renderCardItemHtml(item, idx, ctx, { numbered, expandable }));
+      });
+      inner.push(`</div></div>`);
+    });
+    inner.push(`</div>`);
+  } else if (type === "faq" && items.length > 0) {
     inner.push(`<div class="gs-accordion">`);
     items.forEach((item, idx) => {
       const q = String(item.question ?? item.title ?? item.name ?? `Question ${idx + 1}`);
@@ -798,40 +961,44 @@ function renderSmartBlockHtml(
       inner.push(
         `<div class="gs-accordion-item"><button type="button" class="gs-accordion-trigger" data-gs-accordion-trigger="" aria-controls="${panelId}" aria-expanded="${
           idx === 0 ? "true" : "false"
-        }"><span>${escapeHtml(q)}</span></button><div id="${panelId}" class="gs-accordion-panel" data-gs-accordion-panel=""${
+        }"><span>${escapeHtml(q)}</span><span aria-hidden style="opacity:.65">${
+          idx === 0 ? "−" : "+"
+        }</span></button><div id="${panelId}" class="gs-accordion-panel" data-gs-accordion-panel=""${
           idx === 0 ? "" : " hidden"
         }><p style="margin:0">${escapeHtml(a)}</p></div></div>`,
       );
     });
     inner.push(`</div>`);
+  } else if (type === "before-after" && items.length > 0) {
+    const first = items[0];
+    inner.push(`<div style="margin-top:24px;display:grid;gap:20px">`);
+    if (first && (typeof first.beforeText === "string" || typeof first.afterText === "string")) {
+      inner.push(
+        `<div class="gs-ba-compare"><div class="gs-ba-split"><div class="gs-ba-pane"><span class="gs-meta-tag">Before</span><p style="margin:6px 0 0">${escapeHtml(
+          String(first.beforeText ?? first.text ?? ""),
+        )}</p></div><div class="gs-ba-pane gs-ba-pane--after" data-gs-ba-after=""><span class="gs-meta-tag">After</span><p style="margin:6px 0 0">${escapeHtml(
+          String(first.afterText ?? first.text ?? ""),
+        )}</p></div></div><label class="gs-ba-range-label"><span>Compare stage</span><input type="range" min="15" max="100" value="52" class="gs-ba-range" data-gs-ba-range="" aria-label="Compare before and after"></label></div>`,
+      );
+    }
+    inner.push(`<div class="gs-grid"${layoutAttr}>`);
+    items.forEach((item, idx) => {
+      inner.push(renderCardItemHtml(item, idx, ctx, { numbered, expandable }));
+    });
+    inner.push(`</div></div>`);
+  } else if (type === "pricing" && items.some((i) => typeof i.annualPrice === "string")) {
+    inner.push(
+      `<div class="gs-billing-wrap" data-gs-billing=""><div class="gs-billing-toggle" role="group" aria-label="Billing interval"><button type="button" class="gs-tab-btn is-active" aria-pressed="true" data-gs-billing-btn="monthly">Monthly</button><button type="button" class="gs-tab-btn" aria-pressed="false" data-gs-billing-btn="annual">Annual (Save 20%)</button></div><div class="gs-grid"${layoutAttr} style="margin-top:22px">`,
+    );
+    items.forEach((item, idx) => {
+      inner.push(renderCardItemHtml(item, idx, ctx, { numbered, expandable }));
+    });
+    inner.push(`</div></div>`);
   } else if (items.length > 0) {
     inner.push(`<div class="gs-grid"${layoutAttr} style="margin-top:24px">`);
-    for (const item of items) {
-      const itemImgId =
-        typeof item.imageId === "string"
-          ? item.imageId
-          : typeof item.photoId === "string"
-            ? item.photoId
-            : "";
-      const itemImg = itemImgId ? ctx.images.get(itemImgId) : undefined;
-      inner.push(`<div class="gs-card">`);
-      if (itemImg) {
-        inner.push(
-          `<img src="${escapeHtml(itemImg.src)}" alt="${escapeHtml(String(item.alt ?? item.name ?? item.title ?? ""))}" style="width:100%;height:180px;object-fit:cover;border-radius:var(--s-radius);margin-bottom:12px">`,
-        );
-      }
-      if (typeof item.value === "string") inner.push(`<p class="gs-stat-val">${escapeHtml(item.value)}</p>`);
-      if (typeof item.title === "string") inner.push(`<h3>${escapeHtml(item.title)}</h3>`);
-      if (typeof item.name === "string") inner.push(`<h3>${escapeHtml(item.name)}</h3>`);
-      if (typeof item.role === "string") inner.push(`<p style="opacity:.75;margin-top:0">${escapeHtml(item.role)}</p>`);
-      if (typeof item.price === "string") inner.push(`<p style="font-weight:700;color:var(--s-primary)">${escapeHtml(item.price)}</p>`);
-      if (typeof item.time === "string") inner.push(`<p style="font-weight:600;opacity:.8">${escapeHtml(item.time)}</p>`);
-      if (typeof item.text === "string") inner.push(`<p style="margin:0">${escapeHtml(item.text)}</p>`);
-      if (typeof item.description === "string") inner.push(`<p style="margin:0">${escapeHtml(item.description)}</p>`);
-      if (typeof item.quote === "string") inner.push(`<p style="margin:0">${escapeHtml(item.quote)}</p>`);
-      if (typeof item.author === "string") inner.push(`<p style="margin:10px 0 0;font-weight:600">${escapeHtml(item.author)}</p>`);
-      inner.push(`</div>`);
-    }
+    items.forEach((item, idx) => {
+      inner.push(renderCardItemHtml(item, idx, ctx, { numbered, expandable }));
+    });
     inner.push(`</div>`);
   }
 
@@ -1083,6 +1250,85 @@ if(expanded){panel.setAttribute("hidden","");}else{panel.removeAttribute("hidden
 });
 })(accButtons[j]);
 }
+var tabRoots=document.querySelectorAll("[data-gs-tabs]");
+for(var t=0;t<tabRoots.length;t+=1){
+(function(wrap){
+var btns=wrap.querySelectorAll("[data-gs-tab]");
+var panels=wrap.querySelectorAll("[data-gs-tab-panel]");
+for(var k=0;k<btns.length;k+=1){
+(function(btn){
+btn.addEventListener("click",function(){
+var target=btn.getAttribute("data-gs-tab");
+for(var b=0;b<btns.length;b+=1){
+var isSel=btns[b].getAttribute("data-gs-tab")===target;
+btns[b].setAttribute("aria-selected",isSel?"true":"false");
+if(isSel){btns[b].classList.add("is-active");}else{btns[b].classList.remove("is-active");}
+}
+for(var p=0;p<panels.length;p+=1){
+if(panels[p].getAttribute("data-gs-tab-panel")===target){panels[p].removeAttribute("hidden");}else{panels[p].setAttribute("hidden","");}
+}
+});
+})(btns[k]);
+}
+})(tabRoots[t]);
+}
+var billRoots=document.querySelectorAll("[data-gs-billing]");
+for(var b=0;b<billRoots.length;b+=1){
+(function(wrap){
+var btns=wrap.querySelectorAll("[data-gs-billing-btn]");
+var prices=wrap.querySelectorAll("[data-gs-price-monthly]");
+for(var k=0;k<btns.length;k+=1){
+(function(btn){
+btn.addEventListener("click",function(){
+var mode=btn.getAttribute("data-gs-billing-btn");
+for(var x=0;x<btns.length;x+=1){
+var on=btns[x]===btn;
+btns[x].setAttribute("aria-pressed",on?"true":"false");
+if(on){btns[x].classList.add("is-active");}else{btns[x].classList.remove("is-active");}
+}
+for(var y=0;y<prices.length;y+=1){
+var val=mode==="annual"?prices[y].getAttribute("data-gs-price-annual"):prices[y].getAttribute("data-gs-price-monthly");
+if(val)prices[y].textContent=val;
+}
+});
+})(btns[k]);
+}
+})(billRoots[b]);
+}
+var expBtns=document.querySelectorAll("[data-gs-expand-trigger]");
+for(var e=0;e<expBtns.length;e+=1){
+(function(btn){
+btn.addEventListener("click",function(){
+var card=btn.closest(".gs-card");
+var panel=card?card.querySelector("[data-gs-expand-panel]"):null;
+if(!panel)return;
+var expanded=btn.getAttribute("aria-expanded")==="true";
+btn.setAttribute("aria-expanded",expanded?"false":"true");
+btn.textContent=expanded?"Treatment details":"Hide details";
+if(expanded){panel.setAttribute("hidden","");}else{panel.removeAttribute("hidden");}
+});
+})(expBtns[e]);
+}
+var ranges=document.querySelectorAll("[data-gs-ba-range]");
+for(var r=0;r<ranges.length;r+=1){
+(function(inp){
+inp.addEventListener("input",function(){
+var box=inp.closest(".gs-ba-compare");
+var after=box?box.querySelector("[data-gs-ba-after]"):null;
+if(after)after.style.opacity=String(Math.max(0.35,Math.min(1,Number(inp.value)/100)));
+});
+})(ranges[r]);
+}
+var nls=document.querySelectorAll("[data-gs-newsletter]");
+for(var n=0;n<nls.length;n+=1){
+(function(form){
+form.addEventListener("submit",function(ev){
+ev.preventDefault();
+var btn=form.querySelector('button[type="submit"]');
+if(btn)btn.textContent="Joined";
+});
+})(nls[n]);
+}
 }
 });
 api.register("analytics",{
@@ -1321,6 +1567,13 @@ export function renderHtml(input: {
 
   const rhythm = input.settings.theme?.design?.rhythm ?? "even";
   const headerStyle = input.settings.theme?.header?.style ?? "classic";
+  const presetId = input.settings.theme?.presetId;
+  const fontsUrl = themeGoogleFontsUrl(input.settings.theme);
+  const templateAttr = presetId ? ` data-gs-template="${escapeHtml(String(presetId))}"` : "";
+  const headerPhoneHtml =
+    input.settings.phone && headerStyle === "centered"
+      ? `<a class="gs-header-utility" href="tel:${escapeHtml(input.settings.phone.replace(/[^+\d]/g, ""))}">${escapeHtml(input.settings.phone)}</a>`
+      : "";
 
   return `<!doctype html>
 <html lang="${escapeHtml(input.settings.locale || "en")}">
@@ -1330,11 +1583,12 @@ export function renderHtml(input: {
 <title>${title}</title>
 <meta name="description" content="${desc}">
 <link rel="canonical" href="${escapeHtml(input.canonical)}">
+${fontsUrl ? `<link rel="stylesheet" href="${escapeHtml(fontsUrl)}">` : ""}
 ${input.page.noindex ? '<meta name="robots" content="noindex">' : ""}
 <style data-gs="1">${css}</style>${scriptTag}
 </head>
 <body>
-<div class="gs-root" data-gs-rhythm="${escapeHtml(String(rhythm))}" data-gs-plugins="${escapeHtml(activePlugins.join(","))}" data-gs-page="${escapeHtml(
+<div class="gs-root" data-gs-rhythm="${escapeHtml(String(rhythm))}"${templateAttr} data-gs-plugins="${escapeHtml(activePlugins.join(","))}" data-gs-page="${escapeHtml(
     input.pagePath,
   )}" style="${cssVarsInline(input.settings.theme)}">
 <header class="gs-header" data-gs-header="${escapeHtml(String(headerStyle))}"><div class="gs-container gs-header-inner"><a class="gs-brand" href="/">${
@@ -1347,7 +1601,7 @@ ${input.page.noindex ? '<meta name="robots" content="noindex">' : ""}
           input.settings.tagline,
         )}</span>`
       : ""
-  }</a>${
+  }</a>${headerPhoneHtml}${
     navHtml
       ? `<button type="button" class="gs-nav-toggle" aria-expanded="false" aria-label="Toggle navigation">Menu</button><nav class="gs-nav" aria-label="Main navigation" data-open="false">${navHtml}</nav>`
       : ""

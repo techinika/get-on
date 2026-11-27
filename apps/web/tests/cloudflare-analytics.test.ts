@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { resolveAnalyticsDateWindow } from "@get-on/site-server";
 import { getCloudflareSiteAnalytics } from "@/lib/stats/cloudflare";
-import { buildSevenDayVisitorTrend } from "@/lib/stats/trend";
+import { buildSevenDayVisitorTrend, buildVisitorTrendSeries } from "@/lib/stats/trend";
 
 describe("cloudflare site analytics client", () => {
   const originalFetch = globalThis.fetch;
@@ -52,6 +53,62 @@ describe("cloudflare site analytics client", () => {
     const headers = init.headers as Record<string, string>;
     expect(headers["x-gs-host"]).toBe("api.get-on.tech");
     expect(headers["x-gs-sig"]).toMatch(/^[a-f0-9]{64}$/);
+  });
+
+  it("forwards custom from/to dates to signed worker endpoint and rejects invalid ranges", async () => {
+    const invalid = await getCloudflareSiteAnalytics({
+      hostnames: ["bakery.get-on.tech"],
+      range: "custom",
+      from: "2026-11-20",
+      to: "2026-11-10",
+      now: new Date("2026-11-26T12:00:00Z"),
+    });
+    expect(invalid.ok).toBe(false);
+    expect(invalid.errorCode).toBe("INVALID_DATE_RANGE");
+
+    const fetchMock = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          ok: true,
+          source: "cloudflare",
+          range: "custom",
+          windowDays: 5,
+          from: "2026-11-10",
+          to: "2026-11-14",
+          visitors: 19,
+          views: 31,
+          previousVisitors: 11,
+          previousViews: 20,
+          daily: [{ day: "2026-11-12", visitors: 19, views: 31 }],
+          countries: [],
+          referrers: [],
+          pages: [],
+          devices: [],
+          hostnames: ["bakery.get-on.tech"],
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+
+    const valid = await getCloudflareSiteAnalytics({
+      hostnames: ["bakery.get-on.tech"],
+      range: "custom",
+      from: "2026-11-10",
+      to: "2026-11-14",
+      now: new Date("2026-11-26T12:00:00Z"),
+      workerUrl: "https://api.get-on.tech",
+      workerSecret: "shared-secret",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    expect(valid.ok).toBe(true);
+    expect(valid.from).toBe("2026-11-10");
+    expect(valid.to).toBe("2026-11-14");
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      range: "custom",
+      from: "2026-11-10",
+      to: "2026-11-14",
+    });
   });
 
   it("falls back to direct Cloudflare GraphQL when worker returns ANALYTICS_NOT_CONFIGURED", async () => {
@@ -118,7 +175,32 @@ describe("cloudflare site analytics client", () => {
   });
 });
 
-describe("buildSevenDayVisitorTrend", () => {
+describe("resolveAnalyticsDateWindow", () => {
+  it("resolves custom date spans and marks retention-limited windows beyond 30 days", () => {
+    const now = new Date("2026-11-26T12:00:00Z");
+    const okWindow = resolveAnalyticsDateWindow({
+      range: "custom",
+      from: "2026-10-15",
+      to: "2026-11-20",
+      now,
+    });
+    expect(okWindow.ok).toBe(true);
+    if (okWindow.ok) {
+      expect(okWindow.windowDays).toBe(37);
+      expect(okWindow.retentionLimited).toBe(true);
+    }
+
+    const tooLong = resolveAnalyticsDateWindow({
+      range: "custom",
+      from: "2026-06-01",
+      to: "2026-11-26",
+      now,
+    });
+    expect(tooLong.ok).toBe(false);
+  });
+});
+
+describe("buildSevenDayVisitorTrend & buildVisitorTrendSeries", () => {
   it("builds a continuous 7-day chronological series and zero-fills missing days", () => {
     const now = new Date("2026-11-26T12:00:00Z");
     const series = buildSevenDayVisitorTrend(
@@ -143,5 +225,23 @@ describe("buildSevenDayVisitorTrend", () => {
     expect(series.map((p) => p.visitors)).toEqual([0, 0, 0, 0, 7, 0, 15]);
     expect(series[4]?.label).toBe("Nov 24");
     expect(series[6]?.label).toBe("Nov 26");
+  });
+
+  it("builds a continuous chronological series across a custom date range", () => {
+    const series = buildVisitorTrendSeries(
+      [
+        { day: "2026-11-10", visitors: 4, views: 9 },
+        { day: "2026-11-12", visitors: 12, views: 20 },
+      ],
+      { from: "2026-11-10", to: "2026-11-13" },
+    );
+
+    expect(series.map((p) => p.day)).toEqual([
+      "2026-11-10",
+      "2026-11-11",
+      "2026-11-12",
+      "2026-11-13",
+    ]);
+    expect(series.map((p) => p.visitors)).toEqual([4, 0, 12, 0]);
   });
 });

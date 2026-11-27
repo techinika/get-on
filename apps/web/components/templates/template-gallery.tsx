@@ -548,46 +548,106 @@ export function TemplateGallery({
 }
 
 function TemplateArtwork({ item }: { item: TemplateCatalogItem }) {
-  const { colors, preview } = item;
+  const { colors, preview, slug } = item;
+
+  const isSharp = slug === "law-firm" || slug === "developer-portfolio" || slug === "creative-studio";
+  const isArch = slug === "salon-beauty";
+  const isStatement = slug === "law-firm";
+  const isGridLines = slug === "developer-portfolio" || slug === "software-company";
+
   return (
     <div
-      className="relative min-h-[190px] overflow-hidden border-b border-border p-5"
-      style={{ backgroundColor: colors.background, color: colors.text }}
+      className="relative min-h-[208px] overflow-hidden border-b border-border p-5 flex flex-col justify-between"
+      style={{
+        backgroundColor: colors.background,
+        color: colors.text,
+        backgroundImage: isGridLines
+          ? `linear-gradient(to right, ${colors.soft} 1px, transparent 1px), linear-gradient(to bottom, ${colors.soft} 1px, transparent 1px)`
+          : undefined,
+        backgroundSize: isGridLines ? "24px 24px" : undefined,
+      }}
       aria-hidden
     >
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: colors.primary }}>
+      <div
+        className="flex items-center justify-between border-b pb-2.5"
+        style={{ borderColor: slug === "law-firm" ? colors.accent : colors.soft }}
+      >
+        <span
+          className="text-[11px] font-bold uppercase tracking-[0.14em]"
+          style={{ color: colors.accent }}
+        >
           {preview.eyebrow}
         </span>
-        <span className="flex gap-1.5">
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colors.primary }} />
-          <span className="h-2 w-2 rounded-full" style={{ backgroundColor: colors.accent }} />
+        <span className="flex items-center gap-2 text-[10px] font-medium opacity-75">
+          {preview.items.slice(0, 2).join(" / ")}
         </span>
       </div>
-      <p className="mt-4 max-w-[22ch] text-[22px] font-bold leading-[1.15] tracking-tight">
-        {preview.heading}
-      </p>
-      <p className="mt-2 line-clamp-2 max-w-[34ch] text-[12px] leading-5 opacity-75">
-        {preview.subheading}
-      </p>
-      <div className="mt-4 flex flex-wrap gap-2">
-        {preview.items.map((text, index) => (
-          <span
-            key={text}
-            className="rounded-full px-2.5 py-1 text-[10px] font-semibold"
+
+      {isStatement ? (
+        <div
+          className="my-3 p-3.5"
+          style={{ backgroundColor: colors.primary, color: colors.background }}
+        >
+          <p className="text-[19px] font-bold leading-[1.15] tracking-tight">
+            {preview.heading}
+          </p>
+          <p className="mt-1.5 line-clamp-2 text-[11px] leading-4 opacity-85">
+            {preview.subheading}
+          </p>
+        </div>
+      ) : (
+        <div className="my-3 flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p
+              className={cn(
+                "max-w-[20ch] font-bold leading-[1.12] tracking-tight",
+                slug === "developer-portfolio" ? "text-[22px] uppercase" : "text-[20px]",
+              )}
+            >
+              {preview.heading}
+            </p>
+            <p className="mt-1.5 line-clamp-2 max-w-[30ch] text-[12px] leading-4 opacity-75">
+              {preview.subheading}
+            </p>
+          </div>
+          <div
+            className="h-20 w-16 shrink-0 border"
             style={{
-              backgroundColor: index === 0 ? colors.primary : colors.soft,
-              color: index === 0 ? colors.background : colors.text,
+              backgroundColor: colors.soft,
+              borderColor: colors.primary,
+              borderRadius: isArch ? "999px 999px 6px 6px" : isSharp ? "0px" : "10px",
+              boxShadow: slug === "starter" ? `6px 6px 0 ${colors.accent}` : undefined,
             }}
-          >
-            {text}
-          </span>
-        ))}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-1 text-[11px] font-semibold">
+        <div className="flex flex-wrap gap-3 opacity-80">
+          {preview.items.map((label, idx) => (
+            <span
+              key={label}
+              className="border-b pb-0.5"
+              style={{
+                borderColor: idx === 0 ? colors.accent : "transparent",
+                color: idx === 0 ? colors.text : colors.text,
+              }}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+        <span
+          className="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap"
+          style={{
+            backgroundColor: colors.primary,
+            color: colors.background,
+            borderRadius: isSharp ? "0px" : slug === "restaurant" || slug === "salon-beauty" || slug === "community-church" ? "999px" : "6px",
+          }}
+        >
+          {slug === "developer-portfolio" ? "01 ↗" : "Preview"}
+        </span>
       </div>
-      <span
-        className="absolute -bottom-8 -right-6 h-24 w-24 rounded-full opacity-20"
-        style={{ backgroundColor: colors.accent }}
-      />
     </div>
   );
 }

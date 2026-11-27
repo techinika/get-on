@@ -1,4 +1,4 @@
-export type SiteAnalyticsRange = "7d" | "30d" | "90d";
+export type SiteAnalyticsRange = "7d" | "30d" | "90d" | "custom";
 
 export type SiteDailyPoint = {
   day: string;
@@ -36,6 +36,9 @@ export type CloudflareSiteAnalytics = {
   source: "cloudflare";
   range: SiteAnalyticsRange;
   windowDays: number;
+  from: string;
+  to: string;
+  retentionLimited?: boolean;
   visitors: number;
   views: number;
   previousVisitors: number | null;
@@ -54,6 +57,8 @@ export type FetchCloudflareSiteAnalyticsInput = {
   apiToken: string;
   hostnames: string[];
   range?: SiteAnalyticsRange;
+  from?: string;
+  to?: string;
   zoneId?: string;
   rootDomain?: string;
   now?: Date;
@@ -94,8 +99,117 @@ function countryNameFor(rawCode: string): { code: string; name: string } {
 }
 
 export function normalizeAnalyticsRange(raw: string | null | undefined): SiteAnalyticsRange {
-  if (raw === "7d" || raw === "30d" || raw === "90d") return raw;
+  if (raw === "7d" || raw === "30d" || raw === "90d" || raw === "custom") return raw;
   return "30d";
+}
+
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+export function parseIsoUtcDay(raw: string | null | undefined): Date | null {
+  const cleaned = (raw ?? "").trim();
+  if (!ISO_DAY_RE.test(cleaned)) return null;
+  const date = new Date(`${cleaned}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) return null;
+  if (date.toISOString().slice(0, 10) !== cleaned) return null;
+  return date;
+}
+
+export type ResolvedAnalyticsWindow =
+  | {
+      ok: true;
+      range: SiteAnalyticsRange;
+      from: string;
+      to: string;
+      windowDays: number;
+      startDate: Date;
+      endExclusive: Date;
+      cfStartDate: Date;
+      cfEndExclusive: Date;
+      retentionLimited: boolean;
+      beyondRetentionOnly: boolean;
+    }
+  | {
+      ok: false;
+      errorCode: "INVALID_DATE_RANGE";
+      errorMessage: string;
+    };
+
+export function resolveAnalyticsDateWindow(input: {
+  range?: string | null;
+  from?: string | null;
+  to?: string | null;
+  now?: Date;
+}): ResolvedAnalyticsWindow {
+  const now = input.now ?? new Date();
+  const todayUtc = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const todayIso = isoDayOf(todayUtc);
+  const hasFrom = Boolean(input.from?.trim());
+  const hasTo = Boolean(input.to?.trim());
+  const requestedRange = normalizeAnalyticsRange(input.range);
+
+  let fromDate: Date;
+  let toDate: Date;
+  let effectiveRange: SiteAnalyticsRange;
+
+  if (hasFrom || hasTo || requestedRange === "custom") {
+    const parsedFrom = parseIsoUtcDay(input.from);
+    const parsedTo = hasTo ? parseIsoUtcDay(input.to) : todayUtc;
+    if (!parsedFrom || !parsedTo) {
+      return {
+        ok: false,
+        errorCode: "INVALID_DATE_RANGE",
+        errorMessage: "Please enter valid YYYY-MM-DD start and end dates.",
+      };
+    }
+    toDate = parsedTo.getTime() > todayUtc.getTime() ? todayUtc : parsedTo;
+    fromDate = parsedFrom;
+    if (fromDate.getTime() > toDate.getTime()) {
+      return {
+        ok: false,
+        errorCode: "INVALID_DATE_RANGE",
+        errorMessage: "Start date must be on or before the end date.",
+      };
+    }
+    const spanDays = Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+    if (spanDays > 90) {
+      return {
+        ok: false,
+        errorCode: "INVALID_DATE_RANGE",
+        errorMessage: "Date range cannot exceed 90 days.",
+      };
+    }
+    effectiveRange = "custom";
+  } else {
+    const presetDays = requestedRange === "7d" ? 7 : requestedRange === "90d" ? 90 : 30;
+    toDate = todayUtc;
+    fromDate = shiftUtcDays(todayUtc, -(presetDays - 1));
+    effectiveRange = requestedRange;
+  }
+
+  const from = isoDayOf(fromDate);
+  const to = isoDayOf(toDate);
+  const windowDays = Math.max(1, Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1);
+  const endExclusive = shiftUtcDays(toDate, 1);
+
+  // Cloudflare httpRequestsAdaptiveGroups retains ~30 days on Free/Pro plans.
+  const earliestCfDate = shiftUtcDays(todayUtc, -29);
+  const retentionLimited = fromDate.getTime() < earliestCfDate.getTime();
+  const cfStartDate = retentionLimited ? earliestCfDate : fromDate;
+  const beyondRetentionOnly = cfStartDate.getTime() >= endExclusive.getTime();
+
+  return {
+    ok: true,
+    range: effectiveRange,
+    from: from <= todayIso ? from : todayIso,
+    to,
+    windowDays,
+    startDate: fromDate,
+    endExclusive,
+    cfStartDate,
+    cfEndExclusive: endExclusive,
+    retentionLimited,
+    beyondRetentionOnly,
+  };
 }
 
 export function normalizeAnalyticsHostnames(rawHostnames: string[]): string[] {
@@ -161,15 +275,21 @@ function shiftUtcDays(base: Date, deltaDays: number): Date {
 function emptyResult(
   range: SiteAnalyticsRange,
   windowDays: number,
+  from: string,
+  to: string,
   hostnames: string[],
   errorCode?: string,
   errorMessage?: string,
+  retentionLimited?: boolean,
 ): CloudflareSiteAnalytics {
   return {
     ok: !errorCode,
     source: "cloudflare",
     range,
     windowDays,
+    from,
+    to,
+    ...(retentionLimited ? { retentionLimited: true } : {}),
     visitors: 0,
     views: 0,
     previousVisitors: null,
@@ -330,23 +450,62 @@ type GraphqlZoneNode = {
 export async function fetchCloudflareSiteAnalytics(
   input: FetchCloudflareSiteAnalyticsInput,
 ): Promise<CloudflareSiteAnalytics> {
-  const range = normalizeAnalyticsRange(input.range);
-  // Cloudflare httpRequestsAdaptiveGroups retains ~31 days on Free/Pro plans.
-  const requestedDays = range === "7d" ? 7 : range === "30d" ? 30 : 90;
-  const windowDays = Math.min(requestedDays, 30);
+  const now = input.now ?? new Date();
+  const resolvedWindow = resolveAnalyticsDateWindow({
+    range: input.range,
+    from: input.from,
+    to: input.to,
+    now,
+  });
   const hostnames = normalizeAnalyticsHostnames(input.hostnames);
+  if (!resolvedWindow.ok) {
+    const todayIso = isoDayOf(now);
+    return emptyResult(
+      "custom",
+      0,
+      todayIso,
+      todayIso,
+      hostnames,
+      resolvedWindow.errorCode,
+      resolvedWindow.errorMessage,
+    );
+  }
+
+  const {
+    range,
+    from,
+    to,
+    windowDays,
+    endExclusive,
+    cfStartDate,
+    cfEndExclusive,
+    retentionLimited,
+    beyondRetentionOnly,
+  } = resolvedWindow;
   const apiToken = (input.apiToken ?? "").trim();
 
   if (hostnames.length === 0) {
-    return emptyResult(range, windowDays, hostnames, "NO_HOSTNAMES", "No site hostnames to query.");
+    return emptyResult(
+      range,
+      windowDays,
+      from,
+      to,
+      hostnames,
+      "NO_HOSTNAMES",
+      "No site hostnames to query.",
+      retentionLimited,
+    );
   }
   if (!apiToken) {
     return emptyResult(
       range,
       windowDays,
+      from,
+      to,
       hostnames,
       "ANALYTICS_NOT_CONFIGURED",
       "Cloudflare analytics token is not configured.",
+      retentionLimited,
     );
   }
 
@@ -363,32 +522,55 @@ export async function fetchCloudflareSiteAnalytics(
     return emptyResult(
       range,
       windowDays,
+      from,
+      to,
       hostnames,
       "ZONE_NOT_CONFIGURED",
       "Cloudflare zone ID could not be resolved.",
+      retentionLimited,
     );
   }
 
-  const now = input.now ?? new Date();
-  const endExclusive = shiftUtcDays(now, 1);
-  const startDate = shiftUtcDays(endExclusive, -windowDays);
-  const comparePrevious = range === "7d";
-  const dailyStartDate = comparePrevious ? shiftUtcDays(endExclusive, -(windowDays * 2)) : startDate;
+  if (beyondRetentionOnly) {
+    return emptyResult(
+      range,
+      windowDays,
+      from,
+      to,
+      hostnames,
+      undefined,
+      undefined,
+      true,
+    );
+  }
 
-  const currentStartDay = isoDayOf(startDate);
+  const cfSpanDays = Math.max(
+    1,
+    Math.round((cfEndExclusive.getTime() - cfStartDate.getTime()) / 86_400_000),
+  );
+  const comparePrevious =
+    !retentionLimited &&
+    (range === "7d" || (range === "custom" && windowDays <= 14));
+  const previousStartDate = shiftUtcDays(cfStartDate, -windowDays);
+  const earliestAllowed = shiftUtcDays(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), -29);
+  const canComparePrevious =
+    comparePrevious && previousStartDate.getTime() >= earliestAllowed.getTime();
+  const dailyStartDate = canComparePrevious ? previousStartDate : cfStartDate;
+
+  const currentStartDay = isoDayOf(cfStartDate);
   const previousStartDay = isoDayOf(dailyStartDate);
-  const endDayInclusive = isoDayOf(shiftUtcDays(endExclusive, -1));
+  const endDayInclusive = to;
 
   const filter = {
-    datetime_geq: startDate.toISOString(),
-    datetime_lt: endExclusive.toISOString(),
+    datetime_geq: cfStartDate.toISOString(),
+    datetime_lt: cfEndExclusive.toISOString(),
     clientRequestHTTPHost_in: hostnames,
     requestSource: "eyeball",
     edgeResponseContentTypeName: "html",
   };
   const dailyFilter = {
     datetime_geq: dailyStartDate.toISOString(),
-    datetime_lt: endExclusive.toISOString(),
+    datetime_lt: cfEndExclusive.toISOString(),
     clientRequestHTTPHost_in: hostnames,
     requestSource: "eyeball",
     edgeResponseContentTypeName: "html",
@@ -416,9 +598,12 @@ export async function fetchCloudflareSiteAnalytics(
     return emptyResult(
       range,
       windowDays,
+      from,
+      to,
       hostnames,
       "CLOUDFLARE_UNREACHABLE",
       "Could not reach Cloudflare Analytics.",
+      retentionLimited,
     );
   }
 
@@ -439,29 +624,32 @@ export async function fetchCloudflareSiteAnalytics(
     return emptyResult(
       range,
       windowDays,
+      from,
+      to,
       hostnames,
       isAuth ? "CLOUDFLARE_UNAUTHORIZED" : "CLOUDFLARE_GRAPHQL_ERROR",
       isAuth
         ? "Cloudflare token needs Zone Analytics Read access."
         : "Cloudflare Analytics query could not be completed.",
+      retentionLimited,
     );
   }
 
   const zone = payload?.data?.viewer?.zones?.[0];
   if (!zone) {
-    return emptyResult(range, windowDays, hostnames);
+    return emptyResult(range, windowDays, from, to, hostnames, undefined, undefined, retentionLimited);
   }
 
   const dailyBuckets = new Map<string, { visitors: number; views: number }>();
-  for (let i = 0; i < windowDays; i += 1) {
-    const day = isoDayOf(shiftUtcDays(startDate, i));
+  for (let i = 0; i < cfSpanDays; i += 1) {
+    const day = isoDayOf(shiftUtcDays(cfStartDate, i));
     dailyBuckets.set(day, { visitors: 0, views: 0 });
   }
 
   let totalVisitors = 0;
   let totalViews = 0;
-  let previousVisitors = comparePrevious ? 0 : null;
-  let previousViews = comparePrevious ? 0 : null;
+  let previousVisitors = canComparePrevious ? 0 : null;
+  let previousViews = canComparePrevious ? 0 : null;
 
   for (const row of zone.daily ?? []) {
     const day = String(row.dimensions?.date ?? "").slice(0, 10);
@@ -475,7 +663,7 @@ export async function fetchCloudflareSiteAnalytics(
       dailyBuckets.set(day, existing);
       totalVisitors += visitors;
       totalViews += views;
-    } else if (comparePrevious && day >= previousStartDay && day < currentStartDay) {
+    } else if (canComparePrevious && day >= previousStartDay && day < currentStartDay) {
       previousVisitors = (previousVisitors ?? 0) + visitors;
       previousViews = (previousViews ?? 0) + views;
     }
@@ -561,6 +749,9 @@ export async function fetchCloudflareSiteAnalytics(
     source: "cloudflare",
     range,
     windowDays,
+    from,
+    to,
+    ...(retentionLimited ? { retentionLimited: true } : {}),
     visitors: totalVisitors,
     views: totalViews,
     previousVisitors,

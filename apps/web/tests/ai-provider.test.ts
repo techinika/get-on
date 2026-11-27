@@ -259,6 +259,64 @@ describe("Workers AI provider", () => {
     expect(result.imageBase64).toBe("iVBORw==");
     expect(result.mime).toBe("image/png");
   });
+
+  it("omits tool_choice when tools are empty and parses inline tool calls cleanly", async () => {
+    const fetchNoTools = vi.fn(async () =>
+      jsonResponse({
+        choices: [{ message: { content: "Plain assistant response." } }],
+        usage: { prompt_tokens: 14, completion_tokens: 6 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchNoTools);
+
+    const provider = new WorkersAiProvider(config);
+    const plain = await provider.chatWithTools({
+      modelId: "@cf/meta/llama-3.1-8b-instruct",
+      messages: [{ role: "user", content: "continue" }],
+      tools: [],
+    });
+    expect(plain.text).toBe("Plain assistant response.");
+    expect(plain.toolCalls).toEqual([]);
+    const [, noToolsInit] = fetchNoTools.mock.calls[0] as unknown as [string, RequestInit];
+    const noToolsPayload = JSON.parse(String(noToolsInit.body)) as Record<string, unknown>;
+    expect(noToolsPayload.tools).toBeUndefined();
+    expect(noToolsPayload.tool_choice).toBeUndefined();
+
+    const fetchInline = vi.fn(async () =>
+      jsonResponse({
+        choices: [
+          {
+            message: {
+              content:
+                '<function=lookup_site>{"projectId":"proj-1"}</function>',
+            },
+          },
+        ],
+        usage: { prompt_tokens: 18, completion_tokens: 9 },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchInline);
+
+    const parsed = await provider.chatWithTools({
+      modelId: "@cf/meta/llama-3.1-8b-instruct",
+      messages: [{ role: "user", content: "Inspect my site" }],
+      tools: [
+        {
+          name: "lookup_site",
+          description: "Inspect website",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+    });
+    expect(parsed.toolCalls).toHaveLength(1);
+    expect(typeof parsed.toolCalls[0]?.id).toBe("string");
+    expect(parsed.toolCalls[0]?.id.length).toBeGreaterThan(0);
+    expect(parsed.toolCalls[0]).toMatchObject({
+      name: "lookup_site",
+      arguments: { projectId: "proj-1" },
+    });
+    expect(parsed.text).toBe("");
+  });
 });
 
 

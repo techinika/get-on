@@ -1,7 +1,7 @@
 import {
   fetchCloudflareSiteAnalytics,
   normalizeAnalyticsHostnames,
-  normalizeAnalyticsRange,
+  resolveAnalyticsDateWindow,
   sha256Hex,
   signWorkerRequest,
   type CloudflareSiteAnalytics,
@@ -11,6 +11,8 @@ import {
 export type CloudflareStatsLookupOptions = {
   hostnames: string[];
   range?: SiteAnalyticsRange;
+  from?: string;
+  to?: string;
   rootDomain?: string;
   workerUrl?: string;
   workerSecret?: string;
@@ -18,6 +20,7 @@ export type CloudflareStatsLookupOptions = {
   zoneId?: string;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  now?: Date;
 };
 
 export type CloudflareStatsLookupResult = CloudflareSiteAnalytics & {
@@ -44,8 +47,40 @@ function resolvedWorkerUrl(env: NodeJS.ProcessEnv = process.env): string {
 export async function getCloudflareSiteAnalytics(
   options: CloudflareStatsLookupOptions,
 ): Promise<CloudflareStatsLookupResult> {
-  const range = normalizeAnalyticsRange(options.range);
+  const resolvedWindow = resolveAnalyticsDateWindow({
+    range: options.range,
+    from: options.from,
+    to: options.to,
+    now: options.now,
+  });
   const hostnames = normalizeAnalyticsHostnames(options.hostnames);
+
+  if (!resolvedWindow.ok) {
+    const todayIso = (options.now ?? new Date()).toISOString().slice(0, 10);
+    return {
+      ok: false,
+      source: "cloudflare",
+      via: "none",
+      range: "custom",
+      windowDays: 0,
+      from: todayIso,
+      to: todayIso,
+      visitors: 0,
+      views: 0,
+      previousVisitors: null,
+      previousViews: null,
+      daily: [],
+      countries: [],
+      referrers: [],
+      pages: [],
+      devices: [],
+      hostnames,
+      errorCode: resolvedWindow.errorCode,
+      errorMessage: resolvedWindow.errorMessage,
+    };
+  }
+
+  const { range, from, to, windowDays, retentionLimited } = resolvedWindow;
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? 9_000;
   const rootDomain = (options.rootDomain || process.env.ROOT_DOMAIN || "get-on.tech").trim();
@@ -71,7 +106,10 @@ export async function getCloudflareSiteAnalytics(
       source: "cloudflare",
       via: "none",
       range,
-      windowDays: range === "7d" ? 7 : 30,
+      windowDays,
+      from,
+      to,
+      ...(retentionLimited ? { retentionLimited: true } : {}),
       visitors: 0,
       views: 0,
       previousVisitors: null,
@@ -97,6 +135,7 @@ export async function getCloudflareSiteAnalytics(
       const body = JSON.stringify({
         hostnames,
         range,
+        ...(range === "custom" || options.from || options.to ? { from, to } : {}),
         ...(zoneId ? { zoneId } : {}),
         rootDomain,
       });
@@ -129,6 +168,8 @@ export async function getCloudflareSiteAnalytics(
       if (res.ok && parsed?.ok === true) {
         return {
           ...(parsed as CloudflareSiteAnalytics),
+          from: parsed.from ?? from,
+          to: parsed.to ?? to,
           via: "worker",
         };
       }
@@ -145,8 +186,10 @@ export async function getCloudflareSiteAnalytics(
       apiToken,
       hostnames,
       range,
+      ...(range === "custom" || options.from || options.to ? { from, to } : {}),
       zoneId,
       rootDomain,
+      now: options.now,
       fetchImpl,
       timeoutMs,
     });
@@ -161,7 +204,10 @@ export async function getCloudflareSiteAnalytics(
     source: "cloudflare",
     via: "none",
     range,
-    windowDays: range === "7d" ? 7 : 30,
+    windowDays,
+    from,
+    to,
+    ...(retentionLimited ? { retentionLimited: true } : {}),
     visitors: 0,
     views: 0,
     previousVisitors: null,

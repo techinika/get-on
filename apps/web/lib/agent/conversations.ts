@@ -191,6 +191,26 @@ export async function appendAgentMessage(
   return messageFromRow(data as MessageRow);
 }
 
+export async function finishOpenRunsForConversation(
+  admin: Admin,
+  conversationId: string,
+  status: "succeeded" | "failed" | "cancelled",
+  errorCode: string | null = null,
+): Promise<void> {
+  const { error } = await admin
+    .from("agent_runs")
+    .update({
+      status,
+      error_code: errorCode,
+      finished_at: new Date().toISOString(),
+    })
+    .eq("conversation_id", conversationId)
+    .in("status", ["running", "queued"]);
+  if (error) {
+    console.error("[agent] could not finish open runs", conversationId, error);
+  }
+}
+
 export async function startAgentRun(
   admin: Admin,
   input: {
@@ -211,7 +231,7 @@ export async function startAgentRun(
     .single();
   if (error) {
     if (error.code === "23505") {
-      const staleCutoff = new Date(Date.now() - 90_000).toISOString();
+      const staleCutoff = new Date(Date.now() - 65_000).toISOString();
       const { data: expired } = await admin
         .from("agent_runs")
         .update({

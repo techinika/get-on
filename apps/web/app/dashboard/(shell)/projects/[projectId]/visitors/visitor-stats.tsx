@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  CalendarRange,
   Compass,
   Eye,
   FileText,
   Globe2,
   MonitorSmartphone,
   RefreshCw,
+  RotateCcw,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -30,12 +32,14 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   buildSevenDayVisitorTrend,
+  buildVisitorTrendSeries,
   formatDayShortUtc,
-  type SevenDayTrendPoint,
+  type VisitorTrendPoint,
 } from "@/lib/stats/trend";
 import { cn } from "@/lib/utils";
 
-type RangeOption = "7d" | "30d" | "90d";
+type PresetRangeOption = "7d" | "30d" | "90d";
+type RangeOption = PresetRangeOption | "custom";
 
 type DailyRow = {
   day: string;
@@ -70,8 +74,15 @@ type DeviceRow = {
 
 type StatsResponse = {
   ok?: boolean;
+  error?: string;
+  message?: string;
   source?: string;
   range?: RangeOption;
+  from?: string;
+  to?: string;
+  windowDays?: number;
+  isCustomRange?: boolean;
+  retentionLimited?: boolean;
   visitors: number;
   views: number;
   previousVisitors?: number | null;
@@ -87,25 +98,65 @@ type StatsResponse = {
   cloudflareNotice?: string;
 };
 
-const RANGES: Array<{ value: RangeOption; label: string }> = [
+const RANGES: Array<{ value: PresetRangeOption; label: string }> = [
   { value: "7d", label: "Last 7 days" },
   { value: "30d", label: "Last 30 days" },
   { value: "90d", label: "Last 90 days" },
 ];
 
+const ISO_DAY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isoDayUtc(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function defaultRangeDates(preset: PresetRangeOption, now = new Date()): { from: string; to: string } {
+  const days = preset === "7d" ? 7 : preset === "90d" ? 90 : 30;
+  const to = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  const from = new Date(to);
+  from.setUTCDate(to.getUTCDate() - (days - 1));
+  return { from: isoDayUtc(from), to: isoDayUtc(to) };
+}
+
+function validateCustomDates(from: string, to: string, todayIso: string): string | null {
+  if (!ISO_DAY_RE.test(from) || !ISO_DAY_RE.test(to)) {
+    return "Please select valid start and end dates.";
+  }
+  const fromDate = new Date(`${from}T00:00:00Z`);
+  const toDate = new Date(`${to}T00:00:00Z`);
+  if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
+    return "Please select valid start and end dates.";
+  }
+  if (from > to) {
+    return "Start date must be on or before the end date.";
+  }
+  if (to > todayIso) {
+    return "End date cannot be in the future.";
+  }
+  const spanDays = Math.round((toDate.getTime() - fromDate.getTime()) / 86_400_000) + 1;
+  if (spanDays > 90) {
+    return "Custom range cannot exceed 90 days.";
+  }
+  return null;
+}
+
 function formatNumber(n: number): string {
   return new Intl.NumberFormat("en-US").format(Math.max(0, Math.round(n)));
 }
 
-function pctChangeHint(current: number, previous: number | null | undefined): string | undefined {
+function pctChangeHint(
+  current: number,
+  previous: number | null | undefined,
+  comparisonLabel = "previous period",
+): string | undefined {
   if (previous == null) return undefined;
   if (previous === 0) {
-    return current > 0 ? "Up from 0 in the previous 7 days" : "Same as previous 7 days";
+    return current > 0 ? `Up from 0 in the ${comparisonLabel}` : `Same as ${comparisonLabel}`;
   }
   const delta = Math.round(((current - previous) / previous) * 100);
-  if (delta > 0) return `+${delta}% vs previous 7 days`;
-  if (delta < 0) return `${delta}% vs previous 7 days`;
-  return "No change vs previous 7 days";
+  if (delta > 0) return `+${delta}% vs ${comparisonLabel}`;
+  if (delta < 0) return `${delta}% vs ${comparisonLabel}`;
+  return `No change vs ${comparisonLabel}`;
 }
 
 function sharePct(part: number, total: number): number {
@@ -153,22 +204,39 @@ function TrendTooltip({
   );
 }
 
-function SevenDayVisitorTrendChart({
+function VisitorTrendChart({
   daily,
+  range,
+  from,
+  to,
   previousVisitors,
 }: {
   daily: DailyRow[];
+  range: RangeOption;
+  from?: string;
+  to?: string;
   previousVisitors?: number | null;
 }) {
-  const data = useMemo<SevenDayTrendPoint[]>(
-    () => buildSevenDayVisitorTrend(daily),
-    [daily],
+  const isCustom = range === "custom" && Boolean(from && to);
+  const data = useMemo<VisitorTrendPoint[]>(
+    () =>
+      isCustom
+        ? buildVisitorTrendSeries(daily, { from, to })
+        : buildSevenDayVisitorTrend(daily),
+    [daily, isCustom, from, to],
   );
-  const sevenDayTotal = useMemo(
+  const trendTotal = useMemo(
     () => data.reduce((sum, item) => sum + item.visitors, 0),
     [data],
   );
-  const trendHint = pctChangeHint(sevenDayTotal, previousVisitors);
+  const comparisonLabel = isCustom ? `previous ${data.length} days` : "previous 7 days";
+  const trendHint = pctChangeHint(trendTotal, previousVisitors, comparisonLabel);
+  const title = isCustom
+    ? `Visitor trend (${data.length} day${data.length === 1 ? "" : "s"})`
+    : "7-day visitor trend";
+  const subtitle = isCustom && from && to
+    ? `${formatNumber(trendTotal)} visitors from ${formatDayShortUtc(from)} to ${formatDayShortUtc(to)}`
+    : `${formatNumber(trendTotal)} visitors over the last 7 days`;
 
   return (
     <AppCard className="p-6">
@@ -176,10 +244,10 @@ function SevenDayVisitorTrendChart({
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp size={18} strokeWidth={1.75} className="text-primary" aria-hidden />
-            <h3 className="text-[16px] font-semibold text-text">7-day visitor trend</h3>
+            <h3 className="text-[16px] font-semibold text-text">{title}</h3>
           </div>
           <p className="mt-0.5 text-sm text-text-muted">
-            {formatNumber(sevenDayTotal)} visitors over the last 7 days
+            {subtitle}
             {trendHint ? ` · ${trendHint}` : ""}
           </p>
         </div>
@@ -194,7 +262,7 @@ function SevenDayVisitorTrendChart({
       <div
         className="mt-4 h-[220px] w-full"
         role="img"
-        aria-label="7-day trend of website visitor counts"
+        aria-label={isCustom ? `Visitor trend from ${from} to ${to}` : "7-day trend of website visitor counts"}
       >
         <ResponsiveContainer width="100%" height="100%" initialDimension={{ width: 640, height: 220 }}>
           <AreaChart data={data} margin={{ top: 10, right: 12, left: -16, bottom: 0 }}>
@@ -210,6 +278,7 @@ function SevenDayVisitorTrendChart({
               tick={{ fill: "var(--text-muted)", fontSize: 12 }}
               axisLine={{ stroke: "var(--border)" }}
               tickLine={false}
+              minTickGap={20}
             />
             <YAxis
               allowDecimals={false}
@@ -227,7 +296,7 @@ function SevenDayVisitorTrendChart({
               strokeWidth={2.5}
               fill="url(#gsVisitorsAreaFill)"
               activeDot={{ r: 5, fill: "var(--primary)", stroke: "var(--surface)", strokeWidth: 2 }}
-              dot={{ r: 3, fill: "var(--primary)" }}
+              dot={{ r: data.length <= 14 ? 3 : 0, fill: "var(--primary)" }}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -236,16 +305,28 @@ function SevenDayVisitorTrendChart({
   );
 }
 
-function RangeTrafficChart({ daily, rangeLabel }: { daily: DailyRow[]; rangeLabel: string }) {
+function RangeTrafficChart({
+  daily,
+  rangeLabel,
+  from,
+  to,
+}: {
+  daily: DailyRow[];
+  rangeLabel: string;
+  from?: string;
+  to?: string;
+}) {
   const data = useMemo(
     () =>
-      [...daily].reverse().map((row) => ({
-        day: row.day,
-        label: formatDayShortUtc(row.day),
-        visitors: row.visitors,
-        views: row.views,
-      })),
-    [daily],
+      from && to
+        ? buildVisitorTrendSeries(daily, { from, to })
+        : [...daily].reverse().map((row) => ({
+            day: row.day,
+            label: formatDayShortUtc(row.day),
+            visitors: row.visitors,
+            views: row.views,
+          })),
+    [daily, from, to],
   );
 
   if (data.length === 0) return null;
@@ -298,28 +379,49 @@ function RangeTrafficChart({ daily, rangeLabel }: { daily: DailyRow[]; rangeLabe
 }
 
 export function VisitorStats({ projectId }: { projectId: string }) {
+  const todayIso = isoDayUtc(new Date());
+  const initialDates = defaultRangeDates("30d");
+
   const [range, setRange] = useState<RangeOption>("30d");
+  const [appliedFrom, setAppliedFrom] = useState<string>(initialDates.from);
+  const [appliedTo, setAppliedTo] = useState<string>(initialDates.to);
+  const [draftFrom, setDraftFrom] = useState<string>(initialDates.from);
+  const [draftTo, setDraftTo] = useState<string>(initialDates.to);
+  const [dateError, setDateError] = useState<string | null>(null);
+
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [loadedKey, setLoadedKey] = useState<string | null>(null);
 
-  const requestKey = `${projectId}:${range}:${refreshTick}`;
+  const requestKey =
+    range === "custom"
+      ? `${projectId}:custom:${appliedFrom}:${appliedTo}:${refreshTick}`
+      : `${projectId}:${range}:${refreshTick}`;
   const loading = loadedKey !== requestKey;
 
   useEffect(() => {
     let cancelled = false;
+    const query =
+      range === "custom"
+        ? `range=custom&from=${encodeURIComponent(appliedFrom)}&to=${encodeURIComponent(appliedTo)}`
+        : `range=${range}`;
 
-    fetch(
-      `/api/projects/${encodeURIComponent(projectId)}/stats?range=${range}`,
-      { cache: "no-store" },
-    )
-      .then((response) => response.json() as Promise<StatsResponse>)
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/stats?${query}`, {
+      cache: "no-store",
+    })
+      .then(async (response) => {
+        const data = (await response.json()) as StatsResponse;
+        if (!response.ok) {
+          throw new Error(data.message || "Could not load analytics");
+        }
+        return data;
+      })
       .then((data) => {
         if (cancelled) return;
         setStats(data);
         setLoadedKey(requestKey);
       })
-      .catch(() => {
+      .catch((err) => {
         if (cancelled) return;
         setStats({
           visitors: 0,
@@ -329,7 +431,7 @@ export function VisitorStats({ projectId }: { projectId: string }) {
           referrers: [],
           pages: [],
           devices: [],
-          status: "Could not load analytics",
+          status: err instanceof Error ? err.message : "Could not load analytics",
         });
         setLoadedKey(requestKey);
       });
@@ -337,7 +439,29 @@ export function VisitorStats({ projectId }: { projectId: string }) {
     return () => {
       cancelled = true;
     };
-  }, [projectId, range, requestKey]);
+  }, [projectId, range, appliedFrom, appliedTo, requestKey]);
+
+  function selectPreset(preset: PresetRangeOption) {
+    const dates = defaultRangeDates(preset);
+    setDateError(null);
+    setRange(preset);
+    setAppliedFrom(dates.from);
+    setAppliedTo(dates.to);
+    setDraftFrom(dates.from);
+    setDraftTo(dates.to);
+  }
+
+  function applyCustomRange() {
+    const validationError = validateCustomDates(draftFrom, draftTo, todayIso);
+    if (validationError) {
+      setDateError(validationError);
+      return;
+    }
+    setDateError(null);
+    setAppliedFrom(draftFrom);
+    setAppliedTo(draftTo);
+    setRange("custom");
+  }
 
   const countries = stats?.countries ?? [];
   const referrers = stats?.referrers ?? [];
@@ -345,6 +469,17 @@ export function VisitorStats({ projectId }: { projectId: string }) {
   const devices = stats?.devices ?? [];
   const daily = stats?.daily ?? [];
   const hostnames = stats?.hostnames ?? [];
+  const activeFrom = stats?.from ?? appliedFrom;
+  const activeTo = stats?.to ?? appliedTo;
+  const activeWindowDays = stats?.windowDays ?? 30;
+  const rangeLabel =
+    range === "custom"
+      ? `${formatDayShortUtc(activeFrom)} – ${formatDayShortUtc(activeTo)}`
+      : range === "7d"
+        ? "Last 7 days"
+        : range === "30d"
+          ? "Last 30 days"
+          : "Last 90 days";
 
   const totalVisitors = stats?.visitors ?? 0;
   const totalViews = stats?.views ?? 0;
@@ -370,56 +505,129 @@ export function VisitorStats({ projectId }: { projectId: string }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div
-            role="group"
-            aria-label="Time range"
-            className="inline-flex rounded-input border border-border bg-surface p-1"
-          >
-            {RANGES.map((opt) => (
-              <button
-                key={opt.value}
-                type="button"
-                onClick={() => setRange(opt.value)}
-                aria-pressed={range === opt.value}
-                className={cn(
-                  "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
-                  range === opt.value
-                    ? "bg-primary text-on-primary"
-                    : "text-text-muted hover:text-text",
-                )}
-              >
-                {opt.label}
-              </button>
-            ))}
+      <div className="flex flex-col gap-3 rounded-card border border-border bg-surface p-3 sm:p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <div
+              role="group"
+              aria-label="Time range"
+              className="inline-flex rounded-input border border-border bg-surface-muted p-1"
+            >
+              {RANGES.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => selectPreset(opt.value)}
+                  aria-pressed={range === opt.value}
+                  className={cn(
+                    "whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
+                    range === opt.value
+                      ? "bg-primary text-on-primary"
+                      : "text-text-muted hover:text-text",
+                  )}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            {stats?.source === "cloudflare" || stats?.source === "mixed" ? (
+              <Badge variant="live" dot>
+                Cloudflare Analytics
+              </Badge>
+            ) : stats?.status ? (
+              <Badge variant="draft">{stats.status}</Badge>
+            ) : null}
           </div>
-          {stats?.source === "cloudflare" || stats?.source === "mixed" ? (
-            <Badge variant="live" dot>
-              Cloudflare Analytics
-            </Badge>
-          ) : stats?.status ? (
-            <Badge variant="draft">{stats.status}</Badge>
-          ) : null}
+
+          <div className="flex items-center gap-2">
+            {hostnames.length > 0 ? (
+              <span className="hidden text-xs text-text-muted sm:inline">
+                {hostnames.join(", ")}
+              </span>
+            ) : null}
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={loading}
+              onClick={() => setRefreshTick((tick) => tick + 1)}
+            >
+              {!loading ? <RefreshCw size={15} strokeWidth={1.75} aria-hidden /> : null}
+              Refresh
+            </Button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {hostnames.length > 0 ? (
-            <span className="hidden text-xs text-text-muted sm:inline">
-              {hostnames.join(", ")}
+        <form
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyCustomRange();
+          }}
+          className="flex flex-wrap items-end gap-3 border-t border-border pt-3"
+          aria-label="Custom date range filter"
+        >
+          <div className="flex items-center gap-1.5 text-xs font-medium text-text-muted">
+            <CalendarRange size={15} strokeWidth={1.75} aria-hidden />
+            <span>Custom period</span>
+          </div>
+          <label className="flex flex-col gap-1 text-xs text-text-muted">
+            <span>From</span>
+            <input
+              type="date"
+              value={draftFrom}
+              max={draftTo || todayIso}
+              onChange={(event) => {
+                setDraftFrom(event.target.value);
+                setDateError(null);
+              }}
+              aria-label="Start date"
+              className="h-9 rounded-input border border-border bg-surface px-2.5 text-sm tabular-nums text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-xs text-text-muted">
+            <span>To</span>
+            <input
+              type="date"
+              value={draftTo}
+              min={draftFrom || undefined}
+              max={todayIso}
+              onChange={(event) => {
+                setDraftTo(event.target.value);
+                setDateError(null);
+              }}
+              aria-label="End date"
+              className="h-9 rounded-input border border-border bg-surface px-2.5 text-sm tabular-nums text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            />
+          </label>
+          <div className="flex items-center gap-2">
+            <Button type="submit" variant="primary" size="sm" disabled={loading}>
+              Apply
+            </Button>
+            {range === "custom" ? (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => selectPreset("7d")}
+              >
+                <RotateCcw size={14} strokeWidth={1.75} aria-hidden />
+                Reset
+              </Button>
+            ) : null}
+          </div>
+          {range === "custom" ? (
+            <span className="ml-auto text-xs tabular-nums text-text-muted">
+              Showing {formatDayShortUtc(activeFrom)} – {formatDayShortUtc(activeTo)} ({activeWindowDays}{" "}
+              day{activeWindowDays === 1 ? "" : "s"})
             </span>
           ) : null}
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            loading={loading}
-            onClick={() => setRefreshTick((tick) => tick + 1)}
-          >
-            {!loading ? <RefreshCw size={15} strokeWidth={1.75} aria-hidden /> : null}
-            Refresh
-          </Button>
-        </div>
+        </form>
+
+        {dateError ? (
+          <p role="alert" className="text-xs font-medium text-danger-text">
+            {dateError}
+          </p>
+        ) : null}
       </div>
 
       {stats?.cloudflareNotice ? (
@@ -439,13 +647,21 @@ export function VisitorStats({ projectId }: { projectId: string }) {
               label="Visitors"
               value={formatNumber(totalVisitors)}
               icon={<Users size={18} strokeWidth={1.75} />}
-              hint={pctChangeHint(totalVisitors, stats?.previousVisitors)}
+              hint={pctChangeHint(
+                totalVisitors,
+                stats?.previousVisitors,
+                range === "custom" ? `previous ${activeWindowDays} days` : "previous 7 days",
+              )}
             />
             <StatCard
               label="Page views"
               value={formatNumber(totalViews)}
               icon={<Eye size={18} strokeWidth={1.75} />}
-              hint={pctChangeHint(totalViews, stats?.previousViews)}
+              hint={pctChangeHint(
+                totalViews,
+                stats?.previousViews,
+                range === "custom" ? `previous ${activeWindowDays} days` : "previous 7 days",
+              )}
             />
             <StatCard
               label="Top country"
@@ -469,8 +685,11 @@ export function VisitorStats({ projectId }: { projectId: string }) {
             />
           </div>
 
-          <SevenDayVisitorTrendChart
+          <VisitorTrendChart
             daily={daily}
+            range={range}
+            from={activeFrom}
+            to={activeTo}
             previousVisitors={stats?.previousVisitors}
           />
 
@@ -478,7 +697,8 @@ export function VisitorStats({ projectId }: { projectId: string }) {
             <AppCard className="p-6">
               <h3 className="text-[17px] font-semibold text-text">No visitors recorded yet</h3>
               <p className="mt-1.5 text-[15px] text-text-muted">
-                As soon as people open your live website{hostnames[0] ? ` (${hostnames[0]})` : ""}, Cloudflare visits, countries, and referral sources will appear here.
+                As soon as people open your live website{hostnames[0] ? ` (${hostnames[0]})` : ""} during{" "}
+                {rangeLabel}, Cloudflare visits, countries, and referral sources will appear here.
               </p>
             </AppCard>
           ) : (
@@ -486,7 +706,9 @@ export function VisitorStats({ projectId }: { projectId: string }) {
               {range !== "7d" ? (
                 <RangeTrafficChart
                   daily={daily}
-                  rangeLabel={range === "30d" ? "Last 30 days" : "Last 90 days"}
+                  rangeLabel={rangeLabel}
+                  from={activeFrom}
+                  to={activeTo}
                 />
               ) : null}
 
@@ -498,7 +720,7 @@ export function VisitorStats({ projectId }: { projectId: string }) {
                         Where visitors come from (Countries)
                       </h3>
                       <p className="text-sm text-text-muted">
-                        Geographic regions reaching your website via Cloudflare edge
+                        Geographic regions reaching your website ({rangeLabel})
                       </p>
                     </div>
                     <Globe2 size={18} className="shrink-0 text-text-muted" aria-hidden />
@@ -541,7 +763,7 @@ export function VisitorStats({ projectId }: { projectId: string }) {
                         Where visitors come from (Sources)
                       </h3>
                       <p className="text-sm text-text-muted">
-                        Referring websites, search engines, social links, or direct visits
+                        Referring websites, search engines, social links, or direct visits ({rangeLabel})
                       </p>
                     </div>
                     <Compass size={18} className="shrink-0 text-text-muted" aria-hidden />
@@ -578,7 +800,7 @@ export function VisitorStats({ projectId }: { projectId: string }) {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <h3 className="text-[16px] font-semibold text-text">Most visited pages</h3>
-                      <p className="text-sm text-text-muted">Top HTML paths on your site</p>
+                      <p className="text-sm text-text-muted">Top HTML paths on your site ({rangeLabel})</p>
                     </div>
                     <FileText size={18} className="shrink-0 text-text-muted" aria-hidden />
                   </div>
@@ -611,7 +833,7 @@ export function VisitorStats({ projectId }: { projectId: string }) {
                   <div className="flex items-center justify-between gap-2">
                     <div>
                       <h3 className="text-[16px] font-semibold text-text">Devices</h3>
-                      <p className="text-sm text-text-muted">Desktop, mobile, and tablet split</p>
+                      <p className="text-sm text-text-muted">Desktop, mobile, and tablet split ({rangeLabel})</p>
                     </div>
                     <MonitorSmartphone size={18} className="shrink-0 text-text-muted" aria-hidden />
                   </div>

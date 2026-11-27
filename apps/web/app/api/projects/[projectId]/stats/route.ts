@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   normalizeAnalyticsHostnames,
-  normalizeAnalyticsRange,
+  resolveAnalyticsDateWindow,
   type SiteDailyPoint,
 } from "@get-on/site-server";
 import { createClient } from "@/lib/supabase/server";
@@ -36,11 +36,12 @@ function mergeDailySeries(
     if (!day) continue;
     byDay.set(day, { day, visitors: row.visitors, views: row.views });
   }
+  const cfHasAnyTraffic = cfDaily.some((item) => item.views > 0 || item.visitors > 0);
   for (const row of cfDaily) {
     const day = row.day.slice(0, 10);
     if (!day) continue;
     const prev = byDay.get(day);
-    if (!prev || row.views > 0 || row.visitors > 0 || cfDaily.some((item) => item.views > 0 || item.visitors > 0)) {
+    if (!prev || row.views > 0 || row.visitors > 0 || cfHasAnyTraffic) {
       byDay.set(day, { day, visitors: row.visitors, views: row.views });
     }
   }
@@ -60,8 +61,19 @@ export async function GET(
   }
 
   const url = new URL(request.url);
-  const range = normalizeAnalyticsRange(url.searchParams.get("range"));
-  const limitDays = range === "7d" ? 7 : range === "30d" ? 30 : 90;
+  const window = resolveAnalyticsDateWindow({
+    range: url.searchParams.get("range"),
+    from: url.searchParams.get("from"),
+    to: url.searchParams.get("to"),
+  });
+  if (!window.ok) {
+    return NextResponse.json(
+      { ok: false, error: window.errorCode, message: window.errorMessage },
+      { status: 400 },
+    );
+  }
+
+  const { range, from, to, windowDays, retentionLimited } = window;
 
   const supabase = await createClient();
   const { data: project, error: projectError } = await supabase
@@ -93,6 +105,11 @@ export async function GET(
       ok: true,
       source: "disabled",
       range,
+      from,
+      to,
+      windowDays,
+      isCustomRange: range === "custom",
+      retentionLimited,
       visitors: 0,
       views: 0,
       previousVisitors: null,
@@ -130,23 +147,22 @@ export async function GET(
   const hostnames = normalizeAnalyticsHostnames(candidateHostnames);
 
   const admin = createAdminClient();
-  const cutoffDate = new Date();
-  cutoffDate.setUTCDate(cutoffDate.getUTCDate() - (limitDays - 1));
-  const cutoffIso = cutoffDate.toISOString().slice(0, 10);
-
   const [cfResult, dbRes] = await Promise.all([
     getCloudflareSiteAnalytics({
       hostnames,
       range,
+      from,
+      to,
       rootDomain: publishConfig.rootDomain,
     }),
     admin
       .from("site_stats_daily")
       .select("views, visitors, day")
       .eq("project_id", projectId)
-      .gte("day", cutoffIso)
+      .gte("day", from)
+      .lte("day", to)
       .order("day", { ascending: false })
-      .limit(limitDays),
+      .limit(windowDays),
   ]);
 
   const dbDaily: SiteDailyPoint[] =
@@ -162,25 +178,26 @@ export async function GET(
   const dbVisitors = dbDaily.reduce((sum, row) => sum + row.visitors, 0);
 
   const cfHasTraffic = cfResult.ok && (cfResult.views > 0 || cfResult.visitors > 0);
-  const useDbFallback = (!cfResult.ok || (!cfHasTraffic && (dbViews > 0 || dbVisitors > 0)));
+  const useDbFallback = !cfResult.ok || (!cfHasTraffic && (dbViews > 0 || dbVisitors > 0));
 
   const daily = cfResult.ok
-    ? mergeDailySeries(cfResult.daily, dbDaily, limitDays)
+    ? mergeDailySeries(cfResult.daily, dbDaily, windowDays)
     : dbDaily;
 
+  const sumDaily = retentionLimited || windowDays > 30;
   const views = useDbFallback
     ? dbViews
-    : range === "90d"
+    : sumDaily
       ? daily.reduce((sum, row) => sum + row.views, 0)
       : cfResult.views;
   const visitors = useDbFallback
     ? dbVisitors
-    : range === "90d"
+    : sumDaily
       ? daily.reduce((sum, row) => sum + row.visitors, 0)
       : cfResult.visitors;
 
   const source =
-    cfHasTraffic && range === "90d" && dbDaily.length > 0
+    cfHasTraffic && (retentionLimited || windowDays > 30) && dbDaily.length > 0
       ? "mixed"
       : cfResult.ok && !useDbFallback
         ? "cloudflare"
@@ -197,10 +214,20 @@ export async function GET(
         ? "Edge visit log"
         : "Collecting";
 
+  const retentionNotice =
+    !cfResult.errorMessage && retentionLimited
+      ? "Cloudflare live breakdowns keep the last 30 days of data. Earlier days in this range use your saved daily traffic log."
+      : undefined;
+
   return NextResponse.json({
     ok: true,
     source,
     range,
+    from,
+    to,
+    windowDays,
+    isCustomRange: range === "custom",
+    retentionLimited,
     visitors,
     views,
     previousVisitors: cfResult.ok ? cfResult.previousVisitors : null,
@@ -212,6 +239,9 @@ export async function GET(
     devices: cfResult.ok ? cfResult.devices : [],
     hostnames,
     status,
-    ...(cfResult.errorCode ? { cloudflareError: cfResult.errorCode, cloudflareNotice: cfResult.errorMessage } : {}),
+    ...(cfResult.errorCode ? { cloudflareError: cfResult.errorCode } : {}),
+    ...(cfResult.errorMessage || retentionNotice
+      ? { cloudflareNotice: cfResult.errorMessage ?? retentionNotice }
+      : {}),
   });
 }

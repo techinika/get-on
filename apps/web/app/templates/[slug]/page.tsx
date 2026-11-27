@@ -116,6 +116,7 @@ export default async function TemplatePreviewPage({ params, searchParams }: Para
                 watermark={false}
                 theme={preview.theme}
                 tagline={contact.tagline}
+                phone={contact.phone}
               />
             }
             footer={

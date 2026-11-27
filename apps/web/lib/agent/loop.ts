@@ -79,6 +79,12 @@ type AgentLoopOptions = {
   turnId?: string;
 };
 
+export type AgentNextStep = {
+  label: string;
+  prompt?: string;
+  href?: string;
+};
+
 type AgentLoopSuccess = {
   ok: true;
   text: string;
@@ -87,6 +93,7 @@ type AgentLoopSuccess = {
   requestId: string | null;
   status: "succeeded" | "partial";
   confirmation?: PendingAction;
+  nextSteps: AgentNextStep[];
 };
 
 type AgentLoopFailure = {
@@ -98,6 +105,87 @@ type AgentLoopFailure = {
 };
 
 export type AgentLoopResult = AgentLoopSuccess | AgentLoopFailure;
+
+export function buildAgentNextSteps(input: {
+  projectId: string | null;
+  route?: string;
+  toolExecutions?: ToolExecution[];
+  replyText?: string;
+}): AgentNextStep[] {
+  const pid = input.projectId;
+  const executions = input.toolExecutions ?? [];
+  const lastExec = [...executions].reverse().find((item) => item.ok);
+  const steps: AgentNextStep[] = [];
+  const pushUnique = (step: AgentNextStep) => {
+    if (steps.length >= 3) return;
+    if (steps.some((existing) => existing.label === step.label)) return;
+    steps.push(step);
+  };
+
+  if (lastExec?.tool === "update_create_site_brief" && lastExec.output && typeof lastExec.output === "object") {
+    const out = lastExec.output as { complete?: boolean; missing?: string[] };
+    if (out.complete) {
+      pushUnique({ label: "Create website draft", prompt: "Create my website draft now." });
+      pushUnique({ label: "Adjust style", prompt: "What website styles can I choose from?" });
+    } else {
+      const nextField = Array.isArray(out.missing) ? out.missing[0] : null;
+      if (nextField) {
+        pushUnique({
+          label: `Provide ${nextField}`,
+          prompt: `Let's continue: here is my ${nextField}.`,
+        });
+      }
+      pushUnique({ label: "See templates", prompt: "List the available website templates." });
+    }
+  } else if (
+    (lastExec?.tool === "create_page" ||
+      lastExec?.tool === "update_page_blocks" ||
+      lastExec?.tool === "improve_text" ||
+      lastExec?.tool === "update_seo") &&
+    pid
+  ) {
+    pushUnique({ label: "Open editor", href: `/dashboard/projects/${pid}/editor` });
+    pushUnique({ label: "Publish updates", prompt: "Publish my website updates now." });
+    pushUnique({ label: "Review SEO", prompt: "Check my SEO title and description." });
+  } else if (lastExec?.tool === "publish_site" && pid) {
+    pushUnique({ label: "View visitors", href: `/dashboard/projects/${pid}/visitors` });
+    pushUnique({ label: "Site settings", href: `/dashboard/projects/${pid}/settings` });
+  } else if (lastExec?.tool === "navigate_to" && lastExec.output && typeof lastExec.output === "object") {
+    const screen = String((lastExec.output as { screen?: unknown }).screen ?? "");
+    const screenHref: Record<string, string> = {
+      dashboard: "/dashboard",
+      plan: "/dashboard/plan",
+      team: "/dashboard/team",
+      account: "/dashboard/account",
+      billing: "/dashboard/plan",
+      ...(pid
+        ? {
+            editor: `/dashboard/projects/${pid}/editor`,
+            pages: `/dashboard/projects/${pid}/pages`,
+            images: `/dashboard/projects/${pid}/images`,
+            settings: `/dashboard/projects/${pid}/settings`,
+          }
+        : {}),
+    };
+    if (screenHref[screen]) {
+      pushUnique({ label: `Open ${screen}`, href: screenHref[screen] });
+    }
+  }
+
+  if (steps.length === 0) {
+    if (pid) {
+      pushUnique({ label: "Improve page copy", prompt: "Suggest improvements for my homepage copy." });
+      pushUnique({ label: "Open editor", href: `/dashboard/projects/${pid}/editor` });
+      pushUnique({ label: "Check SEO status", prompt: "Check my website SEO settings and publish status." });
+    } else {
+      pushUnique({ label: "Create a website", prompt: "Help me create a new website." });
+      pushUnique({ label: "Explore templates", prompt: "List the available website templates." });
+      pushUnique({ label: "Check my credits", prompt: "How many AI credits do I have left?" });
+    }
+  }
+
+  return steps.slice(0, 3);
+}
 
 type PendingStep = {
   requestId: string;
@@ -335,28 +423,37 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
       const turnCap = feature.turnCapCredits;
       const reserveAmount = reserveCredits(estimate, turnCap > 0 ? turnCap : 3);
 
-      const idempotencyKey = `${conversationId}:${turnId}:${steps}`;
-      const { data: created, error: createError } = await admin
-        .from("ai_requests")
-        .insert({
-          team_id: teamId,
-          project_id: projectId ?? null,
-          user_id: userId,
-          task: "agent.chat",
-          feature: "assistant",
-          status: "queued",
-          source: "platform",
-          estimate_credits: reserveAmount,
-          cap_credits: turnCap > 0 ? turnCap : 3,
-          steps: [{ name: "moderate" }, { name: "generate" }, { name: "settle" }],
-          model_ids: [model.id],
-          prompt_version: "agent.chat@1",
-          skill_versions: [],
-          input_hash: idempotencyKey,
-          idempotency_key: idempotencyKey,
-        })
-        .select("id")
-        .single();
+      let idempotencyKey = `${conversationId}:${turnId}:${steps}`;
+      const insertAiRequest = async (key: string) =>
+        admin
+          .from("ai_requests")
+          .insert({
+            team_id: teamId,
+            project_id: projectId ?? null,
+            user_id: userId,
+            task: "agent.chat",
+            feature: "assistant",
+            status: "queued",
+            source: "platform",
+            estimate_credits: reserveAmount,
+            cap_credits: turnCap > 0 ? turnCap : 3,
+            steps: [{ name: "moderate" }, { name: "generate" }, { name: "settle" }],
+            model_ids: [model.id],
+            prompt_version: "agent.chat@1",
+            skill_versions: [],
+            input_hash: key,
+            idempotency_key: key,
+          })
+          .select("id")
+          .single();
+
+      let { data: created, error: createError } = await insertAiRequest(idempotencyKey);
+      if (createError && (createError as { code?: string }).code === "23505") {
+        idempotencyKey = `${conversationId}:${turnId}:${steps}:${crypto.randomUUID().slice(0, 8)}`;
+        const retried = await insertAiRequest(idempotencyKey);
+        created = retried.data;
+        createError = retried.error;
+      }
       if (createError || !created) {
         console.error("[agent] could not insert ai_request", createError);
         await releaseAllPending("AI_PROVIDER_ERROR");
@@ -468,24 +565,74 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
 
       const chatTimeoutMs = Math.min(40000, Math.max(4000, deadline - Date.now()));
       const useTools = !forceTextOnly && steps < maxSteps && tools.length > 0;
-      let output;
-      try {
-        output = await provider.chatWithTools({
+      const maxOutTokens = Math.min(900, model.maxOutputTokens > 0 ? model.maxOutputTokens : 900);
+
+      const runTextFallback = async (remainingMs: number) => {
+        if (typeof provider.generateText === "function") {
+          const textResult = await provider.generateText({
+            modelId: model.modelId,
+            messages,
+            maxTokens: maxOutTokens,
+            temperature: 0.4,
+            timeoutMs: remainingMs,
+            metadata,
+          });
+          return {
+            text: textResult.text ?? textResult.value ?? "",
+            toolCalls: [],
+            usage: textResult.usage,
+            modelId: textResult.modelId,
+            raw: textResult.raw,
+          };
+        }
+        return provider.chatWithTools({
           modelId: model.modelId,
           messages,
-          tools: useTools
-            ? tools.map((t) => ({
+          tools: [],
+          maxTokens: maxOutTokens,
+          temperature: 0.4,
+          timeoutMs: remainingMs,
+          metadata,
+        });
+      };
+
+      let output;
+      let usedFallbackTextOnly = !useTools;
+      try {
+        if (useTools) {
+          try {
+            output = await provider.chatWithTools({
+              modelId: model.modelId,
+              messages,
+              tools: tools.map((t) => ({
                 name: t.name,
                 description: t.description,
                 inputSchema: t.jsonSchema,
-              }))
-            : [],
-          toolChoice: useTools ? "auto" : "none",
-          maxTokens: Math.min(900, model.maxOutputTokens > 0 ? model.maxOutputTokens : 900),
-          temperature: 0.4,
-          timeoutMs: chatTimeoutMs,
-          metadata,
-        });
+              })),
+              toolChoice: "auto",
+              maxTokens: maxOutTokens,
+              temperature: 0.4,
+              timeoutMs: chatTimeoutMs,
+              metadata,
+            });
+          } catch (toolError) {
+            const mappedToolErr = isAiError(toolError)
+              ? toolError
+              : new AiError("AI_PROVIDER_ERROR", { cause: toolError });
+            const canFallback =
+              (mappedToolErr.code === "AI_PROVIDER_ERROR" ||
+                mappedToolErr.code === "AI_BAD_RESULT") &&
+              deadline - Date.now() >= 4000;
+            if (!canFallback) throw toolError;
+            usedFallbackTextOnly = true;
+            forceTextOnly = true;
+            output = await runTextFallback(
+              Math.min(35000, Math.max(4000, deadline - Date.now())),
+            );
+          }
+        } else {
+          output = await runTextFallback(chatTimeoutMs);
+        }
       } catch (error) {
         const mapped = isAiError(error) ? error : new AiError("AI_PROVIDER_ERROR", { cause: error });
         const failedUsage = buildRequestUsage({
@@ -568,7 +715,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
         };
       }
 
-      const toolCalls = useTools ? (output.toolCalls ?? []) : [];
+      const toolCalls = useTools && !usedFallbackTextOnly ? (output.toolCalls ?? []) : [];
       if (toolCalls.length === 0) {
         const replyText = (output.text ?? "").trim();
         if (!replyText) {
@@ -599,6 +746,12 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
           toolExecutions,
           requestId,
           status: "succeeded",
+          nextSteps: buildAgentNextSteps({
+            projectId,
+            route: context.route,
+            toolExecutions,
+            replyText,
+          }),
         };
       }
 
@@ -678,6 +831,7 @@ export async function runAgentLoop(options: AgentLoopOptions): Promise<AgentLoop
             requestId,
             status: "succeeded",
             confirmation: exec.confirmation,
+            nextSteps: [],
           };
         }
 

@@ -332,5 +332,47 @@ describe("agent second turn & credit safety", () => {
       totalTokens: 100,
     });
     expect(Number((req1Final?.patch.usage as Record<string, unknown>).totalNeurons)).toBeGreaterThan(0);
+    if (res.ok) {
+      expect(res.nextSteps.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("falls back to text-only completion when a tool call raises AI_PROVIDER_ERROR and returns nextSteps", async () => {
+    chatQueue.push(
+      async () => {
+        throw new AiError("AI_PROVIDER_ERROR", { message: "tool schema rejected" });
+      },
+      async () => ({
+        text: "I checked your project settings and can help you publish when ready.",
+        toolCalls: [],
+        usage: { inputTokens: 60, outputTokens: 16 },
+        modelId: "@cf/meta/llama-3.1-8b-instruct",
+      }),
+    );
+
+    const res = await runAgentLoop({
+      conversationId: "conv-fallback",
+      teamId: "team-1",
+      userId: "user-1",
+      projectId: "proj-1",
+      turnId: "turn-fallback-1",
+      tools: [
+        {
+          name: "lookup_site",
+          schema: z.object({}),
+          description: "Inspect website",
+          jsonSchema: { type: "object", properties: {} },
+          execute: async () => ({ ok: true, data: { pages: 3 } }),
+        },
+      ],
+      context: baseContext,
+    });
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.text).toContain("publish when ready");
+      expect(res.nextSteps.length).toBeGreaterThan(0);
+      expect(res.nextSteps.some((step) => Boolean(step.prompt || step.href))).toBe(true);
+    }
   });
 });

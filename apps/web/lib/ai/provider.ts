@@ -78,7 +78,83 @@ function messageContent(value: unknown): string {
       )
       .join("");
   }
+  if (value && typeof value === "object") {
+    return JSON.stringify(value);
+  }
   return "";
+}
+
+function parseInlineToolCalls(rawContent: string): {
+  toolCalls: AgentToolCall[];
+  remainingText: string;
+} | null {
+  const trimmed = rawContent.trim();
+  if (!trimmed) return null;
+
+  const funcTagMatch = trimmed.match(/<function=([a-z0-9_]+)\s*>([\s\S]*?)<\/function>/i);
+  if (funcTagMatch?.[1]) {
+    const rawArgs = (funcTagMatch[2] ?? "").trim();
+    let args: unknown = {};
+    if (rawArgs) {
+      try {
+        args = JSON.parse(rawArgs);
+      } catch {
+        args = { _raw: rawArgs };
+      }
+    }
+    return {
+      toolCalls: [
+        {
+          id: crypto.randomUUID(),
+          name: funcTagMatch[1],
+          arguments: args,
+        },
+      ],
+      remainingText: "",
+    };
+  }
+
+  const candidate = stripCodeFence(trimmed);
+  if (!(candidate.startsWith("{") || candidate.startsWith("["))) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(candidate) as unknown;
+    const rows = Array.isArray(parsed) ? parsed : [parsed];
+    const extracted: AgentToolCall[] = [];
+    for (const item of rows) {
+      if (!item || typeof item !== "object") continue;
+      const obj = item as Record<string, unknown>;
+      const fn =
+        obj.function && typeof obj.function === "object"
+          ? (obj.function as Record<string, unknown>)
+          : obj;
+      const name = typeof fn.name === "string" ? fn.name.trim() : "";
+      if (!name) continue;
+      let args: unknown = {};
+      const rawArgs = fn.arguments ?? fn.parameters ?? fn.input;
+      if (typeof rawArgs === "string") {
+        try {
+          args = JSON.parse(rawArgs);
+        } catch {
+          args = { _raw: rawArgs };
+        }
+      } else if (rawArgs && typeof rawArgs === "object") {
+        args = rawArgs;
+      }
+      extracted.push({
+        id: typeof obj.id === "string" ? obj.id : crypto.randomUUID(),
+        name,
+        arguments: args,
+      });
+    }
+    if (extracted.length > 0) {
+      return { toolCalls: extracted, remainingText: "" };
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
 
 export class WorkersAiProvider implements AiProvider {
@@ -537,7 +613,8 @@ export class WorkersAiProvider implements AiProvider {
       model: input.modelId,
       messages: input.messages,
     };
-    if (input.tools && input.tools.length > 0) {
+    const hasTools = Boolean(input.tools && input.tools.length > 0);
+    if (hasTools && input.tools) {
       body.tools = input.tools.map((tool) => ({
         type: "function",
         function: {
@@ -546,9 +623,9 @@ export class WorkersAiProvider implements AiProvider {
           parameters: tool.inputSchema,
         },
       }));
-    }
-    if (input.toolChoice) {
-      body.tool_choice = input.toolChoice;
+      if (input.toolChoice) {
+        body.tool_choice = input.toolChoice;
+      }
     }
     if (input.maxTokens) body.max_tokens = input.maxTokens;
     if (input.temperature !== undefined) body.temperature = input.temperature;
@@ -569,11 +646,10 @@ export class WorkersAiProvider implements AiProvider {
       first && typeof first.message === "object"
         ? (first.message as Record<string, unknown>)
         : {};
-    const content = messageContent(message.content);
+    let content = messageContent(message.content);
     const toolCalls: AgentToolCall[] = [];
     const rawToolCalls =
-      message.tool_calls &&
-      Array.isArray(message.tool_calls)
+      message.tool_calls && Array.isArray(message.tool_calls)
         ? (message.tool_calls as unknown[])
         : [];
     for (const call of rawToolCalls) {
@@ -584,13 +660,13 @@ export class WorkersAiProvider implements AiProvider {
       const functionCall =
         row.function && typeof row.function === "object"
           ? (row.function as Record<string, unknown>)
-          : {};
+          : row;
       const name =
         typeof functionCall.name === "string"
           ? functionCall.name
           : undefined;
       let argumentsValue: unknown = {};
-      const rawArgs = functionCall.arguments;
+      const rawArgs = functionCall.arguments ?? functionCall.parameters ?? functionCall.input;
       if (typeof rawArgs === "string") {
         try {
           argumentsValue = JSON.parse(rawArgs);
@@ -602,6 +678,14 @@ export class WorkersAiProvider implements AiProvider {
       }
       if (name) {
         toolCalls.push({ id, name, arguments: argumentsValue });
+      }
+    }
+
+    if (toolCalls.length === 0 && hasTools && content) {
+      const parsedInline = parseInlineToolCalls(content);
+      if (parsedInline) {
+        toolCalls.push(...parsedInline.toolCalls);
+        content = parsedInline.remainingText;
       }
     }
 

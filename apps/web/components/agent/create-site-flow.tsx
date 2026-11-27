@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   CheckCircle,
@@ -27,10 +28,12 @@ export function CreateSiteFlow({
   onComplete,
   onClose,
 }: CreateSiteFlowProps) {
+  const router = useRouter();
   const [step, setStep] = React.useState<Step>("form");
   const [name, setName] = React.useState("");
   const [address, setAddress] = React.useState("");
   const [actionId, setActionId] = React.useState<string | null>(null);
+  const [createdProjectId, setCreatedProjectId] = React.useState<string | null>(null);
   const [preview, setPreview] = React.useState<{
     name: string;
     address: string;
@@ -96,6 +99,9 @@ export function CreateSiteFlow({
         return;
       }
       setSubmitting(false);
+      const createdId =
+        typeof data.project?.id === "string" && data.project.id ? data.project.id : null;
+      setCreatedProjectId(createdId);
       setStep("success");
       onComplete(data.project ?? { id: "", name: preview.name, subdomain: preview.address });
     } catch {
@@ -122,7 +128,12 @@ export function CreateSiteFlow({
         <div className="mt-4 flex w-full flex-col gap-2">
           <button
             type="button"
-            onClick={() => onClose()}
+            onClick={() => {
+              if (createdProjectId) {
+                router.push(`/dashboard/projects/${createdProjectId}`);
+              }
+              onClose();
+            }}
             className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-input bg-primary px-5 font-semibold text-on-primary hover:bg-primary-hover"
           >
             <ArrowRight size={18} strokeWidth={2} aria-hidden />

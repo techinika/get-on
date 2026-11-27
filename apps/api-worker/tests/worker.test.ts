@@ -621,5 +621,95 @@ describe("api-worker", () => {
     expect(json.pages.map((p) => p.path)).toEqual(["/", "/menu"]);
     expect(json.devices.map((d) => d.device)).toEqual(["Mobile", "Desktop"]);
   });
+
+  it("omits tool_choice on /ai/v1/chat/completions when tools array is empty or missing", async () => {
+    const worker = createApiWorker();
+    const secret = "ai-tool-choice-secret";
+    const runMock = vi.fn(async () => ({
+      response: "Plain answer",
+      usage: { prompt_tokens: 10, completion_tokens: 4 },
+    }));
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: secret,
+      AI: { run: runMock },
+    };
+
+    const body = JSON.stringify({
+      model: "@cf/meta/llama-3.2-3b-instruct",
+      messages: [{ role: "user", content: "Continue" }],
+      tools: [],
+      tool_choice: "none",
+    });
+    const ts = String(Date.now());
+    const host = "api.get-on.tech";
+    const sig = await signWorkerRequest(secret, {
+      ts,
+      host,
+      ip: "",
+      bodyHash: await sha256Hex(body),
+    });
+
+    const res = await worker.fetch(
+      new Request("https://api.get-on.tech/ai/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body,
+      }),
+      env,
+    );
+    expect(res.status).toBe(200);
+    expect(runMock).toHaveBeenCalledWith(
+      "@cf/meta/llama-3.2-3b-instruct",
+      { messages: [{ role: "user", content: "Continue" }] },
+      undefined,
+    );
+  });
+
+  it("validates custom date ranges on /analytics/site", async () => {
+    const worker = createApiWorker();
+    const secret = "analytics-date-secret";
+    const env: ApiWorkerEnv = {
+      WORKER_SHARED_SECRET: secret,
+      CLOUDFLARE_ANALYTICS_API_TOKEN: "cf-analytics-token",
+    };
+
+    const body = JSON.stringify({
+      hostnames: ["rosebakery.get-on.tech"],
+      range: "custom",
+      from: "2026-11-25",
+      to: "2026-11-10",
+    });
+    const ts = String(Date.now());
+    const host = "api.get-on.tech";
+    const sig = await signWorkerRequest(secret, {
+      ts,
+      host,
+      ip: "",
+      bodyHash: await sha256Hex(body),
+    });
+
+    const res = await worker.fetch(
+      new Request("https://api.get-on.tech/analytics/site", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-gs-host": host,
+          "x-gs-ip": "",
+          "x-gs-ts": ts,
+          "x-gs-sig": sig,
+        },
+        body,
+      }),
+      env,
+    );
+    expect(res.status).toBe(400);
+    expect(await res.json()).toMatchObject({ ok: false, error: "INVALID_DATE_RANGE" });
+  });
 });
 

@@ -89,7 +89,7 @@ export type MaterializedPage = {
   blocks: Block[];
 };
 
-function contactTailPage(slug: string, heading: string, showPhone = true): TemplatePageDef {
+function contactTailPage(slug: string, heading: string, showPhone = true, tone?: "accent"): TemplatePageDef {
   return {
     key: "contact",
     id: `${slug}-contact`,
@@ -125,6 +125,7 @@ function contactTailPage(slug: string, heading: string, showPhone = true): Templ
           heading,
           showName: true,
           showPhone,
+          ...(tone ? { tone } : {}),
         },
         sec: { anchor: "contact" },
       },
@@ -250,7 +251,7 @@ function buildStarterCompositionPages(
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
             buttonLabel: "Get in touch",
-            buttonLink: { type: "anchor", anchor: "contact" },
+            buttonLink: { type: "url", url: "/contact" },
             button2Label: "Our story",
             button2Link: { type: "url", url: "/about" },
           },
@@ -356,179 +357,192 @@ function buildStarterCompositionPages(
 const STARTER_COMPOSITIONS: TemplateComposition[] = [
   {
     id: "starter-1",
-    name: "Warm Split",
-    theme: { palette: "fresh-green", corners: "soft", density: "comfortable", fonts: { heading: { id: "Bricolage Grotesque", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "even", buttonShape: "soft" } },
-    pages: buildStarterCompositionPages("starter-1", "split", "features", "rows"),
+    name: "Haven Flagship",
+    theme: { presetId: "starter", palette: "fresh-green", corners: "soft", density: "comfortable", fonts: { heading: { id: "Bricolage Grotesque", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "even", buttonShape: "soft" } },
+    pages: buildStarterCompositionPages("starter-1", "offset-frame", "features", "rows"),
   },
   {
     id: "starter-2",
     name: "Ocean Center",
-    theme: { palette: "ocean", corners: "round", density: "airy", fonts: { heading: { id: "Manrope", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "alternate", buttonShape: "pill" } },
+    theme: { presetId: "starter", palette: "ocean", corners: "round", density: "airy", fonts: { heading: { id: "Manrope", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "alternate", buttonShape: "pill" } },
     pages: buildStarterCompositionPages("starter-2", "centered", "stats", "compact"),
   },
   {
     id: "starter-3",
     name: "Berry Editorial",
-    theme: { palette: "berry", corners: "round", density: "comfortable", fonts: { heading: { id: "Fraunces", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "tinted", buttonShape: "round" } },
+    theme: { presetId: "starter", palette: "berry", corners: "round", density: "comfortable", fonts: { heading: { id: "Fraunces", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "tinted", buttonShape: "round" } },
     pages: buildStarterCompositionPages("starter-3", "editorial", "testimonials", "bento"),
   },
   {
     id: "starter-4",
     name: "Sunset Bold",
-    theme: { palette: "sunset", corners: "soft", density: "compact", fonts: { heading: { id: "Space Grotesk", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "split" }, design: { rhythm: "bold", buttonShape: "square" } },
+    theme: { presetId: "starter", palette: "sunset", corners: "soft", density: "compact", fonts: { heading: { id: "Space Grotesk", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "split" }, design: { rhythm: "bold", buttonShape: "square" } },
     pages: buildStarterCompositionPages("starter-4", "fullbleed", "pricing", "rows"),
   },
   {
     id: "starter-5",
     name: "Midnight Clean",
-    theme: { palette: "midnight", corners: "sharp", density: "airy", fonts: { heading: { id: "Lora", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "minimal" }, design: { rhythm: "even", buttonShape: "square" } },
+    theme: { presetId: "starter", palette: "midnight", corners: "sharp", density: "airy", fonts: { heading: { id: "Lora", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "minimal" }, design: { rhythm: "even", buttonShape: "square" } },
     pages: buildStarterCompositionPages("starter-5", "minimal", "before-after", "alternating"),
   },
   {
     id: "starter-6",
     name: "Charcoal Serif",
-    theme: { palette: "charcoal", corners: "soft", density: "comfortable", fonts: { heading: { id: "DM Serif Display", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "alternate", buttonShape: "soft" } },
+    theme: { presetId: "starter", palette: "charcoal", corners: "soft", density: "comfortable", fonts: { heading: { id: "DM Serif Display", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "alternate", buttonShape: "soft" } },
     pages: buildStarterCompositionPages("starter-6", "arch", "menu", "menu-list"),
   },
   {
     id: "starter-7",
     name: "Green Baskerville",
-    theme: { palette: "fresh-green", corners: "soft", density: "comfortable", fonts: { heading: { id: "Libre Baskerville", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "tinted", buttonShape: "soft" } },
-    pages: buildStarterCompositionPages("starter-7", "offset-frame", "testimonials", "rows"),
+    theme: { presetId: "starter", palette: "fresh-green", corners: "soft", density: "comfortable", fonts: { heading: { id: "Libre Baskerville", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "tinted", buttonShape: "soft" } },
+    pages: buildStarterCompositionPages("starter-7", "split", "testimonials", "rows"),
   },
   {
     id: "starter-8",
     name: "Studio Oswald",
-    theme: { palette: "sunset", corners: "sharp", density: "compact", fonts: { heading: { id: "Oswald", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "bold", buttonShape: "square" } },
+    theme: { presetId: "starter", palette: "sunset", corners: "sharp", density: "compact", fonts: { heading: { id: "Oswald", weight: 700 }, body: { id: "Figtree", weight: 400 } }, header: { style: "classic" }, design: { rhythm: "bold", buttonShape: "square" } },
     pages: buildStarterCompositionPages("starter-8", "diagonal", "stats", "compact"),
   },
   {
     id: "starter-9",
     name: "Elegant Cormorant",
-    theme: { palette: "berry", corners: "round", density: "airy", fonts: { heading: { id: "Cormorant Garamond", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "alternate", buttonShape: "pill" } },
+    theme: { presetId: "starter", palette: "berry", corners: "round", density: "airy", fonts: { heading: { id: "Cormorant Garamond", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "centered" }, design: { rhythm: "alternate", buttonShape: "pill" } },
     pages: buildStarterCompositionPages("starter-9", "card-over-image", "features", "mosaic"),
   },
   {
     id: "starter-10",
     name: "Tech Mono",
-    theme: { palette: "charcoal", corners: "sharp", density: "comfortable", fonts: { heading: { id: "JetBrains Mono", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "minimal" }, design: { rhythm: "even", buttonShape: "square" } },
+    theme: { presetId: "starter", palette: "charcoal", corners: "sharp", density: "comfortable", fonts: { heading: { id: "JetBrains Mono", weight: 700 }, body: { id: "Inter", weight: 400 } }, header: { style: "minimal" }, design: { rhythm: "even", buttonShape: "square" } },
     pages: buildStarterCompositionPages("starter-10", "product-shot", "features", "bento"),
   },
 ];
 
-function buildSoftwarePages(): TemplatePageDef[] {
-  const imgs = imagesForSlug("software-company");
+// 1. Frame (creative-studio): Photographer / Visual Portfolio
+function buildCreativeStudioPages(): TemplatePageDef[] {
+  const imgs = imagesForSlug("creative-studio");
   return [
     {
       key: "home",
-      id: "sw-home",
+      id: "cs-home",
       title: "Home",
       path: "/",
       isHome: true,
       showInMenu: true,
-      seoTitle: "{{businessName}} — Modern software platform",
+      seoTitle: "{{businessName}} — Visual Portfolio",
       seoDescription: "{{description}}",
       blocks: [
         {
-          id: "sw-hero",
+          id: "cs-hero",
           type: "hero",
           props: {
-            layout: "product-shot",
-            eyebrow: "Built for fast-moving teams",
+            layout: "editorial",
+            eyebrow: "Selected Studies · Visual Archive",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
-            buttonLabel: "Start free trial",
-            buttonLink: { type: "url", url: "/pricing" },
-            button2Label: "Book a demo",
-            button2Link: { type: "url", url: "/contact" },
+            buttonLabel: "View work",
+            buttonLink: { type: "url", url: "/projects" },
           },
         },
         {
-          id: "sw-stats",
-          type: "stats",
+          id: "cs-gallery",
+          type: "gallery",
           sampleOnly: true,
           props: {
-            layout: "compact",
-            heading: "Operational benchmarks",
+            layout: "masonry",
+            eyebrow: "01 / Monographs",
+            heading: "Asymmetric editorial index",
             items: [
-              { value: "99.98%", title: "Availability", text: "Multi-region failover SLA." },
-              { value: "< 40ms", title: "Edge latency", text: "Fast responses worldwide." },
-              { value: "120+", title: "Integrations", text: "Webhooks, SSO, and REST APIs." },
+              { imageId: imgs.section1.id, category: "Documentary", title: "Solstice Field Studies", text: "Natural daylight series recorded over winter solstice." },
+              { imageId: imgs.portrait.id, category: "Portrait", title: "Ceramicist in Stillness", text: "Medium-format portrait study on raw linen." },
+              { imageId: imgs.section2.id, category: "Architecture", title: "Timber & Limestone", text: "Spatial studies of coastal studio spaces." },
             ],
           },
         },
         {
-          id: "sw-features",
-          type: "features",
+          id: "cs-about-split",
+          type: "image-text",
           sampleOnly: true,
-          props: {
-            layout: "bento",
-            heading: "Workflow infrastructure without the busywork",
-            items: [
-              { title: "Automated routing", text: "Rules evaluate incoming events and trigger teammates automatically." },
-              { title: "Granular permissions", text: "Role-scoped workspaces with full audit logs." },
-              { title: "Realtime status", text: "Live visibility across every active environment." },
-            ],
-          },
-        },
-        {
-          id: "sw-cta",
-          type: "cta",
           props: {
             layout: "split",
-            heading: "Ship faster with {{businessName}}",
-            subheading: "{{description}}",
-            buttonLabel: "Talk to sales",
+            eyebrow: "02 / About",
+            heading: "Quiet observation, unhurried craft",
+            text: "{{description}}",
+            imageId: imgs.portrait.id,
+            buttonLabel: "Read artist statement",
+            buttonLink: { type: "url", url: "/process" },
+          },
+        },
+        {
+          id: "cs-cta-email",
+          type: "cta",
+          props: {
+            layout: "minimal",
+            eyebrow: "03 / Inquiries",
+            heading: "Commissions & editorial assignments",
+            subheading: "Direct studio correspondence — no lengthy intake forms.",
+            buttonLabel: "Write directly",
             buttonLink: { type: "url", url: "/contact" },
           },
         },
       ],
     },
     {
-      key: "product",
-      id: "sw-product",
-      title: "Platform",
-      path: "/platform",
+      key: "projects",
+      id: "cs-projects",
+      title: "Work",
+      path: "/projects",
       showInMenu: true,
-      seoTitle: "Platform | {{businessName}}",
-      seoDescription: "{{tagline}}",
+      seoTitle: "Work | {{businessName}}",
+      seoDescription: "Visual sequences by {{businessName}}",
       blocks: [
         {
-          id: "sw-platform-gallery",
+          id: "cs-sequence",
           type: "gallery",
           sampleOnly: true,
           props: {
-            layout: "bento",
-            heading: "Core architecture",
+            layout: "stacked",
+            heading: "Monograph I — Northern Coast",
+            subheading: "A full-width image sequence paired with short field notes.",
             items: [
-              { imageId: imgs.section1.id, title: "Workspace controls", text: "Manage teams, tokens, and approvals in one place." },
-              { imageId: imgs.section2.id, title: "Live diagnostics", text: "Inspect webhook deliveries and retries instantly." },
+              { imageId: imgs.hero.id, category: "Plate 01", title: "First light over tidal flats", text: "Shot at dawn on 120 film without artificial fill." },
+              { imageId: imgs.section1.id, category: "Plate 02", title: "Studio worktable", text: "Raw mineral pigments, hand-pressed cotton rag paper, quiet focus." },
+              { imageId: imgs.section2.id, category: "Plate 03", title: "Evening shadow line", text: "Long exposure catching architectural quietness at dusk." },
             ],
           },
         },
       ],
     },
     {
-      key: "pricing",
-      id: "sw-pricing",
-      title: "Pricing",
-      path: "/pricing",
+      key: "process",
+      id: "cs-process",
+      title: "About",
+      path: "/process",
       showInMenu: true,
-      seoTitle: "Pricing | {{businessName}}",
-      seoDescription: "Transparent plans from {{businessName}}",
+      seoTitle: "About | {{businessName}}",
+      seoDescription: "Background and commissions",
       blocks: [
         {
-          id: "sw-pricing-tiers",
+          id: "cs-bio-split",
+          type: "image-text",
+          props: {
+            layout: "split-reverse",
+            eyebrow: "Studio Practice",
+            heading: "Working with natural light and permanence",
+            text: "{{description}}",
+            imageId: imgs.portrait.id,
+          },
+        },
+        {
+          id: "cs-engagements",
           type: "pricing",
           sampleOnly: true,
           props: {
-            layout: "rows",
-            heading: "Plans built to scale cleanly",
+            layout: "table-list",
+            heading: "Commission formats",
             items: [
-              { title: "Starter", price: "$29/mo", text: "Up to 5 team members and core automations." },
-              { title: "Growth", price: "$89/mo", text: "Unlimited workflows, priority queue, and SSO." },
-              { title: "Scale", price: "Custom", text: "Dedicated throughput and compliance support." },
+              { title: "Editorial Day Rate", price: "$1,400", text: "Full-day location or studio session with curated print selects." },
+              { title: "Campaign Monograph", price: "$4,200", text: "Multi-day visual story, art direction, and archival delivery." },
             ],
           },
         },
@@ -536,31 +550,32 @@ function buildSoftwarePages(): TemplatePageDef[] {
     },
     {
       key: "faq",
-      id: "sw-faq",
-      title: "Docs & FAQ",
+      id: "cs-faq",
+      title: "Notes",
       path: "/faq",
       showInMenu: true,
-      seoTitle: "FAQ | {{businessName}}",
-      seoDescription: "Answers from {{businessName}}",
+      seoTitle: "Notes | {{businessName}}",
+      seoDescription: "Studio commissions FAQ",
       blocks: [
         {
-          id: "sw-faq-list",
+          id: "cs-faq-items",
           type: "faq",
           sampleOnly: true,
           props: {
-            heading: "Technical questions",
+            heading: "Archival & booking notes",
             items: [
-              { title: "How long does onboarding take?", text: "Most teams connect existing tools in under fifteen minutes." },
-              { title: "Can we export all workspace data?", text: "Yes, full JSON and CSV exports are always available." },
+              { title: "How are finals delivered?", text: "High-resolution TIFF and web editions arrive via private gallery archive within ten days." },
+              { title: "Do you travel for commissions?", text: "Yes, assignments across {{areaServed}} and international destinations are scheduled quarterly." },
             ],
           },
         },
       ],
     },
-    contactTailPage("sw", "Schedule a walkthrough with {{businessName}}", false),
+    contactTailPage("cs", "Direct studio correspondence", false),
   ];
 }
 
+// 2. Meridian (law-firm): Law Firm
 function buildLawFirmPages(): TemplatePageDef[] {
   const imgs = imagesForSlug("law-firm");
   return [
@@ -578,26 +593,45 @@ function buildLawFirmPages(): TemplatePageDef[] {
           id: "law-hero",
           type: "hero",
           props: {
-            layout: "arch",
+            layout: "statement",
             eyebrow: "Principled Representation",
-            heading: "{{businessName}}",
+            heading: "Clarity in complex matters",
             subheading: "{{tagline}}",
-            imageId: imgs.hero.id,
-            buttonLabel: "Book a consultation",
+            buttonLabel: "Book a Consultation",
             buttonLink: { type: "url", url: "/contact" },
+            button2Label: "Our Practice Areas",
+            button2Link: { type: "url", url: "/practice-areas" },
+          },
+        },
+        {
+          id: "law-trust-bar",
+          type: "stats",
+          sampleOnly: true,
+          props: {
+            layout: "compact",
+            heading: "Standing & experience",
+            items: [
+              { value: "28 Years", title: "Established practice", text: "Partner-led counsel on every mandate." },
+              { value: "1,400+", title: "Matters resolved", text: "Commercial agreements, property, and disputes." },
+              { value: "Bar Certified", title: "Regional admissions", text: "Practicing across {{areaServed}}." },
+            ],
           },
         },
         {
           id: "law-practice",
-          type: "features",
+          type: "services",
           sampleOnly: true,
           props: {
-            layout: "alternating",
-            heading: "Areas of practice",
+            layout: "three-col",
+            eyebrow: "Areas of Practice",
+            heading: "Focused counsel across core legal disciplines",
             items: [
-              { title: "Commercial & Corporate", text: "Contracts, incorporations, and board governance." },
-              { title: "Property & Conveyancing", text: "Title due diligence, leases, and closings." },
-              { title: "Dispute Resolution", text: "Mediation and structured settlement strategy." },
+              { number: "01", title: "Corporate & Commercial", text: "Shareholder agreements, entity structuring, and cross-border contracts." },
+              { number: "02", title: "Real Estate & Property", text: "Title diligence, commercial leases, and complex closings." },
+              { number: "03", title: "Civil Litigation", text: "Measured courtroom advocacy and structured resolution." },
+              { number: "04", title: "Employment Counsel", text: "Executive contracts, workplace policy, and severance review." },
+              { number: "05", title: "Private Wealth & Trusts", text: "Succession planning and multi-generational asset stewardship." },
+              { number: "06", title: "Regulatory & Compliance", text: "Licensing frameworks and statutory risk audits." },
             ],
           },
         },
@@ -606,10 +640,11 @@ function buildLawFirmPages(): TemplatePageDef[] {
           type: "testimonials",
           sampleOnly: true,
           props: {
-            layout: "stacked",
-            heading: "Client perspectives",
+            layout: "rows",
+            heading: "Notable results & client perspectives",
             items: [
-              { quote: "Measured advice at every turn and zero ambiguity on fee terms.", author: "Managing Partner, Hospitality Group" },
+              { quote: "Measured counsel at every turn and absolute transparency on fee terms.", author: "Managing Director, Commercial Logistics" },
+              { quote: "Closed a three-party acquisition ahead of schedule with zero surprises.", author: "General Counsel, Regional Manufacturing" },
             ],
           },
         },
@@ -618,8 +653,8 @@ function buildLawFirmPages(): TemplatePageDef[] {
           type: "text",
           includeIf: "phone",
           props: {
-            heading: "Chambers desk",
-            text: "Speak directly with our intake desk at {{phone}} ({{hoursNote}}).",
+            heading: "Chambers intake desk",
+            text: "Speak directly with our chambers desk at {{phone}} ({{hoursNote}}).",
           },
         },
       ],
@@ -640,8 +675,8 @@ function buildLawFirmPages(): TemplatePageDef[] {
           props: {
             heading: "How matters are handled",
             items: [
-              { title: "What happens at the first consultation?", text: "We review relevant agreements and outline practical options in plain language." },
-              { title: "How are retainers structured?", text: "Every engagement starts with a clear written scope and fee schedule." },
+              { title: "What happens at the first consultation?", text: "We review key documents and outline practical legal options in plain language." },
+              { title: "How are retainers structured?", text: "Every engagement starts with a clear written scope and transparent fee schedule." },
             ],
           },
         },
@@ -661,11 +696,12 @@ function buildLawFirmPages(): TemplatePageDef[] {
           type: "team",
           sampleOnly: true,
           props: {
-            layout: "rows",
+            layout: "three-col",
             heading: "Our legal team",
             items: [
-              { photoId: imgs.portrait.id, name: "Senior Counsel", role: "Corporate & Commercial Law", text: "Over fifteen years advising regional founders." },
-              { photoId: imgs.section1.id, name: "Managing Associate", role: "Real Estate & Regulatory", text: "Focused on clean transactions and compliance." },
+              { photoId: imgs.portrait.id, name: "Managing Partner", role: "Corporate & Commercial Law", text: "Over twenty years advising founders and boards.", buttonLabel: "View profile", buttonLink: { type: "url", url: "/contact" } },
+              { photoId: imgs.section1.id, name: "Senior Partner", role: "Real Estate & Regulatory", text: "Lead counsel on high-value commercial conveyancing.", buttonLabel: "View profile", buttonLink: { type: "url", url: "/contact" } },
+              { photoId: imgs.section2.id, name: "Litigation Counsel", role: "Arbitration & Disputes", text: "Representing clients in commercial settlements.", buttonLabel: "View profile", buttonLink: { type: "url", url: "/contact" } },
             ],
           },
         },
@@ -675,6 +711,7 @@ function buildLawFirmPages(): TemplatePageDef[] {
   ];
 }
 
+// 3. Ember (restaurant): Restaurant
 function buildRestaurantPages(): TemplatePageDef[] {
   const imgs = imagesForSlug("restaurant");
   return [
@@ -693,50 +730,110 @@ function buildRestaurantPages(): TemplatePageDef[] {
           type: "hero",
           props: {
             layout: "fullbleed",
-            eyebrow: "Seasonal Table",
+            eyebrow: "Wood-Fired Kitchen · Evening Table",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
-            buttonLabel: "Explore menu",
-            buttonLink: { type: "url", url: "/menu" },
-            button2Label: "Reserve",
-            button2Link: { type: "url", url: "/contact" },
+            buttonLabel: "Reserve a Table",
+            buttonLink: { type: "url", url: "/contact" },
+            button2Label: "View Menu",
+            button2Link: { type: "url", url: "/menu" },
           },
         },
         {
-          id: "rest-menu-preview",
+          id: "rest-chef-story",
+          type: "image-text",
+          sampleOnly: true,
+          props: {
+            layout: "split",
+            eyebrow: "Chef's Kitchen",
+            heading: "Slow fire, seasonal harvests, generous plates",
+            text: "{{description}}",
+            imageId: imgs.portrait.id,
+            buttonLabel: "Read our kitchen story",
+            buttonLink: { type: "url", url: "/story" },
+          },
+        },
+        {
+          id: "rest-menu-tabs",
           type: "menu",
           sampleOnly: true,
           props: {
             layout: "menu-list",
-            heading: "From the kitchen tonight",
-            items: [
-              { title: "Wood-roasted heirloom carrots", price: "$13", text: "Whipped tahini, toasted pistachio, pomegranate glaze." },
-              { title: "Charred seabass fillet", price: "$28", text: "Fennel broth, crushed new potatoes, herb oil." },
-              { title: "Brown-butter almond tart", price: "$11", text: "Cultured cream and roasted figs." },
+            eyebrow: "Nightly Tasting",
+            heading: "Seasonal menus",
+            tabs: [
+              {
+                id: "starters",
+                label: "Starters",
+                featuredImageId: imgs.section1.id,
+                intro: "Shared small plates baked in the wood oven and finished over oak embers.",
+                items: [
+                  { title: "House Sourdough & Cultured Butter", price: "$9", text: "Stone-milled loaf baked fresh each afternoon with sea-salt flakes." },
+                  { title: "Wood-Roasted Heirloom Carrots", price: "$14", text: "Whipped sesame tahini, toasted pistachio, pomegranate glaze." },
+                  { title: "Charred Octopus & Chickpea", price: "$19", text: "Smoked paprika oil, preserved lemon, wild fennel." },
+                ],
+              },
+              {
+                id: "mains",
+                label: "Mains",
+                featuredImageId: imgs.hero.id,
+                intro: "Hearty main courses built around heritage produce and open-flame roasting.",
+                items: [
+                  { title: "Charred Seabass Fillet", price: "$31", text: "Fennel saffron broth, crushed new potatoes, charred leek." },
+                  { title: "Oak-Grilled Ribeye", price: "$42", text: "Bone-marrow herb butter, roasted shallots, crispy rosemary." },
+                  { title: "Wild Mushroom Pappardelle", price: "$25", text: "Hand-cut pasta, aged pecorino, black pepper emulsion." },
+                ],
+              },
+              {
+                id: "desserts",
+                label: "Desserts",
+                featuredImageId: imgs.section2.id,
+                intro: "Warm pastry craft and toasted spices to close the evening.",
+                items: [
+                  { title: "Brown-Butter Almond Tart", price: "$12", text: "Cultured cream, roasted black figs, wildflower honey." },
+                  { title: "Dark Chocolate Olive Oil Cake", price: "$13", text: "Sea-salt caramel and espresso mascarpone." },
+                ],
+              },
+              {
+                id: "drinks",
+                label: "Drinks",
+                featuredImageId: imgs.section1.id,
+                intro: "Low-intervention cellar pours and house botanical aperitifs.",
+                items: [
+                  { title: "Blood Orange Negroni", price: "$15", text: "Small-batch gin, charred rosemary, bitter citrus." },
+                  { title: "Ginger Hibiscus Spritz (Zero-Proof)", price: "$9", text: "Steeped hibiscus petals, fresh lime, sparkling mineral water." },
+                ],
+              },
             ],
           },
         },
         {
-          id: "rest-gallery",
+          id: "rest-gallery-strip",
           type: "gallery",
           sampleOnly: true,
           props: {
-            layout: "mosaic",
-            heading: "Atmosphere & craft",
+            layout: "strip",
+            heading: "Inside the dining room",
             items: [
-              { imageId: imgs.section1.id, title: "Dining room" },
-              { imageId: imgs.section2.id, title: "Morning bake" },
+              { imageId: imgs.section1.id, title: "Open hearth kitchen" },
+              { imageId: imgs.section2.id, title: "Candlelit cellar table" },
+              { imageId: imgs.hero.id, title: "Evening plating" },
+              { imageId: imgs.portrait.id, title: "Pastry station" },
             ],
           },
         },
         {
-          id: "rest-hours",
-          type: "text",
-          includeIf: "hours",
+          id: "rest-reserve-cta",
+          type: "cta",
           props: {
-            heading: "Opening hours",
-            text: "Join us {{hoursNote}} at {{address}}.",
+            layout: "centered",
+            tone: "accent",
+            eyebrow: "Table Bookings",
+            heading: "Join us around the table tonight",
+            subheading: "Walk-ins welcome at the counter; dinner reservations open thirty days ahead.",
+            buttonLabel: "Book your table",
+            buttonLink: { type: "url", url: "/contact" },
           },
         },
       ],
@@ -756,11 +853,11 @@ function buildRestaurantPages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "menu-list",
-            heading: "Seasonal dishes",
+            heading: "Evening kitchen list",
             items: [
-              { title: "House sourdough & cultured butter", price: "$8", text: "Stone-ground flour fermented 36 hours." },
-              { title: "Braised short rib", price: "$32", text: "Root vegetables, charred shallots, red wine jus." },
-              { title: "Citrus olive oil cake", price: "$10", text: "Served warm with mascarpone." },
+              { title: "Warm sourdough & smoked salt butter", price: "$9", text: "Fermented 36 hours in stone hearths." },
+              { title: "Braised short rib", price: "$34", text: "Root vegetables, charred shallots, red wine jus." },
+              { title: "Citrus olive oil cake", price: "$11", text: "Served warm with whipped mascarpone." },
             ],
           },
         },
@@ -769,7 +866,7 @@ function buildRestaurantPages(): TemplatePageDef[] {
     {
       key: "story",
       id: "rest-story",
-      title: "Our Story",
+      title: "Story",
       path: "/story",
       showInMenu: true,
       seoTitle: "Our Story | {{businessName}}",
@@ -784,6 +881,15 @@ function buildRestaurantPages(): TemplatePageDef[] {
           },
         },
         {
+          id: "rest-hours-note",
+          type: "text",
+          includeIf: "hours",
+          props: {
+            heading: "Kitchen hours",
+            text: "Dining room open {{hoursNote}} at {{address}}.",
+          },
+        },
+        {
           id: "rest-schedule",
           type: "schedule",
           sampleOnly: true,
@@ -791,17 +897,18 @@ function buildRestaurantPages(): TemplatePageDef[] {
             layout: "rows",
             heading: "Weekly seatings",
             items: [
-              { title: "Weekday lunch", time: "11:30am - 2:30pm", text: "Express plates and fresh salads." },
-              { title: "Evening dinner", time: "5:30pm - 10:00pm", text: "Full seasonal menu and desserts." },
+              { title: "Midday Hearth Lunch", time: "Thu–Sun · 12:00pm – 2:30pm", text: "Wood-fired flatbreads and crisp market greens." },
+              { title: "Evening Dinner Service", time: "Tue–Sun · 5:30pm – 10:30pm", text: "Full tasting plates, cellar pours, and warm desserts." },
             ],
           },
         },
       ],
     },
-    contactTailPage("rest", "Book a table or private dining", true),
+    contactTailPage("rest", "Reserve a table or private dining", true, "accent"),
   ];
 }
 
+// 4. Concrete (developer-portfolio): Architecture & Structural Studio
 function buildPortfolioPages(): TemplatePageDef[] {
   const imgs = imagesForSlug("developer-portfolio");
   return [
@@ -812,7 +919,7 @@ function buildPortfolioPages(): TemplatePageDef[] {
       path: "/",
       isHome: true,
       showInMenu: true,
-      seoTitle: "{{businessName}}",
+      seoTitle: "{{businessName}} — Architecture & Spatial Studio",
       seoDescription: "{{description}}",
       blocks: [
         {
@@ -820,38 +927,55 @@ function buildPortfolioPages(): TemplatePageDef[] {
           type: "hero",
           props: {
             layout: "minimal",
-            eyebrow: "Selected Engineering Work",
+            eyebrow: "STUDIO 04 · 51.5074° N / 2026",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
-            imageId: imgs.hero.id,
-            buttonLabel: "Read case studies",
+            imageId: imgs.portrait.id,
+            buttonLabel: "Explore index",
             buttonLink: { type: "url", url: "/work" },
           },
         },
         {
-          id: "dev-work-preview",
-          type: "features",
+          id: "dev-work-index",
+          type: "gallery",
           sampleOnly: true,
           props: {
-            layout: "stacked",
-            heading: "Recent builds",
+            layout: "index-list",
+            eyebrow: "Selected Works Index",
+            heading: "Built Commissions (01–04)",
             items: [
-              { title: "Edge checkout pipeline", text: "Cut p99 payment latency by 62% with zero-downtime migration." },
-              { title: "Realtime telemetry viewer", text: "Windowed canvas rendering for 50k+ live events per minute." },
+              { number: "01", imageId: imgs.section1.id, title: "Quay Foundry Pavilions", year: "2025", coordinates: "53.4084° N, 2.9916° W", text: "Adaptive concrete & timber workspace along the canal." },
+              { number: "02", imageId: imgs.section2.id, title: "Northlight Civic Library", year: "2024", coordinates: "55.9533° N, 3.1883° W", text: "Daylit reading atrium anchored by precast masonry walls." },
+              { number: "03", imageId: imgs.hero.id, title: "Basalt Ridge Residence", year: "2024", coordinates: "51.4545° N, 2.5879° W", text: "Passive solar courtyard house set directly into hillside stone." },
+              { number: "04", imageId: imgs.portrait.id, title: "Signal Tower Canopy", year: "2023", coordinates: "52.4862° N, 1.8904° W", text: "Cantilevered weathered steel transit shelter." },
             ],
           },
         },
         {
-          id: "dev-stats",
-          type: "stats",
+          id: "dev-studio-table",
+          type: "team",
           sampleOnly: true,
           props: {
-            layout: "compact",
-            heading: "Track record",
+            layout: "table-list",
+            eyebrow: "Practice Directory",
+            heading: "Principals & Engineers",
             items: [
-              { value: "8+ yrs", title: "Production systems", text: "Distributed backends and React UI." },
-              { value: "Zero", title: "Silent failures", text: "Typed contracts and automated checks." },
+              { name: "Lead Architect, RIBA", role: "Spatial Strategy & Massing", year: "Partner" },
+              { name: "Structural Principal", role: "Timber & Cast Concrete Systems", year: "Partner" },
+              { name: "Technical Associate", role: "Building Envelope & Detailing", year: "Senior" },
             ],
+          },
+        },
+        {
+          id: "dev-cta-arrow",
+          type: "cta",
+          props: {
+            layout: "minimal",
+            eyebrow: "Direct Commission",
+            heading: "Initiate a site brief ↗",
+            subheading: "Available for cultural, civic, and residential commissions across {{areaServed}}.",
+            buttonLabel: "Open Studio Contact ↗",
+            buttonLink: { type: "url", url: "/contact" },
           },
         },
       ],
@@ -859,22 +983,24 @@ function buildPortfolioPages(): TemplatePageDef[] {
     {
       key: "work",
       id: "dev-work",
-      title: "Work",
+      title: "Case Studies",
       path: "/work",
       showInMenu: true,
-      seoTitle: "Work | {{businessName}}",
-      seoDescription: "Engineering portfolio",
+      seoTitle: "Case Studies | {{businessName}}",
+      seoDescription: "Plans, sections, and spatial studies",
       blocks: [
         {
-          id: "dev-work-gallery",
+          id: "dev-work-strip",
           type: "gallery",
           sampleOnly: true,
           props: {
-            layout: "alternating",
-            heading: "Architecture & shipped products",
+            layout: "strip",
+            heading: "Quay Foundry — Plans & Elevations",
+            subheading: "Horizontal documentation strip showing structural phases.",
             items: [
-              { imageId: imgs.section1.id, title: "Design system tooling", text: "Accessible primitives shared across six product apps." },
-              { imageId: imgs.section2.id, title: "Multi-region workers", text: "Global edge routing and signed webhooks." },
+              { imageId: imgs.section1.id, title: "01. Site Axis & Massing", coordinates: "Scale 1:200", text: "Grid alignment locked to existing stone quay walls." },
+              { imageId: imgs.section2.id, title: "02. Truss Section", coordinates: "Scale 1:50", text: "Exposed cross-laminated timber beams spanning 14m clear." },
+              { imageId: imgs.hero.id, title: "03. Finished Atrium", coordinates: "2025", text: "North-facing glazing balancing thermal mass." },
             ],
           },
         },
@@ -883,17 +1009,17 @@ function buildPortfolioPages(): TemplatePageDef[] {
     {
       key: "notes",
       id: "dev-notes",
-      title: "Writing",
+      title: "Studio",
       path: "/notes",
       showInMenu: true,
-      seoTitle: "Writing | {{businessName}}",
-      seoDescription: "Notes on engineering",
+      seoTitle: "Studio | {{businessName}}",
+      seoDescription: "Material philosophy",
       blocks: [
         {
           id: "dev-notes-text",
           type: "text",
           props: {
-            heading: "Technical philosophy",
+            heading: "Structural clarity",
             text: "{{description}}",
           },
         },
@@ -902,19 +1028,20 @@ function buildPortfolioPages(): TemplatePageDef[] {
           type: "faq",
           sampleOnly: true,
           props: {
-            heading: "Availability & stack",
+            heading: "Commission scope",
             items: [
-              { title: "What engagements do you take on?", text: "Fractional principal engineering and greenfield builds." },
-              { title: "Primary stack?", text: "TypeScript, Postgres, React, and edge workers." },
+              { title: "What RIBA stages do you cover?", text: "Full architectural delivery from feasibility (Stage 0) through handover (Stage 7)." },
+              { title: "Where is the studio based?", text: "Our workshop operates across {{areaServed}}." },
             ],
           },
         },
       ],
     },
-    contactTailPage("dev", "Start a technical project", false),
+    contactTailPage("dev", "Submit a project brief", false),
   ];
 }
 
+// 5. Willow (salon-beauty): Wellness / Yoga Studio
 function buildSalonPages(): TemplatePageDef[] {
   const imgs = imagesForSlug("salon-beauty");
   return [
@@ -925,35 +1052,51 @@ function buildSalonPages(): TemplatePageDef[] {
       path: "/",
       isHome: true,
       showInMenu: true,
-      seoTitle: "{{businessName}}",
+      seoTitle: "{{businessName}} — Movement & Calm",
       seoDescription: "{{description}}",
       blocks: [
         {
           id: "salon-hero",
           type: "hero",
           props: {
-            layout: "offset-frame",
-            eyebrow: "Calm Care & Craft",
+            layout: "arch",
+            eyebrow: "Breathe · Move · Restore",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
-            buttonLabel: "Book a visit",
+            buttonLabel: "Try a free class",
             buttonLink: { type: "url", url: "/contact" },
-            button2Label: "Treatment menu",
+            button2Label: "Weekly schedule",
             button2Link: { type: "url", url: "/treatments" },
           },
         },
         {
-          id: "salon-services",
-          type: "menu",
+          id: "salon-classes",
+          type: "services",
           sampleOnly: true,
           props: {
-            layout: "menu-list",
-            heading: "Popular appointments",
+            layout: "three-col",
+            eyebrow: "Daily Practice",
+            heading: "Signature studio classes",
             items: [
-              { title: "Signature cut & botanical wash", price: "$65", text: "Consultation, scalp ritual, and natural dry finish." },
-              { title: "Restorative gloss & mask", price: "$85", text: "Deep hydration formulated for lasting shine." },
-              { title: "Express brow & skin reset", price: "$45", text: "Gentle exfoliation and tailored serum." },
+              { category: "Restorative", title: "Slow Flow Vinyasa", duration: "60 min", level: "All levels", text: "Unrushed breath-led sequences easing neck and hip tension." },
+              { category: "Mobility", title: "Morning Mat & Breathwork", duration: "45 min", level: "Gentle", text: "Grounded stretching and nasal cadence to start the morning." },
+              { category: "Deep Rest", title: "Candlelight Sound Bath", duration: "75 min", level: "Open", text: "Bolstered stillness paired with warm acoustic resonance." },
+            ],
+          },
+        },
+        {
+          id: "salon-timetable",
+          type: "schedule",
+          sampleOnly: true,
+          props: {
+            layout: "rows",
+            eyebrow: "Weekly Timetable",
+            heading: "Reserve your spot on the mat",
+            items: [
+              { category: "Morning Flow", title: "Vinyasa & Breath", time: "Mon / Wed / Fri · 7:30am", text: "Led in our sunlit east room with natural cork mats.", buttonLabel: "Reserve spot", buttonLink: { type: "url", url: "/contact" } },
+              { category: "Midday Reset", title: "Posture & Mobility", time: "Tue / Thu · 12:15pm", text: "Focused shoulder and spine release in 45 minutes.", buttonLabel: "Reserve spot", buttonLink: { type: "url", url: "/contact" } },
+              { category: "Evening Stillness", title: "Yin & Warm Tea", time: "Sun · 6:00pm", text: "Deep floor poses followed by chamomile infusion.", buttonLabel: "Reserve spot", buttonLink: { type: "url", url: "/contact" } },
             ],
           },
         },
@@ -963,11 +1106,22 @@ function buildSalonPages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "rows",
-            heading: "Meet the stylists",
+            heading: "Guides & instructors",
             items: [
-              { photoId: imgs.portrait.id, name: "Creative Director", role: "Precision Cuts & Color", text: "Ten years crafting low-maintenance looks." },
-              { photoId: imgs.section1.id, name: "Senior Aesthetician", role: "Skin & Scalp Rituals", text: "Botanical care tailored to sensitive skin." },
+              { photoId: imgs.portrait.id, name: "Lead Instructor", role: "Vinyasa & Breathwork", quote: "\"Movement feels sustainable when we stop rushing the transitions.\"" },
+              { photoId: imgs.section1.id, name: "Somatic Specialist", role: "Yin & Nervous System Care", quote: "\"True strength grows out of unhurried rest.\"" },
             ],
+          },
+        },
+        {
+          id: "salon-newsletter",
+          type: "newsletter",
+          props: {
+            eyebrow: "Quiet Notes",
+            heading: "Seasonal workshop invitations",
+            subheading: "One gentle note per month — new weekend retreats, solstice sessions, and studio hours.",
+            buttonLabel: "Join circle",
+            placeholder: "you@example.com",
           },
         },
       ],
@@ -975,10 +1129,10 @@ function buildSalonPages(): TemplatePageDef[] {
     {
       key: "treatments",
       id: "salon-treatments",
-      title: "Treatments",
+      title: "Memberships",
       path: "/treatments",
       showInMenu: true,
-      seoTitle: "Treatments | {{businessName}}",
+      seoTitle: "Memberships | {{businessName}}",
       seoDescription: "{{tagline}}",
       blocks: [
         {
@@ -986,11 +1140,12 @@ function buildSalonPages(): TemplatePageDef[] {
           type: "pricing",
           sampleOnly: true,
           props: {
-            layout: "bento",
-            heading: "Care rituals & bundles",
+            layout: "three-col",
+            heading: "Unhurried studio memberships",
             items: [
-              { title: "Seasonal refresh", price: "$110", text: "Wash, tailored trim, and conditioning glaze." },
-              { title: "Bridal & event styling", price: "$160", text: "Trial consultation plus day-of finish." },
+              { title: "Single Drop-In", price: "$24", text: "Any 60-minute practice with mat and herbal tea included.", features: ["Mat & props provided", "Tea lounge access"] },
+              { category: "Most loved", highlighted: true, title: "Unlimited Sanctuary", price: "$128/mo", text: "Unlimited weekly classes plus one guest pass every month.", features: ["Unlimited classes", "Monthly guest pass", "Workshop discounts"] },
+              { title: "Five-Class Pack", price: "$98", text: "Flexible pack valid across six months for busy schedules.", features: ["Shareable with a friend", "6-month validity"] },
             ],
           },
         },
@@ -999,10 +1154,10 @@ function buildSalonPages(): TemplatePageDef[] {
     {
       key: "studio",
       id: "salon-studio",
-      title: "The Lounge",
+      title: "The Space",
       path: "/lounge",
       showInMenu: true,
-      seoTitle: "Lounge | {{businessName}}",
+      seoTitle: "The Space | {{businessName}}",
       seoDescription: "{{description}}",
       blocks: [
         {
@@ -1010,19 +1165,355 @@ function buildSalonPages(): TemplatePageDef[] {
           type: "faq",
           sampleOnly: true,
           props: {
-            heading: "Preparing for your visit",
+            heading: "Preparing for your first class",
             items: [
-              { title: "When should I arrive?", text: "Please arrive ten minutes early to enjoy herbal tea before starting." },
-              { title: "Do you carry gentle formulas?", text: "Yes, every wash and serum is sulfate-free and botanical based." },
+              { title: "Do I need to bring a yoga mat?", text: "No — natural cork mats, linen bolsters, and organic cotton blankets are set out for you." },
+              { title: "When should I arrive?", text: "Doors open fifteen minutes early so you can settle in with warm herbal tea." },
             ],
           },
         },
       ],
     },
-    contactTailPage("salon", "Request an appointment time", true),
+    contactTailPage("salon", "Book your introductory free class", true),
   ];
 }
 
+// 6. Pulse (software-company): SaaS / Tech Startup
+function buildSoftwarePages(): TemplatePageDef[] {
+  const imgs = imagesForSlug("software-company");
+  return [
+    {
+      key: "home",
+      id: "sw-home",
+      title: "Home",
+      path: "/",
+      isHome: true,
+      showInMenu: true,
+      seoTitle: "{{businessName}} — Product-First Software Platform",
+      seoDescription: "{{description}}",
+      blocks: [
+        {
+          id: "sw-hero",
+          type: "hero",
+          props: {
+            layout: "product-shot",
+            eyebrow: "v4.2 · Real-Time Edge Platform",
+            heading: "{{businessName}}",
+            subheading: "{{tagline}}",
+            imageId: imgs.hero.id,
+            buttonLabel: "Start Free",
+            buttonLink: { type: "url", url: "/pricing" },
+            button2Label: "Watch Demo",
+            button2Link: { type: "url", url: "/platform" },
+          },
+        },
+        {
+          id: "sw-logos",
+          type: "stats",
+          sampleOnly: true,
+          props: {
+            layout: "logo-strip",
+            heading: "Trusted by modern engineering orgs",
+            items: [
+              { value: "99.99%", title: "Uptime SLA" },
+              { value: "< 18ms", title: "Global Edge p95" },
+              { value: "4.2B", title: "Daily Events" },
+              { value: "SOC 2", title: "Type II Certified" },
+            ],
+          },
+        },
+        {
+          id: "sw-features",
+          type: "features",
+          sampleOnly: true,
+          props: {
+            layout: "bento",
+            eyebrow: "Capabilities",
+            heading: "Built for teams shipping multiple times a day",
+            items: [
+              { category: "Live Pipeline", title: "Zero-config event routing", text: "Stream webhooks, cron triggers, and AI tasks across isolated workers without YAML sprawl." },
+              { category: "Access", title: "Scoped RBAC tokens", text: "Per-environment permissions with instant key rotation." },
+              { category: "Observability", title: "Sub-second trace replay", text: "Inspect payloads, latency waterfalls, and token spend in one view." },
+            ],
+          },
+        },
+        {
+          id: "sw-how-it-works",
+          type: "services",
+          sampleOnly: true,
+          props: {
+            layout: "three-col",
+            eyebrow: "How It Works",
+            heading: "From zero to production in three steps",
+            items: [
+              { number: "01", title: "Connect your repo", text: "Import TypeScript handlers directly with typed schemas and instant previews." },
+              { number: "02", title: "Configure policies", text: "Set rate caps, retries, and role gates declaratively." },
+              { number: "03", title: "Deploy everywhere", text: "Ship globally across edge regions with live telemetry." },
+            ],
+          },
+        },
+        {
+          id: "sw-cta",
+          type: "cta",
+          props: {
+            layout: "centered",
+            heading: "Ready to accelerate with {{businessName}}?",
+            subheading: "{{description}}",
+            buttonLabel: "Start building free",
+            buttonLink: { type: "url", url: "/contact" },
+          },
+        },
+      ],
+    },
+    {
+      key: "product",
+      id: "sw-product",
+      title: "Product",
+      path: "/platform",
+      showInMenu: true,
+      seoTitle: "Product | {{businessName}}",
+      seoDescription: "{{tagline}}",
+      blocks: [
+        {
+          id: "sw-platform-gallery",
+          type: "gallery",
+          sampleOnly: true,
+          props: {
+            layout: "bento",
+            heading: "Inside the workspace",
+            items: [
+              { imageId: imgs.section1.id, title: "Visual workflow canvas", text: "Inspect every branch, retry policy, and queue depth live." },
+              { imageId: imgs.section2.id, title: "Trace & cost inspector", text: "Track neuron usage, tokens, and response percentiles per route." },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      key: "pricing",
+      id: "sw-pricing",
+      title: "Pricing",
+      path: "/pricing",
+      showInMenu: true,
+      seoTitle: "Pricing | {{businessName}}",
+      seoDescription: "Monthly & annual plans from {{businessName}}",
+      blocks: [
+        {
+          id: "sw-pricing-tiers",
+          type: "pricing",
+          sampleOnly: true,
+          props: {
+            layout: "three-col",
+            heading: "Simple, usage-transparent pricing",
+            items: [
+              { title: "Starter", price: "$29/mo", annualPrice: "$23/mo", text: "Up to 5 seats and 250k edge runs monthly.", features: ["5 team seats", "30-day log retention", "Community support"] },
+              { category: "Recommended", highlighted: true, title: "Growth", price: "$89/mo", annualPrice: "$71/mo", text: "Unlimited workflows, SSO, and real-time trace replay.", features: ["Unlimited seats", "SAML SSO & RBAC", "Priority SLA"] },
+              { title: "Scale", price: "Custom", annualPrice: "Custom", text: "Dedicated throughput clusters and compliance reporting.", features: ["Custom retention", "Dedicated engineer", "99.99% SLA"] },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      key: "faq",
+      id: "sw-faq",
+      title: "FAQ",
+      path: "/faq",
+      showInMenu: true,
+      seoTitle: "FAQ | {{businessName}}",
+      seoDescription: "Answers from {{businessName}}",
+      blocks: [
+        {
+          id: "sw-faq-list",
+          type: "faq",
+          sampleOnly: true,
+          props: {
+            heading: "Technical questions",
+            items: [
+              { title: "How long does onboarding take?", text: "Most teams connect repositories and deploy their first worker in under ten minutes." },
+              { title: "Can we export all workspace logs?", text: "Yes, OpenTelemetry and JSON exports are available on every tier." },
+            ],
+          },
+        },
+      ],
+    },
+    contactTailPage("sw", "Book a live engineering walkthrough", false),
+  ];
+}
+
+// 7. Clearview (home-services): Dental / Medical Clinic
+function buildHomeServicesPages(): TemplatePageDef[] {
+  const imgs = imagesForSlug("home-services");
+  return [
+    {
+      key: "home",
+      id: "hs-home",
+      title: "Home",
+      path: "/",
+      isHome: true,
+      showInMenu: true,
+      seoTitle: "{{businessName}} — Family Dental & Preventive Care",
+      seoDescription: "{{description}}",
+      blocks: [
+        {
+          id: "hs-hero",
+          type: "hero",
+          props: {
+            layout: "split",
+            eyebrow: "Gentle Modern Care · New Patients Welcome",
+            heading: "{{businessName}}",
+            subheading: "{{tagline}}",
+            text: "Same-week appointments, calm private treatment suites, and clear upfront care plans.",
+            imageId: imgs.hero.id,
+            buttonLabel: "Book Appointment",
+            buttonLink: { type: "url", url: "/contact" },
+            button2Label: "Explore Services",
+            button2Link: { type: "url", url: "/services" },
+          },
+        },
+        {
+          id: "hs-quick-strip",
+          type: "stats",
+          sampleOnly: true,
+          props: {
+            layout: "quick-strip",
+            heading: "Clinic essentials",
+            items: [
+              { value: "Same Day", title: "Emergency line", text: "Dedicated urgent toothache & repair slots every morning." },
+              { value: "Direct Billing", title: "Insurance accepted", text: "Major family & employer health plans filed at reception." },
+              { value: "Evening Care", title: "Open late Tue & Thu", text: "Convenient early and after-work bookings." },
+            ],
+          },
+        },
+        {
+          id: "hs-services-expand",
+          type: "services",
+          sampleOnly: true,
+          props: {
+            layout: "rows",
+            expandable: true,
+            eyebrow: "Treatments",
+            heading: "Comprehensive dental care under one roof",
+            items: [
+              { category: "Preventive", title: "Cleaning & Gentle Checkups", duration: "45 min", text: "Digital low-radiation scans and warm-water hygiene polish.", details: "Includes ultrasonic tartar removal, periodontal screening, fluoride-free or enamel-safe polish, and a plain-language written checkup summary." },
+              { category: "Cosmetic", title: "Enamel-Safe Whitening", duration: "60 min", text: "Lift coffee and age staining up to six shades comfortably.", details: "Pre-treated with desensitizing minerals so even sensitive teeth stay comfortable during and after the studio session." },
+              { category: "Restorative", title: "Implants & Crowns", duration: "Custom plan", text: "Natural-shade ceramics matched seamlessly to your smile.", details: "3D digital impressions eliminate putty trays, pairing guided placement with lifelike porcelain restorations." },
+              { category: "Alignment", title: "Clear Orthodontics", duration: "6–14 months", text: "Discreet removable aligners checked monthly with gentle digital scans.", details: "Preview your projected bite alignment at consultation before deciding, with flexible zero-interest monthly plans." },
+            ],
+          },
+        },
+        {
+          id: "hs-before-after",
+          type: "before-after",
+          sampleOnly: true,
+          props: {
+            heading: "Patient treatment outcomes",
+            items: [
+              {
+                title: "Enamel bonding & whitening restoration",
+                beforeText: "Chipped incisal edges and uneven surface shading causing smile hesitation.",
+                afterText: "Micro-layered porcelain shade matching and gentle edge contouring in two calm visits.",
+                text: "Two-visit conservative smile balance with zero tooth sensitivity.",
+              },
+              {
+                title: "Clear aligner bite harmony",
+                beforeText: "Lower crowding creating uneven wear.",
+                afterText: "Aligned arch symmetry in 8 months of removable aligners.",
+                text: "Completed comfortably with digital check-ins.",
+              },
+            ],
+          },
+        },
+        {
+          id: "hs-phone",
+          type: "text",
+          includeIf: "phone",
+          props: {
+            heading: "Reception & urgent dental line",
+            text: "Call {{businessName}} on {{phone}} during {{hoursNote}}.",
+          },
+        },
+      ],
+    },
+    {
+      key: "services",
+      id: "hs-services",
+      title: "Team & Services",
+      path: "/services",
+      showInMenu: true,
+      seoTitle: "Team & Services | {{businessName}}",
+      seoDescription: "{{tagline}}",
+      blocks: [
+        {
+          id: "hs-team",
+          type: "team",
+          sampleOnly: true,
+          props: {
+            layout: "three-col",
+            heading: "Meet the clinical team",
+            items: [
+              { photoId: imgs.portrait.id, name: "Lead Dentist, DDS", role: "Restorative & Preventive Care", text: "Known for gentle bedside pacing and crystal-clear explanations." },
+              { photoId: imgs.section1.id, name: "Orthodontic Specialist", role: "Clear Aligners & Bite Harmony", text: "12 years designing subtle, lasting alignment plans." },
+              { photoId: imgs.section2.id, name: "Lead Hygienist, RDH", role: "Warm-Water Airflow Therapy", text: "Making cleanings calm for anxious first-time visitors." },
+            ],
+          },
+        },
+        {
+          id: "hs-rates",
+          type: "pricing",
+          sampleOnly: true,
+          props: {
+            layout: "rows",
+            heading: "Clear self-pay & insurance rates",
+            items: [
+              { title: "New Patient Exam & Digital Scans", price: "$95", text: "Complete oral wellness review and tailored care roadmap." },
+              { title: "Airflow Hygiene Visit", price: "$135", text: "Gentle warm-water clean, polish, and gum health check." },
+            ],
+          },
+        },
+      ],
+    },
+    {
+      key: "reviews",
+      id: "hs-reviews",
+      title: "Patient Reviews",
+      path: "/reviews",
+      showInMenu: true,
+      seoTitle: "Patient Reviews | {{businessName}}",
+      seoDescription: "Verified patient stories",
+      blocks: [
+        {
+          id: "hs-testimonials",
+          type: "testimonials",
+          sampleOnly: true,
+          props: {
+            layout: "rows",
+            heading: "5.0 ★ Patient reviews",
+            items: [
+              { category: "★★★★★", quote: "Never thought I'd look forward to dental visits — calm room, warm water cleaning, zero rush.", author: "Priya M." },
+              { category: "★★★★★", quote: "Explained my insurance coverage upfront and fixed a broken crown the very same morning.", author: "Gareth T." },
+            ],
+          },
+        },
+        {
+          id: "hs-faq",
+          type: "faq",
+          sampleOnly: true,
+          props: {
+            heading: "First visit questions",
+            items: [
+              { title: "Do you handle nervous patients gently?", text: "Yes — let us know when booking and we schedule extra unhurried time with headphones available." },
+              { title: "Where is the clinic located?", text: "Conveniently accessible across {{areaServed}} with ground-floor access." },
+            ],
+          },
+        },
+      ],
+    },
+    contactTailPage("hs", "Book your dental appointment", true),
+  ];
+}
+
+// 8. Bloom & Bold (boutique-shop): Boutique Florist & Curated Goods
 function buildBoutiquePages(): TemplatePageDef[] {
   const imgs = imagesForSlug("boutique-shop");
   return [
@@ -1033,7 +1524,7 @@ function buildBoutiquePages(): TemplatePageDef[] {
       path: "/",
       isHome: true,
       showInMenu: true,
-      seoTitle: "{{businessName}}",
+      seoTitle: "{{businessName}} — Floral & Independent Shop",
       seoDescription: "{{description}}",
       blocks: [
         {
@@ -1041,12 +1532,14 @@ function buildBoutiquePages(): TemplatePageDef[] {
           type: "hero",
           props: {
             layout: "card-over-image",
-            eyebrow: "Curated Goods",
+            eyebrow: "Daily Fresh Stems & Small-Batch Craft",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
             buttonLabel: "Browse collections",
             buttonLink: { type: "url", url: "/collections" },
+            button2Label: "Join a workshop",
+            button2Link: { type: "url", url: "/makers" },
           },
         },
         {
@@ -1055,11 +1548,38 @@ function buildBoutiquePages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "mosaic",
-            heading: "Fresh on the shelves",
-            items: [
-              { imageId: imgs.section1.id, title: "Stoneware vessels", price: "$48" },
-              { imageId: imgs.section2.id, title: "Woven table linens", price: "$62" },
-              { imageId: imgs.portrait.id, title: "Hand-poured candles", price: "$28" },
+            eyebrow: "Atelier Shelves",
+            heading: "Shop seasonal categories",
+            tabs: [
+              {
+                id: "bouquets",
+                label: "Bouquets",
+                featuredImageId: imgs.section1.id,
+                intro: "Hand-tied daily from local flower growers using seasonal garden blooms and scented foliage.",
+                items: [
+                  { imageId: imgs.section1.id, title: "Sunlit Meadow Bunch", price: "$54", text: "Ranunculus, chamomile, eucalyptus, wrapped in raw linen." },
+                  { imageId: imgs.hero.id, title: "Velvet Crimson Stem Edit", price: "$78", text: "Sculptural dahlias and wild berries for dinner tables." },
+                ],
+              },
+              {
+                id: "plants",
+                label: "Potted Plants",
+                featuredImageId: imgs.section2.id,
+                intro: "Architectural indoor foliage potted in breathable wheel-thrown terracotta.",
+                items: [
+                  { imageId: imgs.section2.id, title: "Olive Tree in Terracotta", price: "$86", text: "Sun-loving tabletop tree with care guide." },
+                  { imageId: imgs.portrait.id, title: "Trailing String of Pearls", price: "$38", text: "Planted in speckled stoneware hanging vessel." },
+                ],
+              },
+              {
+                id: "workshops",
+                label: "Workshops",
+                featuredImageId: imgs.portrait.id,
+                intro: "Small Sunday table gatherings learning spiral stem tying and ceramic pairing.",
+                items: [
+                  { imageId: imgs.portrait.id, title: "Seasonal Bouquet Workshop", price: "$95", time: "Sundays · 10:30am", text: "Take home your wrapped arrangement and ceramic vase." },
+                ],
+              },
             ],
           },
         },
@@ -1069,10 +1589,10 @@ function buildBoutiquePages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "compact",
-            heading: "Thoughtful shopping",
+            heading: "Thoughtful neighbourhood delivery",
             items: [
-              { title: "Same-day pickup", text: "Order ahead and collect wrapped at the counter." },
-              { title: "Small-batch makers", text: "Pieces crafted with natural fibres and glazes." },
+              { title: "Same-day local courier", text: "Orders before noon arrive fresh across {{areaServed}}." },
+              { title: "Zero-plastic wrapping", text: "Kraft paper, dampened linen wraps, and twine." },
             ],
           },
         },
@@ -1092,11 +1612,12 @@ function buildBoutiquePages(): TemplatePageDef[] {
           type: "pricing",
           sampleOnly: true,
           props: {
-            layout: "rows",
-            heading: "Gift sets & seasonal editions",
+            layout: "three-col",
+            heading: "Subscription stems & gift boxes",
             items: [
-              { title: "Host gift box", price: "$75", text: "Linen napkin pair, beeswax tapers, and ceramic dish." },
-              { title: "Quiet morning set", price: "$58", text: "Hand-thrown mug paired with local roast blend." },
+              { title: "Host Gift Bundle", price: "$75", text: "Seasonal garden bouquet paired with hand-dipped beeswax tapers." },
+              { category: "Favourite", highlighted: true, title: "Bi-Weekly Flower Drop", price: "$62", text: "Fresh grower stems wrapped for your kitchen vase every fortnight." },
+              { title: "Atelier Ceramics Edit", price: "$88", text: "Stoneware pitcher accompanied by dried meadow grasses." },
             ],
           },
         },
@@ -1112,11 +1633,13 @@ function buildBoutiquePages(): TemplatePageDef[] {
       seoDescription: "{{description}}",
       blocks: [
         {
-          id: "shop-about-text",
-          type: "text",
+          id: "shop-about-split",
+          type: "image-text",
           props: {
-            heading: "Behind our shelves",
+            layout: "split",
+            heading: "Grown & gathered close by",
             text: "{{description}}",
+            imageId: imgs.portrait.id,
           },
         },
         {
@@ -1124,149 +1647,20 @@ function buildBoutiquePages(): TemplatePageDef[] {
           type: "faq",
           sampleOnly: true,
           props: {
-            heading: "Orders & gift wrapping",
+            heading: "Orders & care notes",
             items: [
-              { title: "Do you wrap gifts?", text: "Complimentary kraft paper and linen ribbon on every parcel." },
-              { title: "Can I hold an item in store?", text: "Send us a quick note and we will set pieces aside for 48 hours." },
+              { title: "Do you include gift cards?", text: "Handwritten heavy cardstock notes accompany every wrapped parcel." },
+              { title: "Can I book the shop for a private class?", text: "Yes, we host intimate creative groups of up to twelve guests." },
             ],
           },
         },
       ],
     },
-    contactTailPage("shop", "Ask about stock or gift orders", false),
+    contactTailPage("shop", "Order bespoke stems or gifts", false),
   ];
 }
 
-function buildHomeServicesPages(): TemplatePageDef[] {
-  const imgs = imagesForSlug("home-services");
-  return [
-    {
-      key: "home",
-      id: "hs-home",
-      title: "Home",
-      path: "/",
-      isHome: true,
-      showInMenu: true,
-      seoTitle: "{{businessName}}",
-      seoDescription: "{{description}}",
-      blocks: [
-        {
-          id: "hs-hero",
-          type: "hero",
-          props: {
-            layout: "diagonal",
-            eyebrow: "Licensed & Local Crew",
-            heading: "{{businessName}}",
-            subheading: "{{tagline}}",
-            imageId: imgs.hero.id,
-            buttonLabel: "Request a quote",
-            buttonLink: { type: "url", url: "/contact" },
-            button2Label: "See services",
-            button2Link: { type: "url", url: "/services" },
-          },
-        },
-        {
-          id: "hs-services-grid",
-          type: "features",
-          sampleOnly: true,
-          props: {
-            layout: "rows",
-            heading: "Fast, tidy home repairs",
-            items: [
-              { title: "Urgent leak & drain calls", text: "Rapid dispatch across {{areaServed}}." },
-              { title: "Planned installations", text: "Fixtures, water heaters, and annual checkups." },
-              { title: "Written estimates", text: "Firm pricing agreed before work begins." },
-            ],
-          },
-        },
-        {
-          id: "hs-before-after",
-          type: "before-after",
-          sampleOnly: true,
-          props: {
-            layout: "grid",
-            heading: "Recent transformations",
-            items: [
-              { title: "Utility room repipe", text: "Replaced aging lines with tidy copper manifolds in one day." },
-              { title: "Bathroom upgrade", text: "Installed modern thermostatic mixer and sealed vanity." },
-            ],
-          },
-        },
-        {
-          id: "hs-phone",
-          type: "text",
-          includeIf: "phone",
-          props: {
-            heading: "Need help today?",
-            text: "Call {{businessName}} on {{phone}} during {{hoursNote}}.",
-          },
-        },
-      ],
-    },
-    {
-      key: "services",
-      id: "hs-services",
-      title: "Services",
-      path: "/services",
-      showInMenu: true,
-      seoTitle: "Services | {{businessName}}",
-      seoDescription: "{{tagline}}",
-      blocks: [
-        {
-          id: "hs-rates",
-          type: "pricing",
-          sampleOnly: true,
-          props: {
-            layout: "rows",
-            heading: "Transparent service rates",
-            items: [
-              { title: "Diagnostic visit", price: "$65", text: "Full inspection credited toward approved repair." },
-              { title: "Annual tune-up", price: "$125", text: "Preventive inspection checklist and safety test." },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      key: "reviews",
-      id: "hs-reviews",
-      title: "Reviews",
-      path: "/reviews",
-      showInMenu: true,
-      seoTitle: "Reviews | {{businessName}}",
-      seoDescription: "Customer reviews",
-      blocks: [
-        {
-          id: "hs-testimonials",
-          type: "testimonials",
-          sampleOnly: true,
-          props: {
-            layout: "rows",
-            heading: "Trusted by homeowners",
-            items: [
-              { quote: "Showed up right on the hour, kept floors protected, and fixed it cleanly.", author: "Priya M." },
-              { quote: "Clear breakdown of options with zero sales pressure.", author: "Gareth T." },
-            ],
-          },
-        },
-        {
-          id: "hs-faq",
-          type: "faq",
-          sampleOnly: true,
-          props: {
-            heading: "Service questions",
-            items: [
-              { title: "Do you carry parts in the van?", text: "Yes, vans are stocked for most common fittings on the first visit." },
-              { title: "Which areas do you cover?", text: "We service homes throughout {{areaServed}}." },
-            ],
-          },
-        },
-      ],
-    },
-    contactTailPage("hs", "Request an estimate", true),
-  ];
-}
-
+// 9. Sprout (community-church): Youth, Family & Community Gathering
 function buildCommunityChurchPages(): TemplatePageDef[] {
   const imgs = imagesForSlug("community-church");
   return [
@@ -1285,12 +1679,14 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
           type: "hero",
           props: {
             layout: "centered",
-            eyebrow: "Everyone Welcome",
+            eyebrow: "Open Doors · All Ages Welcome",
             heading: "{{businessName}}",
             subheading: "{{tagline}}",
             imageId: imgs.hero.id,
             buttonLabel: "Plan a visit",
             buttonLink: { type: "url", url: "/visit" },
+            button2Label: "Weekly schedule",
+            button2Link: { type: "url", url: "/community" },
           },
         },
         {
@@ -1299,11 +1695,27 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "rows",
-            heading: "Weekly gatherings",
-            items: [
-              { title: "Sunday Gathering", time: "9:30am & 11:15am", text: "Warm welcome, acoustic music, and kids groups." },
-              { title: "Midweek Meal", time: "Wednesdays 6:00pm", text: "Community dinner table open to all neighbours." },
-              { title: "Youth & Coffee", time: "Fridays 7:00pm", text: "Games, mentorship, and relaxed conversation." },
+            eyebrow: "What's On",
+            heading: "Weekly gatherings & clubs",
+            tabs: [
+              {
+                id: "sundays",
+                label: "Weekend",
+                intro: "Relaxed family gatherings with music, coffee, and creative kids rooms.",
+                items: [
+                  { title: "Sunday Morning Table", time: "Sundays · 10:00am", text: "Warm welcome, acoustic music, and age-grouped kids craft rooms." },
+                  { title: "Community Potluck & Games", time: "Last Sunday · 12:30pm", text: "Bring a dish or just bring yourself — plenty for everyone." },
+                ],
+              },
+              {
+                id: "midweek",
+                label: "Midweek",
+                intro: "Practical workshops, youth drop-in, and shared neighbourhood dinners.",
+                items: [
+                  { title: "Wednesday Shared Supper", time: "Wednesdays · 6:00pm", text: "Hot meal open to families, students, and neighbours." },
+                  { title: "After-School Makers & Youth", time: "Fridays · 4:30pm", text: "Homework help, board games, and mentoring." },
+                ],
+              },
             ],
           },
         },
@@ -1312,9 +1724,9 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
           type: "cta",
           props: {
             layout: "centered",
-            heading: "Rooted in {{areaServed}}",
+            heading: "Rooted together across {{areaServed}}",
             subheading: "{{description}}",
-            buttonLabel: "Connect with us",
+            buttonLabel: "Say hello",
             buttonLink: { type: "url", url: "/contact" },
           },
         },
@@ -1327,7 +1739,7 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
       path: "/visit",
       showInMenu: true,
       seoTitle: "Plan a Visit | {{businessName}}",
-      seoDescription: "Sunday details at {{businessName}}",
+      seoDescription: "First-visit guide for {{businessName}}",
       blocks: [
         {
           id: "ch-faq",
@@ -1336,8 +1748,8 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
           props: {
             heading: "First time here?",
             items: [
-              { title: "What should I wear?", text: "Come casually and comfortably — whatever feels natural." },
-              { title: "Is childcare available?", text: "Yes, safe age-grouped rooms are open during Sunday mornings." },
+              { title: "What should I wear?", text: "Come casually and comfortably — jeans, trainers, whatever feels relaxed." },
+              { title: "Are kids and strollers welcome?", text: "Always! Step-free entry and supervised play rooms are open throughout." },
             ],
           },
         },
@@ -1350,7 +1762,7 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
       path: "/community",
       showInMenu: true,
       seoTitle: "Community | {{businessName}}",
-      seoDescription: "Groups and leaders",
+      seoDescription: "Programs and volunteers",
       blocks: [
         {
           id: "ch-leaders",
@@ -1358,149 +1770,16 @@ function buildCommunityChurchPages(): TemplatePageDef[] {
           sampleOnly: true,
           props: {
             layout: "rows",
-            heading: "Neighbours & volunteers",
+            heading: "Coordinators & hosts",
             items: [
-              { photoId: imgs.portrait.id, name: "Community Pastor", role: "Hospitality & Care", text: "Helping newcomers find circles and local support." },
-              { photoId: imgs.section1.id, name: "Outreach Coordinator", role: "Neighbourhood Partnerships", text: "Coordinating food pantry and tutoring teams." },
+              { photoId: imgs.portrait.id, name: "Hospitality Coordinator", role: "Sunday Welcome & Meals", text: "Making sure first-timers have a warm seat and friendly introductions." },
+              { photoId: imgs.section1.id, name: "Youth & Outreach Lead", role: "Community Pantry & Clubs", text: "Coordinating after-school groups and local partnerships." },
             ],
           },
         },
       ],
     },
     contactTailPage("ch", "Reach our welcome team", false),
-  ];
-}
-
-function buildCreativeStudioPages(): TemplatePageDef[] {
-  const imgs = imagesForSlug("creative-studio");
-  return [
-    {
-      key: "home",
-      id: "cs-home",
-      title: "Home",
-      path: "/",
-      isHome: true,
-      showInMenu: true,
-      seoTitle: "{{businessName}}",
-      seoDescription: "{{description}}",
-      blocks: [
-        {
-          id: "cs-hero",
-          type: "hero",
-          props: {
-            layout: "editorial",
-            eyebrow: "Design & Direction",
-            heading: "{{businessName}}",
-            subheading: "{{tagline}}",
-            imageId: imgs.hero.id,
-            buttonLabel: "Start a brief",
-            buttonLink: { type: "url", url: "/contact" },
-            button2Label: "Selected projects",
-            button2Link: { type: "url", url: "/projects" },
-          },
-        },
-        {
-          id: "cs-gallery",
-          type: "gallery",
-          sampleOnly: true,
-          props: {
-            layout: "bento",
-            heading: "Selected campaigns",
-            items: [
-              { imageId: imgs.section1.id, title: "Solstice Roasters Identity", text: "Packaging system, typography, and retail signage." },
-              { imageId: imgs.section2.id, title: "Wayfinder Annual Report", text: "Editorial print layout and data illustrations." },
-              { imageId: imgs.portrait.id, title: "Marrow Ceramics Campaign", text: "Art direction and seasonal lookbook." },
-            ],
-          },
-        },
-        {
-          id: "cs-services",
-          type: "features",
-          sampleOnly: true,
-          props: {
-            layout: "compact",
-            heading: "Capabilities",
-            items: [
-              { title: "Brand systems", text: "Visual identity, type scales, and practical guidelines." },
-              { title: "Art direction", text: "Campaign concepting and production direction." },
-              { title: "Digital flagships", text: "Editorial websites crafted for speed and clarity." },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      key: "projects",
-      id: "cs-projects",
-      title: "Projects",
-      path: "/projects",
-      showInMenu: true,
-      seoTitle: "Projects | {{businessName}}",
-      seoDescription: "Studio portfolio",
-      blocks: [
-        {
-          id: "cs-ba",
-          type: "before-after",
-          sampleOnly: true,
-          props: {
-            layout: "alternating",
-            heading: "Rebrands & evolutions",
-            items: [
-              { title: "Harbour Bakery Packaging", text: "Unified six legacy labels into a crisp seasonal grid." },
-              { title: "Fieldwork Press Flagship", text: "Redesigned navigation for faster catalog discovery." },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      key: "process",
-      id: "cs-process",
-      title: "Process",
-      path: "/process",
-      showInMenu: true,
-      seoTitle: "Process | {{businessName}}",
-      seoDescription: "How we work",
-      blocks: [
-        {
-          id: "cs-pricing",
-          type: "pricing",
-          sampleOnly: true,
-          props: {
-            layout: "rows",
-            heading: "Studio engagements",
-            items: [
-              { title: "Identity sprint", price: "$2,800", text: "Three-week focused brand mark and toolkit." },
-              { title: "Full flagship direction", price: "$6,400", text: "Identity, art direction, and launch assets." },
-            ],
-          },
-        },
-      ],
-    },
-    {
-      key: "faq",
-      id: "cs-faq",
-      title: "FAQ",
-      path: "/faq",
-      showInMenu: true,
-      seoTitle: "FAQ | {{businessName}}",
-      seoDescription: "Working with {{businessName}}",
-      blocks: [
-        {
-          id: "cs-faq-items",
-          type: "faq",
-          sampleOnly: true,
-          props: {
-            heading: "Studio questions",
-            items: [
-              { title: "How far ahead should we book?", text: "We open two new studio slots per month; reach out anytime for availability." },
-              { title: "Do you deliver editable files?", text: "Yes, every handoff includes clean vector masters and usage guides." },
-            ],
-          },
-        },
-      ],
-    },
-    contactTailPage("cs", "Tell us about your brief", false),
   ];
 }
 
@@ -1525,7 +1804,7 @@ function buildPagesForSlug(slug: string): TemplatePageDef[] {
     case "creative-studio":
       return buildCreativeStudioPages();
     default:
-      return buildStarterCompositionPages(slug, "split", "features", "rows");
+      return buildStarterCompositionPages(slug, "offset-frame", "features", "rows");
   }
 }
 
@@ -1545,16 +1824,16 @@ type TemplateSpec = {
 };
 
 const TEMPLATE_SPECS: TemplateSpec[] = [
-  { slug: "starter", hero: "split", header: "classic", font: "Bricolage Grotesque", bodyFont: "Figtree", corners: "soft", density: "comfortable", buttonShape: "soft", rhythm: "even", palette: "fresh-green", sampleName: "Cedarbrook Neighbourhood Sample", businessTypes: ["local business", "consultant", "general"] },
-  { slug: "software-company", hero: "product-shot", header: "classic", font: "Manrope", bodyFont: "Inter", corners: "round", density: "compact", buttonShape: "round", rhythm: "bold", palette: "ocean", sampleName: "Northwind Telemetry Sample", businessTypes: ["software", "saas"] },
-  { slug: "law-firm", hero: "arch", header: "centered", font: "Libre Baskerville", bodyFont: "Inter", corners: "sharp", density: "airy", buttonShape: "square", rhythm: "tinted", palette: "midnight", sampleName: "Alder & Associates Chambers", businessTypes: ["law firm", "legal", "accounting"] },
-  { slug: "restaurant", hero: "fullbleed", header: "overlay", font: "DM Serif Display", bodyFont: "Figtree", corners: "soft", density: "comfortable", buttonShape: "pill", rhythm: "alternate", palette: "berry", sampleName: "Saffron Copper Hearth Bistro", businessTypes: ["restaurant", "cafe", "bakery"] },
-  { slug: "developer-portfolio", hero: "minimal", header: "minimal", font: "JetBrains Mono", bodyFont: "Inter", corners: "sharp", density: "airy", buttonShape: "square", rhythm: "even", palette: "charcoal", sampleName: "Kieran Vale Engineering", businessTypes: ["portfolio", "developer"] },
-  { slug: "salon-beauty", hero: "offset-frame", header: "centered", font: "Cormorant Garamond", bodyFont: "Figtree", corners: "round", density: "airy", buttonShape: "pill", rhythm: "alternate", palette: "berry", sampleName: "Camellia Botanical Lounge", businessTypes: ["salon", "beauty", "spa"] },
-  { slug: "boutique-shop", hero: "card-over-image", header: "split", font: "Fraunces", bodyFont: "Figtree", corners: "round", density: "comfortable", buttonShape: "round", rhythm: "tinted", palette: "sunset", sampleName: "Loom & Clay Curated Goods", businessTypes: ["shop", "retail", "boutique"] },
-  { slug: "home-services", hero: "diagonal", header: "classic", font: "Oswald", bodyFont: "Inter", corners: "sharp", density: "compact", buttonShape: "square", rhythm: "bold", palette: "fresh-green", sampleName: "Oakridge Plumbing & Heating", businessTypes: ["home services", "plumbing", "repair"] },
-  { slug: "community-church", hero: "centered", header: "classic", font: "Lora", bodyFont: "Figtree", corners: "soft", density: "airy", buttonShape: "pill", rhythm: "alternate", palette: "ocean", sampleName: "Meadowbrook Community Fellowship", businessTypes: ["church", "nonprofit", "community"] },
-  { slug: "creative-studio", hero: "editorial", header: "classic", font: "Space Grotesk", bodyFont: "Inter", corners: "sharp", density: "comfortable", buttonShape: "soft", rhythm: "even", palette: "charcoal", sampleName: "Paperkite Visual Direction", businessTypes: ["creative studio", "agency", "photography"] },
+  { slug: "starter", hero: "offset-frame", header: "classic", font: "Bricolage Grotesque", bodyFont: "Figtree", corners: "soft", density: "comfortable", buttonShape: "soft", rhythm: "even", palette: "fresh-green", sampleName: "Haven Street Collective", businessTypes: ["local business", "consultant", "general"] },
+  { slug: "software-company", hero: "product-shot", header: "split", font: "Space Grotesk", bodyFont: "Inter", corners: "soft", density: "compact", buttonShape: "round", rhythm: "bold", palette: "pulse", sampleName: "Pulse Cloud Systems", businessTypes: ["software", "saas", "tech"] },
+  { slug: "law-firm", hero: "statement", header: "centered", font: "Libre Caslon Text", bodyFont: "Source Sans 3", corners: "sharp", density: "airy", buttonShape: "square", rhythm: "tinted", palette: "meridian", sampleName: "Meridian Law LLP", businessTypes: ["law firm", "legal", "accounting"] },
+  { slug: "restaurant", hero: "fullbleed", header: "overlay", font: "DM Serif Display", bodyFont: "Nunito Sans", corners: "round", density: "comfortable", buttonShape: "pill", rhythm: "alternate", palette: "ember", sampleName: "Ember Wood Kitchen", businessTypes: ["restaurant", "cafe", "bakery"] },
+  { slug: "developer-portfolio", hero: "minimal", header: "minimal", font: "Anton", bodyFont: "IBM Plex Mono", corners: "sharp", density: "airy", buttonShape: "square", rhythm: "bold", palette: "concrete", sampleName: "CONCRETE ATELIER", businessTypes: ["architecture", "portfolio", "developer"] },
+  { slug: "salon-beauty", hero: "arch", header: "centered", font: "Fraunces", bodyFont: "Manrope", corners: "round", density: "airy", buttonShape: "pill", rhythm: "alternate", palette: "willow", sampleName: "Willow Yoga & Wellness", businessTypes: ["yoga", "wellness", "salon", "spa"] },
+  { slug: "boutique-shop", hero: "card-over-image", header: "split", font: "Bodoni Moda", bodyFont: "Montserrat", corners: "soft", density: "comfortable", buttonShape: "soft", rhythm: "tinted", palette: "bloom", sampleName: "Bloom & Bold Studio", businessTypes: ["florist", "shop", "retail", "boutique"] },
+  { slug: "home-services", hero: "split", header: "classic", font: "Poppins", bodyFont: "Nunito", corners: "round", density: "comfortable", buttonShape: "round", rhythm: "even", palette: "clearview", sampleName: "Clearview Dental Care", businessTypes: ["dental", "clinic", "medical", "home services"] },
+  { slug: "community-church", hero: "centered", header: "classic", font: "Baloo 2", bodyFont: "Quicksand", corners: "round", density: "airy", buttonShape: "pill", rhythm: "alternate", palette: "sprout", sampleName: "Sprout Commons", businessTypes: ["community", "youth", "church", "nonprofit"] },
+  { slug: "creative-studio", hero: "editorial", header: "minimal", font: "Cormorant Garamond", bodyFont: "Inter", corners: "sharp", density: "airy", buttonShape: "square", rhythm: "even", palette: "frame", sampleName: "FRAME — Lena Mercer", businessTypes: ["photographer", "creative studio", "portfolio"] },
 ];
 
 export const SYSTEM_TEMPLATES: SystemTemplatePackage[] = TEMPLATE_SPECS.map((spec) => {
@@ -1576,16 +1855,16 @@ export const SYSTEM_TEMPLATES: SystemTemplatePackage[] = TEMPLATE_SPECS.map((spe
     },
     sampleProfile: {
       businessName: spec.sampleName,
-      tagline: `${spec.sampleName} serving our neighbourhood with care`,
-      description: `${spec.sampleName} delivers dependable service built around practical local needs.`,
+      tagline: `${spec.sampleName} crafting clear, attentive experiences every day`,
+      description: `${spec.sampleName} brings dedicated craft and attentive personal guidance to clients across the region.`,
       phone: "+1 555 019 4820",
       email: `hello@${spec.slug.replace(/[^a-z0-9]/g, "")}.example`,
-      address: "742 Evergreen Sample Terrace, Suite 4B",
+      address: "742 Northbridge Terrace, Suite 4B",
       hoursNote: "Mon-Sat 8:30am-6:00pm",
-      city: "Sampleton",
+      city: "Northbridge",
       region: "Highland Province",
-      country: "Sampleland",
-      areaServed: "Greater Sampleton Metro",
+      country: "Freelandia",
+      areaServed: "Greater Northbridge Metro",
       social: [{ network: "instagram", url: `https://instagram.com/${spec.slug}` }],
     },
     assets: [{ id: heroId, role: "hero" }],
@@ -1597,6 +1876,7 @@ export const SYSTEM_TEMPLATES: SystemTemplatePackage[] = TEMPLATE_SPECS.map((spe
               id: `${spec.slug}-1`,
               name: catalog.name,
               theme: {
+                presetId: spec.slug,
                 palette: spec.palette,
                 corners: spec.corners,
                 density: spec.density,

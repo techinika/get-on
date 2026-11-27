@@ -4,8 +4,7 @@ import { templateAvailable, templateBySlug } from "@/lib/templates/catalog";
 import { applyTemplateToProject } from "@/lib/templates/apply";
 import type { AgentActor } from "./auth";
 import {
-  startAgentRun,
-  finishAgentRun,
+  finishOpenRunsForConversation,
   appendAgentMessage,
   verifyAgentProject,
 } from "./conversations";
@@ -273,26 +272,19 @@ export async function executeSiteDraft(
     .eq("id", actionId);
 
   try {
-    const run = await startAgentRun(admin, {
+    const template = templateBySlug(templateSlug);
+    const assistantText = `I’ve created your draft website “${name}” at ${slugToPrimaryAddress(
+      address,
+    )}. It uses the ${template?.name ?? "Starter"} template and is not published yet. Open it from your dashboard to keep editing.`;
+    await appendAgentMessage(admin, {
       conversationId,
       teamId: actor.teamId,
-      userId: actor.userId,
+      userId: null,
+      role: "assistant",
+      content: assistantText,
+      credits: DRAFT_CREDITS,
     });
-    if (run.ok) {
-      const template = templateBySlug(templateSlug);
-      const assistantText = `I’ve created your draft website “${name}” at ${slugToPrimaryAddress(
-        address,
-      )}. It uses the ${template?.name ?? "Starter"} template and is not published yet. Open it from your dashboard to keep editing.`;
-      await appendAgentMessage(admin, {
-        conversationId,
-        teamId: actor.teamId,
-        userId: null,
-        role: "assistant",
-        content: assistantText,
-        credits: DRAFT_CREDITS,
-      });
-      await finishAgentRun(admin, run.id, { status: "succeeded" });
-    }
+    await finishOpenRunsForConversation(admin, conversationId, "succeeded");
   } catch (error) {
     console.error("[agent] could not post site-created reply", error);
   }

@@ -67,6 +67,20 @@ type Conversation = {
   createdAt: string;
 };
 
+type AgentNextStep = {
+  label: string;
+  prompt?: string;
+  href?: string;
+};
+
+type PendingConfirmationState = {
+  id: string;
+  tool: string;
+  summary: string;
+  estimatedCredits: number;
+  expiresAt: string;
+};
+
 export type AssistantDockProps = {
   open: boolean;
   tab: AssistantTab;
@@ -199,6 +213,40 @@ function messageFrom(value: unknown): ChatMessage | null {
   };
 }
 
+function nextStepsFrom(value: unknown): AgentNextStep[] {
+  if (!Array.isArray(value)) return [];
+  const steps: AgentNextStep[] = [];
+  for (const item of value) {
+    if (!item || typeof item !== "object") continue;
+    const row = item as Record<string, unknown>;
+    if (typeof row.label !== "string" || !row.label.trim()) continue;
+    const step: AgentNextStep = { label: row.label.trim() };
+    if (typeof row.prompt === "string" && row.prompt.trim()) {
+      step.prompt = row.prompt.trim();
+    }
+    if (typeof row.href === "string" && row.href.trim()) {
+      step.href = row.href.trim();
+    }
+    if (step.prompt || step.href) {
+      steps.push(step);
+    }
+  }
+  return steps.slice(0, 3);
+}
+
+function pendingActionFrom(value: unknown): PendingConfirmationState | null {
+  if (!value || typeof value !== "object") return null;
+  const action = value as Record<string, unknown>;
+  if (typeof action.id !== "string" || !action.id) return null;
+  return {
+    id: action.id,
+    tool: String(action.tool ?? ""),
+    summary: String(action.summary ?? ""),
+    estimatedCredits: Number(action.estimatedCredits ?? 0),
+    expiresAt: String(action.expiresAt ?? ""),
+  };
+}
+
 export function AssistantDock({
   open,
   tab,
@@ -222,6 +270,7 @@ export function AssistantDock({
   const closeRef = React.useRef<HTMLButtonElement>(null);
   const loadedRef = React.useRef(false);
   const optimisticIdRef = React.useRef<string | null>(null);
+  const optimisticSeqRef = React.useRef(0);
   const abortRef = React.useRef<AbortController | null>(null);
   const sendingRef = React.useRef(false);
   const conversationIdRef = React.useRef<string | null>(null);
@@ -246,13 +295,9 @@ export function AssistantDock({
   const [remoteBusy, setRemoteBusy] = React.useState(false);
   const [balance, setBalance] = React.useState(credits);
   const [createSiteOpen, setCreateSiteOpen] = React.useState(false);
-  const [pendingConfirmation, setPendingConfirmation] = React.useState<{
-    id: string;
-    tool: string;
-    summary: string;
-    estimatedCredits: number;
-    expiresAt: string;
-  } | null>(null);
+  const [nextSteps, setNextSteps] = React.useState<AgentNextStep[]>([]);
+  const [pendingConfirmation, setPendingConfirmation] =
+    React.useState<PendingConfirmationState | null>(null);
   const [editingBrief, setEditingBrief] = React.useState(false);
   const [briefForm, setBriefForm] = React.useState<{
     name: string;
@@ -320,6 +365,10 @@ export function AssistantDock({
             MAX_MESSAGES,
           ),
         );
+        const restoredPending = pendingActionFrom(data.pendingConfirmation);
+        setPendingConfirmation(restoredPending);
+        if (!restoredPending) setEditingBrief(false);
+        setNextSteps(restoredPending ? [] : nextStepsFrom(data.nextSteps));
         if (typeof data.balance === "number") setBalance(data.balance);
         writeStorage(activeKey, id);
       } catch (loadError) {
@@ -501,6 +550,9 @@ export function AssistantDock({
     abortRef.current = null;
     setConversationId(null);
     setMessages([]);
+    setNextSteps([]);
+    setPendingConfirmation(null);
+    setEditingBrief(false);
     setListResetKey((key) => key + 1);
     setDraft("");
     clearStreamBuffer();
@@ -536,18 +588,32 @@ export function AssistantDock({
     setCreateSiteOpen(true);
   }
 
-  async function send(overrideText?: string) {
+  async function send(
+    overrideText?: string,
+    options?: { bypassConfirmation?: boolean },
+  ) {
     const text = (overrideText ?? draft).trim();
-    if (!text || sending || needsCredits || !enabled || !canUse || pendingConfirmation) return;
+    if (
+      !text ||
+      sending ||
+      needsCredits ||
+      !enabled ||
+      !canUse ||
+      (pendingConfirmation && !options?.bypassConfirmation)
+    ) {
+      return;
+    }
 
     sendingRef.current = true;
     setSending(true);
     setError(null);
+    setNextSteps([]);
     clearStreamBuffer();
     setStatusLabel("Sending");
     const controller = new AbortController();
     abortRef.current = controller;
-    const optimisticId = `local-${Date.now()}`;
+    optimisticSeqRef.current += 1;
+    const optimisticId = `local-${optimisticSeqRef.current}`;
     optimisticIdRef.current = optimisticId;
     setMessages((current) =>
       keepLast([...current, { id: optimisticId, role: "user", content: text }], MAX_MESSAGES),
@@ -597,12 +663,17 @@ export function AssistantDock({
       if (!response.ok) {
         const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
         throw new Error(
-          typeof data.error === "string" ? data.error : "The assistant could not answer.",
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : "The assistant could not answer.",
         );
       }
       if (!response.body) throw new Error("The assistant could not answer.");
 
       setStatusLabel("Thinking");
+      let receivedTerminalEvent = false;
       await readSse(response.body, (event, data) => {
         if (event === "message") {
           const saved = messageFrom(data);
@@ -637,24 +708,21 @@ export function AssistantDock({
           return;
         }
         if (event === "confirmation_required") {
+          receivedTerminalEvent = true;
           clearStreamBuffer();
+          setNextSteps([]);
           setStatusLabel("");
           setSending(false);
           sendingRef.current = false;
           abortRef.current = null;
-          const action = data.action as Record<string, unknown> | undefined;
-          if (action) {
-            setPendingConfirmation({
-              id: String(action.id ?? ""),
-              tool: String(action.tool ?? ""),
-              summary: String(action.summary ?? ""),
-              estimatedCredits: Number(action.estimatedCredits ?? 0),
-              expiresAt: String(action.expiresAt ?? ""),
-            });
+          const nextPending = pendingActionFrom(data.action);
+          if (nextPending) {
+            setPendingConfirmation(nextPending);
           }
           return;
         }
         if (event === "error") {
+          receivedTerminalEvent = true;
           clearStreamBuffer();
           setError(
             typeof data.message === "string"
@@ -666,6 +734,7 @@ export function AssistantDock({
           return;
         }
         if (event === "done") {
+          receivedTerminalEvent = true;
           const saved = messageFrom(data.message);
           clearStreamBuffer();
           if (saved) {
@@ -696,10 +765,20 @@ export function AssistantDock({
                 ),
             );
           }
+          setNextSteps(nextStepsFrom(data.nextSteps));
           if (typeof data.balance === "number") setBalance(data.balance);
           setStatusLabel("");
         }
       });
+
+      if (!receivedTerminalEvent && !controller.signal.aborted) {
+        clearStreamBuffer();
+        setStatusLabel("");
+        setError("The assistant connection ended before replying. Please try again.");
+        if (conversationIdRef.current) {
+          void loadConversation(conversationIdRef.current);
+        }
+      }
     } catch (sendError) {
       if (!controller.signal.aborted) {
         setError(
@@ -727,13 +806,26 @@ export function AssistantDock({
       });
       const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
       if (!response.ok) {
-        setError(typeof data.error === "string" ? data.error : "We could not confirm that action.");
+        setError(
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : "We could not confirm that action.",
+        );
         return;
       }
       setPendingConfirmation(null);
       setEditingBrief(false);
       setError(null);
-      if (conversationIdRef.current) void loadConversation(conversationIdRef.current);
+      const confirmSteps = nextStepsFrom(data.nextSteps);
+      setNextSteps(confirmSteps);
+      if (conversationIdRef.current) {
+        await loadConversation(conversationIdRef.current);
+        if (confirmSteps.length > 0) {
+          setNextSteps((current) => (current.length > 0 ? current : confirmSteps));
+        }
+      }
     } catch {
       setError("We could not confirm that action. Please try again.");
     } finally {
@@ -975,7 +1067,7 @@ export function AssistantDock({
             <VirtualizedMessageList
               key={listResetKey}
               messages={messages}
-              stickTrigger={`${streamingText.length}:${sending ? 1 : 0}:${remoteBusy ? 1 : 0}:${pendingConfirmation?.id ?? ""}:${editingBrief ? 1 : 0}`}
+              stickTrigger={`${streamingText.length}:${sending ? 1 : 0}:${remoteBusy ? 1 : 0}:${pendingConfirmation?.id ?? ""}:${editingBrief ? 1 : 0}:${nextSteps.length}`}
               loading={loading}
               loadingState={
                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-text-muted">
@@ -1001,8 +1093,9 @@ export function AssistantDock({
                       <button
                         key={suggestion}
                         type="button"
-                        onClick={() => setDraft(suggestion)}
-                        className="rounded-full border border-border bg-surface px-3 py-2 text-left text-sm text-text hover:bg-surface-muted"
+                        disabled={sending || needsCredits}
+                        onClick={() => void send(suggestion)}
+                        className="rounded-full border border-border bg-surface px-3 py-2 text-left text-sm text-text hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
                       >
                         {suggestion}
                       </button>
@@ -1011,7 +1104,12 @@ export function AssistantDock({
                 </div>
               }
               hasTrailingContent={Boolean(
-                streamingText || pendingConfirmation || sending || remoteBusy || editingBrief,
+                streamingText ||
+                  pendingConfirmation ||
+                  sending ||
+                  remoteBusy ||
+                  editingBrief ||
+                  nextSteps.length > 0,
               )}
               footer={
                 <>
@@ -1049,11 +1147,17 @@ export function AssistantDock({
                       <div className="mt-3 flex gap-2">
                         <button
                           type="button"
-                          onClick={() => {
+                          onClick={async () => {
                             const summaryText = `Update the website brief: name "${briefForm.name}", address "${briefForm.address}", business type "${briefForm.businessType}", about "${briefForm.about}".`;
+                            const pendingId = pendingConfirmation?.id;
                             setEditingBrief(false);
                             setPendingConfirmation(null);
-                            void send(summaryText);
+                            if (pendingId) {
+                              await fetch(`/api/agent/actions/${pendingId}/cancel`, {
+                                method: "POST",
+                              }).catch(() => {});
+                            }
+                            void send(summaryText, { bypassConfirmation: true });
                           }}
                           disabled={sending}
                           className="flex-1 h-9 rounded-input border border-border bg-surface px-3 text-sm text-text transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
@@ -1124,6 +1228,43 @@ export function AssistantDock({
                     <div className="flex items-center gap-2 self-start rounded-[14px] bg-surface-muted px-3.5 py-2.5 text-sm text-text-muted">
                       <Loader2 size={16} strokeWidth={1.75} className="animate-spin" aria-hidden />
                       {statusLabel || "Assistant is answering"}
+                    </div>
+                  ) : null}
+                  {!sending &&
+                  !remoteBusy &&
+                  !streamingText &&
+                  !pendingConfirmation &&
+                  nextSteps.length > 0 ? (
+                    <div className="mt-2 space-y-1.5" aria-label="Next steps">
+                      <p className="text-xs font-medium text-text-muted">Next steps</p>
+                      <div className="flex flex-wrap gap-2">
+                        {nextSteps.map((step) =>
+                          step.href ? (
+                            <Link
+                              key={`${step.label}:${step.href}`}
+                              href={step.href}
+                              onClick={() => {
+                                if (isMobile) onClose();
+                              }}
+                              className="inline-flex h-8 items-center rounded-input border border-border bg-surface px-3 text-xs font-medium text-text whitespace-nowrap shrink-0 transition-colors hover:bg-surface-muted"
+                            >
+                              {step.label}
+                            </Link>
+                          ) : (
+                            <button
+                              key={`${step.label}:${step.prompt ?? ""}`}
+                              type="button"
+                              disabled={sending || needsCredits}
+                              onClick={() => {
+                                if (step.prompt) void send(step.prompt);
+                              }}
+                              className="inline-flex h-8 items-center rounded-input border border-border bg-surface px-3 text-xs font-medium text-text whitespace-nowrap shrink-0 transition-colors hover:bg-surface-muted disabled:pointer-events-none disabled:opacity-50"
+                            >
+                              {step.label}
+                            </button>
+                          ),
+                        )}
+                      </div>
                     </div>
                   ) : null}
                 </>

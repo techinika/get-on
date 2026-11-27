@@ -85,7 +85,7 @@ type SiteBrief = {
   includeContactForm: boolean;
 };
 
-const JSON_SCHEMA_OBJECT = { type: "object", additionalProperties: true };
+const JSON_SCHEMA_OBJECT = { type: "object", properties: {}, additionalProperties: false };
 const JSON_SCHEMA_STRING = { type: "string" };
 
 function requireEditorOrAbove(role: string): boolean {
@@ -149,7 +149,17 @@ export const updateCreateSiteBrief: ToolExecutor<
   name: "update_create_site_brief",
   description: "Save the details the user wants for their new website (name, web address, business type, about, style).",
   schema: updateCreateSiteBriefSchema,
-  jsonSchema: JSON_SCHEMA_OBJECT,
+  jsonSchema: {
+    type: "object",
+    properties: {
+      name: JSON_SCHEMA_STRING,
+      address: JSON_SCHEMA_STRING,
+      businessType: JSON_SCHEMA_STRING,
+      about: JSON_SCHEMA_STRING,
+      style: JSON_SCHEMA_STRING,
+      includeContactForm: { type: "boolean" },
+    },
+  },
   execute: async (input, ctx) => {
     const actor = await getAgentActor();
     if (!actor) {
@@ -252,7 +262,12 @@ export const generateSite: ToolExecutor<
   name: "generate_site",
   description: "Create a new website draft from the saved brief. Needs confirmation before it runs.",
   schema: generateSiteSchema,
-  jsonSchema: JSON_SCHEMA_OBJECT,
+  jsonSchema: {
+    type: "object",
+    properties: {
+      confirm: { type: "boolean" },
+    },
+  },
   execute: async (input, ctx) => {
     const actor = await getAgentActor();
     if (!actor) {
@@ -868,7 +883,10 @@ export const updatePageBlocks: ToolExecutor<UpdatePageBlocksInput, { pageId: str
     type: "object",
     properties: {
       pageId: JSON_SCHEMA_STRING,
-      blocks: { type: "array" },
+      blocks: {
+        type: "array",
+        items: { type: "object", properties: {}, additionalProperties: true },
+      },
       expectedRevision: { type: "integer" },
     },
     required: ["pageId", "blocks", "expectedRevision"],
@@ -1069,7 +1087,17 @@ export const reorderPages: ToolExecutor<ReorderPagesInput, { projectId: string }
     type: "object",
     properties: {
       projectId: JSON_SCHEMA_STRING,
-      pageOrders: { type: "array" },
+      pageOrders: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            id: JSON_SCHEMA_STRING,
+            position: { type: "integer" },
+          },
+          required: ["id", "position"],
+        },
+      },
     },
     required: ["projectId", "pageOrders"],
   },

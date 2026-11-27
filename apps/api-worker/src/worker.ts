@@ -1,7 +1,7 @@
 import {
   fetchCloudflareSiteAnalytics,
   normalizeAnalyticsHostnames,
-  normalizeAnalyticsRange,
+  resolveAnalyticsDateWindow,
   sha256Hex,
   verifyWorkerRequest,
 } from "@get-on/site-server";
@@ -366,8 +366,10 @@ async function handleAiChatCompletions(
   const inputs: Record<string, unknown> = {
     messages: Array.isArray(parsed.messages) ? parsed.messages : [],
   };
-  if (Array.isArray(parsed.tools) && parsed.tools.length > 0) inputs.tools = parsed.tools;
-  if (parsed.tool_choice !== undefined) inputs.tool_choice = parsed.tool_choice;
+  if (Array.isArray(parsed.tools) && parsed.tools.length > 0) {
+    inputs.tools = parsed.tools;
+    if (parsed.tool_choice !== undefined) inputs.tool_choice = parsed.tool_choice;
+  }
   if (typeof parsed.max_tokens === "number") inputs.max_tokens = parsed.max_tokens;
   if (typeof parsed.temperature === "number") inputs.temperature = parsed.temperature;
   if (parsed.response_format && typeof parsed.response_format === "object") {
@@ -678,9 +680,19 @@ async function handleAnalyticsSite(
     return jsonResponse(503, { ok: false, error: "ANALYTICS_NOT_CONFIGURED" });
   }
 
-  const range = normalizeAnalyticsRange(
-    typeof parsed.range === "string" ? parsed.range : undefined,
-  );
+  const resolvedWindow = resolveAnalyticsDateWindow({
+    range: typeof parsed.range === "string" ? parsed.range : undefined,
+    from: typeof parsed.from === "string" ? parsed.from : undefined,
+    to: typeof parsed.to === "string" ? parsed.to : undefined,
+  });
+  if (!resolvedWindow.ok) {
+    return jsonResponse(400, {
+      ok: false,
+      error: resolvedWindow.errorCode,
+      message: resolvedWindow.errorMessage,
+    });
+  }
+
   const zoneId =
     typeof parsed.zoneId === "string" && parsed.zoneId.trim()
       ? parsed.zoneId.trim()
@@ -693,19 +705,24 @@ async function handleAnalyticsSite(
   const analytics = await fetchCloudflareSiteAnalytics({
     apiToken,
     hostnames,
-    range,
+    range: resolvedWindow.range,
+    ...(resolvedWindow.range === "custom"
+      ? { from: resolvedWindow.from, to: resolvedWindow.to }
+      : {}),
     zoneId,
     rootDomain,
   });
 
   if (!analytics.ok) {
     const status =
-      analytics.errorCode === "CLOUDFLARE_UNAUTHORIZED"
-        ? 403
-        : analytics.errorCode === "ANALYTICS_NOT_CONFIGURED" ||
-            analytics.errorCode === "ZONE_NOT_CONFIGURED"
-          ? 503
-          : 502;
+      analytics.errorCode === "INVALID_DATE_RANGE"
+        ? 400
+        : analytics.errorCode === "CLOUDFLARE_UNAUTHORIZED"
+          ? 403
+          : analytics.errorCode === "ANALYTICS_NOT_CONFIGURED" ||
+              analytics.errorCode === "ZONE_NOT_CONFIGURED"
+            ? 503
+            : 502;
     return jsonResponse(status, {
       ok: false,
       error: analytics.errorCode ?? "CLOUDFLARE_GRAPHQL_ERROR",

@@ -21,16 +21,16 @@ export type ArtPlan = {
 };
 
 const PLANS: Record<string, ArtPlan> = {
-  starter: { hero: "horizon-waves", sections: ["geometric-grid", "soft-orbitals"], portrait: "botanical-arches", logo: "craft-mosaic" },
-  "software-company": { hero: "geometric-grid", sections: ["editorial-stripes", "soft-orbitals"], portrait: "horizon-waves", logo: "geometric-grid" },
-  "law-firm": { hero: "botanical-arches", sections: ["editorial-stripes", "layered-peaks"], portrait: "botanical-arches", logo: "editorial-stripes" },
-  restaurant: { hero: "layered-peaks", sections: ["botanical-arches", "craft-mosaic"], portrait: "soft-orbitals", logo: "craft-mosaic" },
-  "developer-portfolio": { hero: "editorial-stripes", sections: ["geometric-grid", "horizon-waves"], portrait: "geometric-grid", logo: "editorial-stripes" },
-  "salon-beauty": { hero: "soft-orbitals", sections: ["botanical-arches", "horizon-waves"], portrait: "soft-orbitals", logo: "botanical-arches" },
-  "boutique-shop": { hero: "craft-mosaic", sections: ["soft-orbitals", "botanical-arches"], portrait: "craft-mosaic", logo: "soft-orbitals" },
-  "home-services": { hero: "Studio-collage", sections: ["layered-peaks", "geometric-grid"], portrait: "layered-peaks", logo: "geometric-grid" },
-  "community-church": { hero: "botanical-arches", sections: ["horizon-waves", "soft-orbitals"], portrait: "horizon-waves", logo: "botanical-arches" },
-  "creative-studio": { hero: "Studio-collage", sections: ["craft-mosaic", "editorial-stripes"], portrait: "editorial-stripes", logo: "Studio-collage" },
+  starter: { hero: "horizon-waves", sections: ["craft-mosaic", "soft-orbitals"], portrait: "botanical-arches", logo: "horizon-waves" },
+  "software-company": { hero: "geometric-grid", sections: ["soft-orbitals", "editorial-stripes"], portrait: "geometric-grid", logo: "soft-orbitals" },
+  "law-firm": { hero: "editorial-stripes", sections: ["layered-peaks", "geometric-grid"], portrait: "editorial-stripes", logo: "layered-peaks" },
+  restaurant: { hero: "craft-mosaic", sections: ["layered-peaks", "botanical-arches"], portrait: "craft-mosaic", logo: "soft-orbitals" },
+  "developer-portfolio": { hero: "geometric-grid", sections: ["editorial-stripes", "geometric-grid"], portrait: "editorial-stripes", logo: "geometric-grid" },
+  "salon-beauty": { hero: "botanical-arches", sections: ["soft-orbitals", "horizon-waves"], portrait: "botanical-arches", logo: "soft-orbitals" },
+  "boutique-shop": { hero: "Studio-collage", sections: ["craft-mosaic", "botanical-arches"], portrait: "Studio-collage", logo: "craft-mosaic" },
+  "home-services": { hero: "horizon-waves", sections: ["soft-orbitals", "layered-peaks"], portrait: "soft-orbitals", logo: "horizon-waves" },
+  "community-church": { hero: "soft-orbitals", sections: ["horizon-waves", "botanical-arches"], portrait: "horizon-waves", logo: "craft-mosaic" },
+  "creative-studio": { hero: "editorial-stripes", sections: ["Studio-collage", "editorial-stripes"], portrait: "Studio-collage", logo: "editorial-stripes" },
 };
 
 export function artPlanFor(slug: string): ArtPlan {

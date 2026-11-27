@@ -3,8 +3,16 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { canUseAssistant, getAgentActor } from "@/lib/agent/auth";
 import { executeSiteDraft } from "@/lib/agent/site-draft";
 import { createSiteFromBrief, type SiteBrief } from "@/lib/agent/site-generation";
-import { appendAgentMessage, finishAgentRun } from "@/lib/agent/conversations";
+import { appendAgentMessage, finishOpenRunsForConversation } from "@/lib/agent/conversations";
 import { getAssistantFeature } from "@/lib/agent/settings";
+
+function siteCreatedNextSteps(projectId: string) {
+  return [
+    { label: "Open website", href: `/dashboard/projects/${projectId}` },
+    { label: "Open editor", href: `/dashboard/projects/${projectId}/editor` },
+    { label: "Publish website", prompt: "Please publish my new website." },
+  ];
+}
 
 export async function POST(
   request: Request,
@@ -44,6 +52,7 @@ export async function POST(
   }
   if (new Date(action.expires_at) < new Date()) {
     await admin.from("agent_pending_actions").update({ status: "expired" }).eq("id", id);
+    await finishOpenRunsForConversation(admin, String(action.conversation_id), "failed", "AGENT_ACTION_EXPIRED");
     return NextResponse.json({ error: "This action has expired. Start over." }, { status: 409 });
   }
 
@@ -51,19 +60,25 @@ export async function POST(
   if (toolName === "create_site") {
     const result = await executeSiteDraft(admin, id, actor);
     if (!result.ok) {
+      await finishOpenRunsForConversation(admin, String(action.conversation_id), "failed", result.code);
       return NextResponse.json({ error: result.code, message: confirmSiteErrorMessage(result.code) }, { status: 409 });
     }
-    return NextResponse.json({ project: result.project }, { status: 200 });
+    return NextResponse.json(
+      { project: result.project, nextSteps: siteCreatedNextSteps(result.project.id) },
+      { status: 200 },
+    );
   }
 
   if (toolName === "generate_site") {
     const args = action.arguments as Record<string, unknown>;
     const brief = args.brief as Record<string, unknown> | undefined;
     if (!brief) {
+      await finishOpenRunsForConversation(admin, String(action.conversation_id), "failed", "MISSING_BRIEF");
       return NextResponse.json({ error: "This action is missing its details." }, { status: 409 });
     }
     const result = await createSiteFromBrief(admin, actor, String(action.conversation_id), brief as SiteBrief);
     if (!result.ok) {
+      await finishOpenRunsForConversation(admin, String(action.conversation_id), "failed", result.code);
       return NextResponse.json({ error: result.code, message: result.message, upgrade_hint: result.upgrade_hint }, { status: 409 });
     }
 
@@ -71,29 +86,28 @@ export async function POST(
 
     const assistantText = `Your draft website “${result.project.name}” is ready at ${`https://${result.project.subdomain}.get-on.tech`}. It is not published yet — you can open it from your dashboard to keep editing, or ask me to publish it.`;
     try {
-      const { data: run } = await admin
-        .from("agent_runs")
-        .select("id")
-        .eq("conversation_id", action.conversation_id)
-        .eq("user_id", actor.userId)
-        .eq("status", "running")
-        .maybeSingle();
-      if (run?.id) {
-        await appendAgentMessage(admin, {
-          conversationId: String(action.conversation_id),
-          teamId: actor.teamId,
-          userId: null,
-          role: "assistant",
-          content: assistantText,
-          credits: result.credits,
-        });
-        await finishAgentRun(admin, String(run.id), { status: "succeeded" });
-      }
+      await appendAgentMessage(admin, {
+        conversationId: String(action.conversation_id),
+        teamId: actor.teamId,
+        userId: null,
+        role: "assistant",
+        content: assistantText,
+        credits: result.credits,
+      });
+      await finishOpenRunsForConversation(admin, String(action.conversation_id), "succeeded");
     } catch {
       // Best effort to surface the result in the chat.
     }
 
-    return NextResponse.json({ project: result.project, credits: result.credits, ai: result.ai }, { status: 200 });
+    return NextResponse.json(
+      {
+        project: result.project,
+        credits: result.credits,
+        ai: result.ai,
+        nextSteps: siteCreatedNextSteps(result.project.id),
+      },
+      { status: 200 },
+    );
   }
 
   return NextResponse.json({ error: "This action is not supported." }, { status: 409 });
