@@ -12,16 +12,19 @@ import {
   type Theme,
 } from "@get-on/blocks";
 import {
+  renderCardMeta,
+  type ResolvedItem,
+  type ResolvedMedia,
+  type ResolvedTab,
+} from "./card-meta";
+import {
   BeforeAfterClient,
+  ContactFormClient,
   ExpandableCardsClient,
   FaqAccordionClient,
   NewsletterClient,
   PricingToggleClient,
-  renderCardMeta,
   TabbedItemsClient,
-  type ResolvedItem,
-  type ResolvedMedia,
-  type ResolvedTab,
 } from "./interactive";
 
 export const RENDERER_CSS_VERSION = 8;
@@ -339,44 +342,12 @@ function SmartBlock({
               Enable the Contact forms plugin to start receiving visitor messages from this form.
             </p>
           ) : null}
-          <form
-            className="gs-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-            }}
-          >
-            {showName ? (
-              <div className="gs-field">
-                <label>Name</label>
-                <input className="gs-input" type="text" name="name" placeholder="Your name" required />
-              </div>
-            ) : null}
-            <div className="gs-field">
-              <label>Email</label>
-              <input className="gs-input" type="email" name="email" placeholder="you@example.com" required />
-            </div>
-            {showPhone ? (
-              <div className="gs-field">
-                <label>Phone</label>
-                <input
-                  className="gs-input"
-                  type="tel"
-                  name="phone"
-                  placeholder="+1 555 000 0000"
-                  required={phoneRequired}
-                />
-              </div>
-            ) : null}
-            <div className="gs-field">
-              <label>Message</label>
-              <textarea className="gs-textarea" name="message" placeholder="How can we help?" required />
-            </div>
-            <div>
-              <button type="submit" className="gs-btn">
-                {submitLabel}
-              </button>
-            </div>
-          </form>
+          <ContactFormClient
+            showName={showName}
+            showPhone={showPhone}
+            phoneRequired={phoneRequired}
+            submitLabel={submitLabel}
+          />
         </div>
       </section>
     );
