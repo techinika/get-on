@@ -14,6 +14,7 @@ export type Plan = {
   maxWebsites: number | null;
   maxPagesPerSite: number | null;
   maxMembers: number | null;
+  maxPlugins: number | null;
   storageMb: number | null;
   aiMonthlyCredits: number;
   aiDailyActions: number;
@@ -42,6 +43,7 @@ function toPlan(id: PlanId): Plan {
     maxWebsites: limits.maxWebsites,
     maxPagesPerSite: limits.maxPagesPerSite,
     maxMembers: limits.maxMembers,
+    maxPlugins: limits.maxPlugins,
     storageMb: limits.storageMb,
     aiMonthlyCredits: limits.aiMonthlyCredits,
     aiDailyActions: limits.aiDailyActions,

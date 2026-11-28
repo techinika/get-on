@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { primaryAddress, readPublishConfig } from "@/lib/publishing/config";
 import { siteStateOf } from "@/lib/publishing/status";
+import { planLimits, type PlanId } from "@/lib/plans";
+import { resolveEffectiveQuota } from "@/lib/quotas";
+import type { AgentPageSummary, AgentWebsiteSummary } from "./prompt";
 
 type Admin = ReturnType<typeof createAdminClient>;
 
@@ -388,4 +391,79 @@ export async function verifyAgentProject(
     .eq("id", projectId)
     .maybeSingle();
   return Boolean(data && data.team_id === teamId && !data.deleted_at);
+}
+
+export type AgentTeamResources = {
+  planId: PlanId;
+  planName: string;
+  credits: number;
+  activeWebsites: number;
+  maxWebsites: number | null;
+  maxPagesPerSite: number | null;
+  maxPlugins: number | null;
+  storageMb: number | null;
+  customDomainAllowed: boolean;
+  websites: AgentWebsiteSummary[];
+  pages?: AgentPageSummary[];
+};
+
+export async function getAgentTeamResources(
+  admin: Admin,
+  teamId: string,
+  planId: PlanId,
+  projectId?: string | null,
+): Promise<AgentTeamResources> {
+  const plan = planLimits(planId);
+  const [credits, quota, sitesResult, pagesResult] = await Promise.all([
+    getAgentBalance(admin, teamId),
+    resolveEffectiveQuota(admin, teamId, planId),
+    admin
+      .from("projects")
+      .select("id, name, subdomain, status")
+      .eq("team_id", teamId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25),
+    projectId
+      ? admin
+          .from("pages")
+          .select("id, title, path, is_homepage, revision")
+          .eq("project_id", projectId)
+          .order("position", { ascending: true })
+          .limit(30)
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const websites: AgentWebsiteSummary[] = Array.isArray(sitesResult.data)
+    ? sitesResult.data.map((row) => ({
+        id: String(row.id),
+        name: String(row.name ?? ""),
+        subdomain: String(row.subdomain ?? ""),
+        status: String(row.status ?? "draft"),
+      }))
+    : [];
+
+  const pages: AgentPageSummary[] | undefined = Array.isArray(pagesResult.data)
+    ? pagesResult.data.map((row) => ({
+        id: String(row.id),
+        title: String(row.title ?? ""),
+        path: String(row.path ?? "/"),
+        isHomepage: Boolean(row.is_homepage),
+        revision: Number(row.revision ?? 0),
+      }))
+    : undefined;
+
+  return {
+    planId,
+    planName: plan.name,
+    credits,
+    activeWebsites: Math.max(quota.active_sites, websites.length),
+    maxWebsites: quota.max_websites,
+    maxPagesPerSite: plan.maxPagesPerSite,
+    maxPlugins: plan.maxPlugins,
+    storageMb: plan.storageMb,
+    customDomainAllowed: plan.customDomainAllowed,
+    websites,
+    pages,
+  };
 }

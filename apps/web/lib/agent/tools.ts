@@ -4,6 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { normalizeAddress, validateAddress } from "@/lib/address";
 import { getCreateSiteDraftPreview, type CreateSiteDraftPreview } from "@/lib/agent/site-draft";
 import { getAgentActor } from "@/lib/agent/auth";
+import { getAgentTeamResources, verifyAgentProject } from "@/lib/agent/conversations";
 import { getAssistantFeature } from "@/lib/agent/settings";
 import { type ToolContext, type ToolExecutor } from "@/lib/agent/loop";
 import { runTask } from "@/lib/ai/pipeline";
@@ -12,6 +13,7 @@ import { logActivity } from "@/lib/activity";
 import { recordSecurityEvent } from "@/lib/security/events";
 import { can } from "@/lib/permissions";
 import { planLimits } from "@/lib/plans";
+import { templateAvailable } from "@/lib/templates/catalog";
 import {
   collectContentBlocks,
   isPageContentV5,
@@ -354,9 +356,30 @@ export const generateSite: ToolExecutor<
 
 export const getContextSchema = z.object({});
 
-export const getContext: ToolExecutor<z.infer<typeof getContextSchema>, { route: string; project: { id: string; name: string } | null; selection: string | null; plan: string; credits: number; limits: { maxWebsites: number | null; maxPages: number | null } }> = {
+export const getContext: ToolExecutor<
+  z.infer<typeof getContextSchema>,
+  {
+    route: string;
+    project: { id: string; name: string; subdomain?: string; status?: string } | null;
+    selection: string | null;
+    plan: string;
+    planName: string;
+    credits: number;
+    usage: { activeWebsites: number; maxWebsites: number | null };
+    limits: {
+      maxWebsites: number | null;
+      maxPages: number | null;
+      maxPlugins: number | null;
+      storageMb: number | null;
+      customDomainAllowed: boolean;
+      customDomainsPerSite: number;
+    };
+    websites: Array<{ id: string; name: string; subdomain: string; status: string }>;
+    pages?: Array<{ id: string; title: string; path: string; isHomepage: boolean; revision?: number }>;
+  }
+> = {
   name: "get_context",
-  description: "Return the current route, project, selection, plan, credits and limits.",
+  description: "Return the current route, project, websites, pages, plan, credits and limits.",
   schema: getContextSchema,
   jsonSchema: JSON_SCHEMA_OBJECT,
   execute: async (_input, ctx) => {
@@ -365,12 +388,7 @@ export const getContext: ToolExecutor<z.infer<typeof getContextSchema>, { route:
       return { ok: false, code: "AUTH", message: "Please sign in again." };
     }
     const admin = createAdminClient();
-    const balance = await admin.rpc("ai_balance", { p_team: actor.teamId }).then((r) => {
-      const v = r.data && typeof r.data === "object" ? (r.data as Record<string, unknown>) : {};
-      return Number(v.total ?? 0);
-    });
-    const plan = planLimits(actor.planId);
-    let project: { id: string; name: string } | null = null;
+    let pid: string | null = null;
     if (ctx.conversationId) {
       const { data: conv } = await admin
         .from("agent_conversations")
@@ -379,26 +397,65 @@ export const getContext: ToolExecutor<z.infer<typeof getContextSchema>, { route:
         .eq("team_id", actor.teamId)
         .eq("user_id", actor.userId)
         .maybeSingle();
-      const pid = conv?.project_id ?? null;
-      if (pid) {
-        const { data: proj } = await admin
-          .from("projects")
-          .select("id, name")
-          .eq("id", pid)
-          .maybeSingle();
-        if (proj) project = { id: proj.id, name: proj.name };
+      pid = conv?.project_id ?? null;
+    }
+
+    const resources = await getAgentTeamResources(admin, actor.teamId, actor.planId, pid);
+    const plan = planLimits(actor.planId);
+    const activeProject = pid
+      ? resources.websites.find((site) => site.id === pid) ?? null
+      : null;
+
+    let project: { id: string; name: string; subdomain?: string; status?: string } | null =
+      activeProject
+        ? {
+            id: activeProject.id,
+            name: activeProject.name,
+            subdomain: activeProject.subdomain,
+            status: activeProject.status,
+          }
+        : null;
+    if (!project && pid) {
+      const { data: proj } = await admin
+        .from("projects")
+        .select("id, name, subdomain, status")
+        .eq("id", pid)
+        .eq("team_id", actor.teamId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (proj) {
+        project = {
+          id: proj.id,
+          name: proj.name,
+          subdomain: proj.subdomain,
+          status: proj.status,
+        };
       }
     }
 
     return {
       ok: true,
       data: {
-        route: "",
+        route: ctx.route ?? "",
         project,
         selection: null,
-        plan: actor.planId,
-        credits: balance,
-        limits: { maxWebsites: plan.maxWebsites, maxPages: plan.maxPagesPerSite },
+        plan: resources.planId,
+        planName: resources.planName,
+        credits: resources.credits,
+        usage: {
+          activeWebsites: resources.activeWebsites,
+          maxWebsites: resources.maxWebsites,
+        },
+        limits: {
+          maxWebsites: resources.maxWebsites,
+          maxPages: resources.maxPagesPerSite,
+          maxPlugins: resources.maxPlugins,
+          storageMb: resources.storageMb,
+          customDomainAllowed: resources.customDomainAllowed,
+          customDomainsPerSite: plan.customDomainsPerSite,
+        },
+        websites: resources.websites,
+        ...(resources.pages ? { pages: resources.pages } : {}),
       },
     };
   },
@@ -512,27 +569,50 @@ export const getSiteSettings: ToolExecutor<z.infer<typeof getSiteSettingsSchema>
 
 export const getUsageSchema = z.object({});
 
-export const getUsage: ToolExecutor<z.infer<typeof getUsageSchema>, { plan: string; credits: number; dailyActions: number; monthlyCredits: number }> = {
+export const getUsage: ToolExecutor<
+  z.infer<typeof getUsageSchema>,
+  {
+    plan: string;
+    planName: string;
+    credits: number;
+    dailyActions: number;
+    monthlyCredits: number;
+    activeWebsites: number;
+    maxWebsites: number | null;
+    maxPagesPerSite: number | null;
+    maxPlugins: number | null;
+    storageMb: number | null;
+    customDomainAllowed: boolean;
+    customDomainsPerSite: number;
+  }
+> = {
   name: "get_usage",
-  description: "Return the current plan, credit balance and usage limits.",
+  description: "Return the current plan, credit balance, website usage and resource limits.",
   schema: getUsageSchema,
   jsonSchema: JSON_SCHEMA_OBJECT,
   execute: async () => {
     const actor = await getAgentActor();
     if (!actor) return { ok: false, code: "AUTH", message: "Please sign in again." };
     const admin = createAdminClient();
-    const balance = await admin.rpc("ai_balance", { p_team: actor.teamId }).then((r) => {
-      const v = r.data && typeof r.data === "object" ? (r.data as Record<string, unknown>) : {};
-      return Number(v.total ?? 0);
-    });
-    const plan = planLimits(actor.planId);
+    const [resources, plan] = await Promise.all([
+      getAgentTeamResources(admin, actor.teamId, actor.planId),
+      Promise.resolve(planLimits(actor.planId)),
+    ]);
     return {
       ok: true,
       data: {
-        plan: actor.planId,
-        credits: balance,
+        plan: resources.planId,
+        planName: resources.planName,
+        credits: resources.credits,
         dailyActions: plan.aiDailyActions,
         monthlyCredits: plan.aiMonthlyCredits,
+        activeWebsites: resources.activeWebsites,
+        maxWebsites: resources.maxWebsites,
+        maxPagesPerSite: resources.maxPagesPerSite,
+        maxPlugins: resources.maxPlugins,
+        storageMb: resources.storageMb,
+        customDomainAllowed: resources.customDomainAllowed,
+        customDomainsPerSite: plan.customDomainsPerSite,
       },
     };
   },
@@ -540,9 +620,12 @@ export const getUsage: ToolExecutor<z.infer<typeof getUsageSchema>, { plan: stri
 
 export const listTemplatesSchema = z.object({});
 
-export const listTemplates: ToolExecutor<z.infer<typeof listTemplatesSchema>, { templates: Array<{ slug: string; name: string; businessType: string }> }> = {
+export const listTemplates: ToolExecutor<
+  z.infer<typeof listTemplatesSchema>,
+  { templates: Array<{ slug: string; name: string; businessType: string; planMin: string; available: boolean }> }
+> = {
   name: "list_templates",
-  description: "List available website templates by business type.",
+  description: "List available website templates by business type and whether they are included on the current plan.",
   schema: listTemplatesSchema,
   jsonSchema: JSON_SCHEMA_OBJECT,
   execute: async () => {
@@ -555,6 +638,8 @@ export const listTemplates: ToolExecutor<z.infer<typeof listTemplatesSchema>, { 
           slug: item.slug,
           name: item.name,
           businessType: item.category,
+          planMin: item.planMin,
+          available: templateAvailable(actor.planId, item.slug),
         })),
       },
     };
@@ -1004,6 +1089,10 @@ export const createPage: ToolExecutor<CreatePageInput, { page: { id: string; tit
     }
     const fields = input as CreatePageInput;
 
+    const admin = createAdminClient();
+    if (!(await verifyAgentProject(admin, actor.teamId, fields.projectId))) {
+      return { ok: false, code: "NOT_FOUND", message: "Website not found." };
+    }
     const supabase = await createClient();
     const plan = planLimits(actor.planId);
     const { count } = await supabase

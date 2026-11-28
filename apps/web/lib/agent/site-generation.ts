@@ -10,7 +10,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 import { planLimits } from "@/lib/team";
 import { normalizeAddress, validateAddress } from "@/lib/address";
-import { getQuota } from "@/lib/quotas";
+import { resolveEffectiveQuota } from "@/lib/quotas";
 import { templateAvailable, templateBySlug } from "@/lib/templates/catalog";
 import { parseDesignPrefs } from "@/lib/ai/design-prefs";
 import { fillTemplateTextWithAi } from "@/lib/ai/template-fill";
@@ -82,10 +82,8 @@ export async function validateSiteBrief(
     return { ok: false, code: "TEMPLATE_PLAN_REQUIRED" };
   }
 
-  const quota = await getQuota(actor.teamId);
-  const maxWebsites = quota?.max_websites ?? null;
-  const activeSites = Number(quota?.active_sites ?? 0);
-  if (maxWebsites !== null && activeSites >= maxWebsites) {
+  const quota = await resolveEffectiveQuota(admin, actor.teamId, actor.planId);
+  if (quota.max_websites !== null && quota.active_sites >= quota.max_websites) {
     return { ok: false, code: "LIMIT_WEBSITES_REACHED", upgrade_hint: "upgrade" };
   }
 

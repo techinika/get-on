@@ -21,7 +21,7 @@ import {
   designSummary,
 } from "@/lib/ai/wizard-design";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getQuota } from "@/lib/quotas";
+import { resolveEffectiveQuota } from "@/lib/quotas";
 import { logTeamActivity } from "@/lib/activity/log";
 
 export const maxDuration = 120;
@@ -73,8 +73,8 @@ export async function POST(request: Request) {
 
   const supabase = await createClient();
   const plan = planLimits(current.team.planId);
-  const quota = await getQuota(current.team.teamId);
-  if (quota && quota.max_websites !== null && quota.active_sites >= quota.max_websites) {
+  const quota = await resolveEffectiveQuota(supabase, current.team.teamId, current.team.planId);
+  if (quota.max_websites !== null && quota.active_sites >= quota.max_websites) {
     return NextResponse.json({ error: "LIMIT_WEBSITES_REACHED" }, { status: 403 });
   }
 

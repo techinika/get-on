@@ -184,6 +184,7 @@ export function CreateSiteFlow({
             address={address}
             setAddress={setAddress}
             templateName={templateName}
+            error={error}
             disabled={submitting}
             onSubmit={createPreview}
           />
@@ -208,6 +209,7 @@ function CreateSiteForm({
   address,
   setAddress,
   templateName,
+  error,
   disabled,
   onSubmit,
 }: {
@@ -216,11 +218,17 @@ function CreateSiteForm({
   address: string;
   setAddress: (value: string) => void;
   templateName: string;
+  error: string | null;
   disabled: boolean;
   onSubmit: () => void;
 }) {
   return (
     <div className="space-y-4">
+      {error ? (
+        <div role="alert" className="rounded-info bg-danger-soft p-3 text-sm text-danger-text">
+          {error}
+        </div>
+      ) : null}
       <p className="text-[15px] text-text-muted">
         Create a draft website for your business. Choose a name and a web
         address. It will not be published until you choose to publish it.

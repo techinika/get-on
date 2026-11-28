@@ -10,6 +10,7 @@ import {
   getAgentBalance,
   getAgentConversation,
   getAgentProjectContext,
+  getAgentTeamResources,
   startAgentRun,
 } from "@/lib/agent/conversations";
 import {
@@ -150,20 +151,28 @@ export async function POST(
     );
   }
 
-  const projectContext =
+  const [projectContext, teamResources] = await Promise.all([
     conversation.projectId
-      ? await getAgentProjectContext(
+      ? getAgentProjectContext(
           admin,
           actor.teamId,
           conversation.projectId,
         ).catch(() => null)
-      : null;
+      : Promise.resolve(null),
+    getAgentTeamResources(
+      admin,
+      actor.teamId,
+      actor.planId,
+      conversation.projectId,
+    ).catch(() => null),
+  ]);
 
   const baseContext: AgentPageContext = {
     route: "",
     pageTitle: conversation.title,
     projectName: projectContext?.projectName ?? conversation.title,
     teamName: actor.teamName,
+    projectId: conversation.projectId,
   };
   let context = normaliseAgentContext(parsed.data.context, baseContext);
   if (projectContext) {
@@ -171,6 +180,12 @@ export async function POST(
       ...context,
       ...projectContext,
       projectName: projectContext.projectName ?? context.projectName,
+    };
+  }
+  if (teamResources) {
+    context = {
+      ...context,
+      ...teamResources,
     };
   }
 
@@ -195,12 +210,7 @@ export async function POST(
         turnId: userMessage.id,
         timeoutMs: 48000,
         tools: Object.values(assistantTools),
-        context: {
-          route: context.route,
-          pageTitle: context.pageTitle,
-          projectName: context.projectName,
-          teamName: context.teamName,
-        },
+        context,
       });
 
       if (!result.ok) {
